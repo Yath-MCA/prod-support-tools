@@ -1,0 +1,1 @@
+"""CJK integrity checker package."""

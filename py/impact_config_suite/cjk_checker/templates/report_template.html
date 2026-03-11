@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CJK Integrity Report - {doc_id}</title>
+  <style>
+    :root {{
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --inserted: #1f9d55;
+      --deleted: #d64545;
+      --tracked-insert: #2563eb;
+      --tracked-delete: #d97706;
+      --untracked: #7c3aed;
+    }}
+    body {{ margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: var(--bg); color: var(--text); }}
+    .layout {{ display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }}
+    .sidebar {{ background: #0f172a; color: #e2e8f0; padding: 20px; position: sticky; top: 0; height: 100vh; box-sizing: border-box; }}
+    .sidebar h2 {{ margin: 0 0 16px; font-size: 18px; }}
+    .sidebar button {{ width: 100%; margin-bottom: 8px; padding: 10px; border: 0; border-radius: 6px; background: #1e293b; color: #e2e8f0; cursor: pointer; text-align: left; }}
+    .sidebar button:hover {{ background: #334155; }}
+    main {{ padding: 22px; }}
+    .card {{ background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }}
+    .hero {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }}
+    .hero-left {{ min-width: 280px; }}
+    .hero-kicker {{ color: var(--muted); font-size: 13px; margin: 0 0 4px; }}
+    .brand-strip {{ display: flex; gap: 12px; align-items: center; margin: 0; flex-wrap: wrap; justify-content: flex-end; }}
+    .brand-logo {{ max-height: 28px; width: auto; object-fit: contain; }}
+    .meta {{ display: flex; flex-direction: column; gap: 10px; }}
+    .meta-row {{ color: var(--muted); }}
+    .meta-label {{ display: block; font-weight: 600; color: var(--text); margin-bottom: 2px; }}
+    .meta-value {{ display: block; word-break: break-word; overflow-wrap: anywhere; }}
+    ul.summary {{ margin: 8px 0 0; padding-left: 20px; }}
+    table {{ width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); }}
+    th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
+    tr.data-row {{ cursor: pointer; }}
+    tr.detail-row {{ display: none; background: #f8fafc; }}
+    tr.ok td:last-child {{ color: #334155; }}
+    tr.inserted td:last-child {{ color: var(--inserted); font-weight: 600; }}
+    tr.deleted td:last-child {{ color: var(--deleted); font-weight: 600; }}
+    tr.tracked-insert td:last-child {{ color: var(--tracked-insert); font-weight: 600; }}
+    tr.tracked-delete td:last-child {{ color: var(--tracked-delete); font-weight: 600; }}
+    tr.untracked td:last-child {{ color: var(--untracked); font-weight: 700; }}
+    code {{ white-space: pre-wrap; word-break: break-word; }}
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Filter</h2>
+      <button onclick="applyFilter('All')">All</button>
+      <button onclick="applyFilter('Inserted')">Inserted</button>
+      <button onclick="applyFilter('Deleted')">Deleted</button>
+      <button onclick="applyFilter('Tracked Insert')">Tracked Insert</button>
+      <button onclick="applyFilter('Tracked Delete')">Tracked Delete</button>
+      <button onclick="applyFilter('Untracked Change')">Untracked</button>
+    </aside>
+    <main>
+      <section class="card">
+        <div class="hero">
+          <div class="hero-left">
+            <h1>CJK Integrity Report</h1>
+            <p class="hero-kicker">Brand verified report</p>
+          </div>
+          {brand_logos}
+        </div>
+        <div class="meta">
+          <div class="meta-row">
+            <span class="meta-label">Document ID</span>
+            <span class="meta-value">{doc_id}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Generated</span>
+            <span class="meta-value">{generated_at}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Original URL</span>
+            <span class="meta-value">{original_url}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Revised URL</span>
+            <span class="meta-value">{revised_url}</span>
+          </div>
+        </div>
+        <ul class="summary">{summary_items}</ul>
+      </section>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Element Path</th>
+            <th>Character Index</th>
+            <th>Original</th>
+            <th>Revised</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table_rows}
+        </tbody>
+      </table>
+    </main>
+  </div>
+
+  <script>
+    function applyFilter(status) {{
+      const rows = document.querySelectorAll('tbody tr');
+      rows.forEach((row) => {{
+        const rowStatus = row.getAttribute('data-status');
+        const show = status === 'All' || rowStatus === status;
+        row.style.display = show ? (row.classList.contains('detail-row') ? 'none' : '') : 'none';
+      }});
+    }}
+
+    document.querySelectorAll('tr.data-row').forEach((row) => {{
+      row.addEventListener('click', () => {{
+        const detail = row.nextElementSibling;
+        if (!detail || !detail.classList.contains('detail-row')) return;
+        detail.style.display = detail.style.display === 'table-row' ? 'none' : 'table-row';
+      }});
+    }});
+  </script>
+</body>
+</html>

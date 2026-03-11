@@ -1,0 +1,204 @@
+Name:              <module>
+Filename:          main.py
+Argument count:    0
+Positional-only arguments: 0
+Kw-only arguments: 0
+Number of locals:  0
+Stack size:        7
+Flags:             0x0
+Constants:
+   0: 0
+   1: None
+   2: ('ttk', 'messagebox')
+   3: ('ThemedTk',)
+   4: True
+   5: False
+   6: ('Image', 'ImageTk', 'ImageSequence')
+   7: ('XMLConfigEditor',)
+   8: ('ConfigToolsApp',)
+   9: ('AnalysesTab',)
+  10: ('PatternsTab',)
+  11: ('SearchTab',)
+  12: <code object ImpactConfigSuite at 0x0000015F91EC5330, file "main.py", line 22>
+  13: 'ImpactConfigSuite'
+  14: <code object main at 0x0000015F923BDBB0, file "main.py", line 169>
+  15: '__main__'
+Names:
+   0: tkinter
+   1: tk
+   2: ttk
+   3: messagebox
+   4: os
+   5: sys
+   6: path
+   7: append
+   8: dirname
+   9: abspath
+  10: __file__
+  11: ttkthemes
+  12: ThemedTk
+  13: HAS_THEMES
+  14: ImportError
+  15: PIL
+  16: Image
+  17: ImageTk
+  18: ImageSequence
+  19: editor_app
+  20: XMLConfigEditor
+  21: tools_app
+  22: ConfigToolsApp
+  23: analyses_tab
+  24: AnalysesTab
+  25: patterns_tab
+  26: PatternsTab
+  27: search_tab
+  28: SearchTab
+  29: ImpactConfigSuite
+  30: main
+  31: __name__
+
+   0           RESUME                   0
+
+   1           LOAD_CONST               0 (0)
+               LOAD_CONST               1 (None)
+               IMPORT_NAME              0 (tkinter)
+               STORE_NAME               1 (tk)
+
+   2           LOAD_CONST               0 (0)
+               LOAD_CONST               2 (('ttk', 'messagebox'))
+               IMPORT_NAME              0 (tkinter)
+               IMPORT_FROM              2 (ttk)
+               STORE_NAME               2 (ttk)
+               IMPORT_FROM              3 (messagebox)
+               STORE_NAME               3 (messagebox)
+               POP_TOP
+
+   3           LOAD_CONST               0 (0)
+               LOAD_CONST               1 (None)
+               IMPORT_NAME              4 (os)
+               STORE_NAME               4 (os)
+
+   4           LOAD_CONST               0 (0)
+               LOAD_CONST               1 (None)
+               IMPORT_NAME              5 (sys)
+               STORE_NAME               5 (sys)
+
+   7           LOAD_NAME                5 (sys)
+               LOAD_ATTR               12 (path)
+               LOAD_ATTR               15 (append + NULL|self)
+               LOAD_NAME                4 (os)
+               LOAD_ATTR               12 (path)
+               LOAD_ATTR               17 (dirname + NULL|self)
+               LOAD_NAME                4 (os)
+               LOAD_ATTR               12 (path)
+               LOAD_ATTR               19 (abspath + NULL|self)
+               LOAD_NAME               10 (__file__)
+               CALL                     1
+               CALL                     1
+               CALL                     1
+               POP_TOP
+
+   9           NOP
+
+  10   L1:     LOAD_CONST               0 (0)
+               LOAD_CONST               3 (('ThemedTk',))
+               IMPORT_NAME             11 (ttkthemes)
+               IMPORT_FROM             12 (ThemedTk)
+               STORE_NAME              12 (ThemedTk)
+               POP_TOP
+
+  11           LOAD_CONST               4 (True)
+               STORE_NAME              13 (HAS_THEMES)
+
+  15   L2:     LOAD_CONST               0 (0)
+               LOAD_CONST               6 (('Image', 'ImageTk', 'ImageSequence'))
+               IMPORT_NAME             15 (PIL)
+               IMPORT_FROM             16 (Image)
+               STORE_NAME              16 (Image)
+               IMPORT_FROM             17 (ImageTk)
+               STORE_NAME              17 (ImageTk)
+               IMPORT_FROM             18 (ImageSequence)
+               STORE_NAME              18 (ImageSequence)
+               POP_TOP
+
+  16           LOAD_CONST               0 (0)
+               LOAD_CONST               7 (('XMLConfigEditor',))
+               IMPORT_NAME             19 (editor_app)
+               IMPORT_FROM             20 (XMLConfigEditor)
+               STORE_NAME              20 (XMLConfigEditor)
+               POP_TOP
+
+  17           LOAD_CONST               0 (0)
+               LOAD_CONST               8 (('ConfigToolsApp',))
+               IMPORT_NAME             21 (tools_app)
+               IMPORT_FROM             22 (ConfigToolsApp)
+               STORE_NAME              22 (ConfigToolsApp)
+               POP_TOP
+
+  18           LOAD_CONST               0 (0)
+               LOAD_CONST               9 (('AnalysesTab',))
+               IMPORT_NAME             23 (analyses_tab)
+               IMPORT_FROM             24 (AnalysesTab)
+               STORE_NAME              24 (AnalysesTab)
+               POP_TOP
+
+  19           LOAD_CONST               0 (0)
+               LOAD_CONST              10 (('PatternsTab',))
+               IMPORT_NAME             25 (patterns_tab)
+               IMPORT_FROM             26 (PatternsTab)
+               STORE_NAME              26 (PatternsTab)
+               POP_TOP
+
+  20           LOAD_CONST               0 (0)
+               LOAD_CONST              11 (('SearchTab',))
+               IMPORT_NAME             27 (search_tab)
+               IMPORT_FROM             28 (SearchTab)
+               STORE_NAME              28 (SearchTab)
+               POP_TOP
+
+  22           LOAD_BUILD_CLASS
+               PUSH_NULL
+               LOAD_CONST              12 (<code object ImpactConfigSuite at 0x0000015F91EC5330, file "main.py", line 22>)
+               MAKE_FUNCTION
+               LOAD_CONST              13 ('ImpactConfigSuite')
+               CALL                     2
+               STORE_NAME              29 (ImpactConfigSuite)
+
+ 169           LOAD_CONST              14 (<code object main at 0x0000015F923BDBB0, file "main.py", line 169>)
+               MAKE_FUNCTION
+               STORE_NAME              30 (main)
+
+ 179           LOAD_NAME               31 (__name__)
+               LOAD_CONST              15 ('__main__')
+               COMPARE_OP              88 (bool(==))
+               POP_JUMP_IF_FALSE        8 (to L3)
+
+ 180           LOAD_NAME               30 (main)
+               PUSH_NULL
+               CALL                     0
+               POP_TOP
+               RETURN_CONST             1 (None)
+
+ 179   L3:     RETURN_CONST             1 (None)
+
+  --   L4:     PUSH_EXC_INFO
+
+  12           LOAD_NAME               14 (ImportError)
+               CHECK_EXC_MATCH
+               POP_JUMP_IF_FALSE        5 (to L6)
+               POP_TOP
+
+  13           LOAD_CONST               5 (False)
+               STORE_NAME              13 (HAS_THEMES)
+       L5:     POP_EXCEPT
+               JUMP_BACKWARD_NO_INTERRUPT 78 (to L2)
+
+  12   L6:     RERAISE                  0
+
+  --   L7:     COPY                     3
+               POP_EXCEPT
+               RERAISE                  1
+ExceptionTable:
+  L1 to L2 -> L4 [0]
+  L4 to L5 -> L7 [1] lasti
+  L6 to L7 -> L7 [1] lasti

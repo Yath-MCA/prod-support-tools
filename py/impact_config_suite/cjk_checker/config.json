@@ -1,0 +1,22 @@
+{
+  "timeout": 30,
+  "domains": {
+    "PROD": {
+      "original_url": "https://impactonlinebackend.newgen.co/{original_doc_path}",
+      "revised_url": "https://impactonlinebackend.newgen.co/{revised_doc_path}"
+    },
+    "UAT": {
+      "original_url": "https://impactonlinebackend-uat.newgen.co/{original_doc_path}",
+      "revised_url": "https://impactonlinebackend-uat.newgen.co/{revised_doc_path}"
+    },
+    "LOCAL": {
+      "original_url": "http://localhost/api/original/{original_doc_path}",
+      "revised_url": "http://localhost/api/{revised_doc_path}"
+    },
+    "DEV": {
+      "original_url": "https://impactonlinebackend-dev.newgen.co/{original_doc_path}",
+      "revised_url": "https://impactonlinebackend-dev.newgen.co/{revised_doc_path}"
+    }
+  },
+  "default_domain": "UAT"
+}

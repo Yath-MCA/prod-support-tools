@@ -1,0 +1,62 @@
+{
+  "data": [],
+  "patterns": {
+    "ref_numbered": {},
+    "ref_unnumbered": {},
+    "ref_footnote": {},
+    "figtab": {},
+    "partlab_figure": {},
+    "partlab_table": {},
+    "ref_numbered_mapping": {},
+    "ref_unnumbered_mapping": {},
+    "ref_footnote_mapping": {},
+    "figtab_mapping": {},
+    "partlab_figure_mapping": {},
+    "partlab_table_mapping": {},
+    "journal_info": {}
+  },
+  "percentage_stats": {
+    "ref_numbered": {
+      "total": 0,
+      "max_match": 0,
+      "max_pct": 0.0,
+      "patterns": []
+    },
+    "ref_unnumbered": {
+      "total": 0,
+      "max_match": 0,
+      "max_pct": 0.0,
+      "patterns": []
+    },
+    "ref_footnote": {
+      "total": 0,
+      "max_match": 0,
+      "max_pct": 0.0,
+      "patterns": []
+    },
+    "figtab": {
+      "total": 0,
+      "max_match": 0,
+      "max_pct": 0.0,
+      "patterns": []
+    },
+    "partlab_figure": {
+      "total": 0,
+      "max_match": 0,
+      "max_pct": 0.0,
+      "patterns": []
+    },
+    "partlab_table": {
+      "total": 0,
+      "max_match": 0,
+      "max_pct": 0.0,
+      "patterns": []
+    },
+    "summary": {
+      "total_ref": 0,
+      "total_figtab": 0,
+      "total_partlab": 0,
+      "grand_total": 0
+    }
+  }
+}

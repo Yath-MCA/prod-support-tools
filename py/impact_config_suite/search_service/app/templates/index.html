@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Advanced file search system with real-time results and smart filtering">
+    <title>IMPACT Search - Advanced File Discovery</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <!-- Background Elements -->
+    <div class="particles-bg"></div>
+    <div class="gradient-orb orb-1"></div>
+    <div class="gradient-orb orb-2"></div>
+    <div class="gradient-orb orb-3"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-search-location"></i>
+                    <h1>IMPACT Search</h1>
+                </div>
+                <nav class="nav">
+                    <a href="#" class="nav-link active">
+                        <i class="fas fa-search"></i> Search
+                    </a>
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-history"></i> Recent
+                    </a>
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Search Section -->
+            <section class="search-section">
+                <div class="search-header">
+                    <h2 class="section-title">Discover Files Instantly</h2>
+                    <p class="section-subtitle">Search across millions of documents with powerful filters and real-time
+                        results</p>
+                </div>
+
+                <!-- Fetch Documents Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <i class="fas fa-download"></i>
+                        <h3>Fetch Documents</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="rootFolderInput">
+                                Root Folder Path
+                                <small class="hint" style="display: inline; margin: 0;">(Leave empty to use default:
+                                    D:\IMPACT)</small>
+                            </label>
+                            <input type="text" id="rootFolderInput" class="input-field"
+                                placeholder="e.g., D:\CUSTOM_FOLDER (optional)">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dateFilter">Filter by Date</label>
+                            <div class="input-group">
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="dateType" value="days" checked>
+                                        <span>Last N Days</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="dateType" value="specific">
+                                        <span>Specific Date</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" id="daysGroup">
+                                <label for="daysInput">Number of Days</label>
+                                <input type="number" id="daysInput" class="input-field" value="7" min="1" max="365">
+                            </div>
+                            <div class="form-group hidden" id="dateGroup">
+                                <label for="dateInput">Date (YYYY-MM-DD)</label>
+                                <input type="date" id="dateInput" class="input-field">
+                            </div>
+                        </div>
+
+                        <button id="fetchBtn" class="btn btn-primary">
+                            <i class="fas fa-cloud-download-alt"></i>
+                            Fetch Documents
+                        </button>
+                    </div>
+
+                    <!-- Fetch Results -->
+                    <div id="fetchResults" class="results-container hidden">
+                        <div class="results-header">
+                            <h4>Generated Batches</h4>
+                            <span class="badge" id="batchCount">0</span>
+                        </div>
+                        <div id="batchList" class="batch-list"></div>
+                    </div>
+                </div>
+
+                <!-- Copy Files Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <i class="fas fa-copy"></i>
+                        <h3>Copy Batch Files</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="batchFileInput">Batch File Path</label>
+                            <input type="text" id="batchFileInput" class="input-field"
+                                placeholder="e.g., D:\SEARCH_API\BATCH_LISTS_...\1_250.txt">
+                        </div>
+                        <button id="copyBtn" class="btn btn-primary">
+                            <i class="fas fa-copy"></i>
+                            Copy Files
+                        </button>
+                    </div>
+
+                    <!-- Copy Results -->
+                    <div id="copyResults" class="results-container hidden">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <i class="fas fa-check-circle"></i>
+                                <div class="stat-value" id="copiedCount">0</div>
+                                <div class="stat-label">Copied</div>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-times-circle"></i>
+                                <div class="stat-value" id="skippedCount">0</div>
+                                <div class="stat-label">Skipped</div>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-folder"></i>
+                                <div class="stat-value" id="totalCount">0</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                        </div>
+                        <div class="destination-path">
+                            <strong>Destination:</strong> <span id="destPath"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <i class="fas fa-search"></i>
+                        <h3>Search in Batch</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="batchFolderInput">Batch Folder Path</label>
+                            <input type="text" id="batchFolderInput" class="input-field"
+                                placeholder="e.g., D:\SEARCH_API\BATCH_LISTS_...\BK_FILES\1_250">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="searchTermsInput">Search Terms (one per line)</label>
+                            <textarea id="searchTermsInput" class="input-field textarea" rows="4"
+                                placeholder="Enter search terms..."></textarea>
+                            <small class="hint">Tip: Add multiple terms to find all matches</small>
+                        </div>
+
+                        <button id="searchBtn" class="btn btn-primary btn-large">
+                            <i class="fas fa-search"></i>
+                            Search Now
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Results -->
+                <div id="searchResults" class="card glass-card hidden">
+                    <div class="card-header">
+                        <i class="fas fa-list"></i>
+                        <h3>Search Results</h3>
+                        <span class="badge" id="resultCount">0</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>Document ID</th>
+                                        <th>Client</th>
+                                        <th>File ID</th>
+                                        <th>Emails</th>
+                                        <th>Found Terms</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultsTableBody">
+                                    <!-- Results will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination" id="pagination">
+                            <!-- Pagination will be added dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p>Processing your request...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Custom JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

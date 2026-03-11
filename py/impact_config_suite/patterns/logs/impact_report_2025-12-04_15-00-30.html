@@ -1,0 +1,353 @@
+<html><head><meta charset=utf-8><title>Report</title>
+<style>body{font-family:Arial}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px}th{background:#eee}.client{border:1px solid #ccc;margin:10px;padding:10px}.pattern{display:inline-block;padding:4px 8px;background:#eef;margin:4px;cursor:pointer}</style>
+<script>
+function upd(){let t=document.querySelector('input[name=t]:checked').value;let dd=document.getElementById('c');dd.innerHTML='';let arr=[];if(t=='journals')arr=JSON.parse(dd.dataset.j);else if(t=='books')arr=JSON.parse(dd.dataset.b);else arr=JSON.parse(dd.dataset.a);let o=document.createElement('option');o.value='all';o.text='All';dd.append(o);arr.forEach(x=>{let z=document.createElement('option');z.value=x;z.text=x;dd.append(z)});flt();}
+function flt(pf){let t=document.querySelector('input[name=t]:checked').value;let c=document.getElementById('c').value;document.querySelectorAll('.client').forEach(b=>{let bt=b.dataset.type,bc=b.dataset.client,bp=b.dataset.pattern;let ok=(t=='all'||t==bt)&&(c=='all'||c==bc)&&(!pf||pf==bp);b.style.display=ok?'block':'none';});}
+function sp(p){document.getElementById('c').value='all';document.querySelector('input[value=all]').checked=true;flt(p);}
+</script></head><body>
+<h1>Report 2025-12-04_15-00-30</h1>
+<div><label><input type=radio name=t value=all checked onclick=upd()>All</label>
+<label><input type=radio name=t value=journals onclick=upd()>Journals</label>
+<label><input type=radio name=t value=books onclick=upd()>Books</label>
+<select id=c onchange=flt() data-j='["ACS", "BRILL", "INTELLECT", "LWW", "MEDKNOW", "NIHR", "OUP", "PLOS", "SANDBOX", "TNFJOURNALS"]' data-b='["OHO", "OSO", "TNF"]' data-a='["ACS", "BRILL", "INTELLECT", "LWW", "MEDKNOW", "NIHR", "OHO", "OSO", "OUP", "PLOS", "SANDBOX", "TNF", "TNFJOURNALS"]'><option value=all>All</option><option>ACS</option><option>BRILL</option><option>INTELLECT</option><option>LWW</option><option>MEDKNOW</option><option>NIHR</option><option>OHO</option><option>OSO</option><option>OUP</option><option>PLOS</option><option>SANDBOX</option><option>TNF</option><option>TNFJOURNALS</option></select></div>
+<h3>Patterns</h3>
+<span class=pattern onclick=sp('pattern_1')>pattern_1 (23)</span> 
+<span class=pattern onclick=sp('pattern_2')>pattern_2 (117)</span> 
+<span class=pattern onclick=sp('pattern_3')>pattern_3 (40)</span> 
+<span class=pattern onclick=sp('pattern_4')>pattern_4 (16)</span> 
+<span class=pattern onclick=sp('pattern_5')>pattern_5 (31)</span> 
+<span class=pattern onclick=sp('pattern_6')>pattern_6 (10)</span> 
+<span class=pattern onclick=sp('pattern_7')>pattern_7 (8)</span> 
+<span class=pattern onclick=sp('pattern_8')>pattern_8 (9)</span> 
+<span class=pattern onclick=sp('pattern_9')>pattern_9 (1)</span> 
+<span class=pattern onclick=sp('pattern_10')>pattern_10 (1)</span> 
+<span class=pattern onclick=sp('pattern_11')>pattern_11 (1)</span> 
+<span class=pattern onclick=sp('pattern_12')>pattern_12 (1)</span> 
+<span class=pattern onclick=sp('pattern_13')>pattern_13 (1)</span> 
+<span class=pattern onclick=sp('pattern_14')>pattern_14 (1)</span> 
+<span class=pattern onclick=sp('pattern_15')>pattern_15 (4)</span> 
+<span class=pattern onclick=sp('pattern_16')>pattern_16 (1)</span> 
+<span class=pattern onclick=sp('pattern_17')>pattern_17 (1)</span> 
+<span class=pattern onclick=sp('pattern_18')>pattern_18 (1)</span> 
+<span class=pattern onclick=sp('pattern_19')>pattern_19 (3)</span> 
+<span class=pattern onclick=sp('pattern_20')>pattern_20 (1)</span> 
+<span class=pattern onclick=sp('pattern_21')>pattern_21 (1)</span> 
+<span class=pattern onclick=sp('pattern_22')>pattern_22 (1)</span> 
+<span class=pattern onclick=sp('pattern_23')>pattern_23 (78)</span> 
+<span class=pattern onclick=sp('pattern_24')>pattern_24 (5)</span> 
+<span class=pattern onclick=sp('pattern_25')>pattern_25 (2)</span> 
+<span class=pattern onclick=sp('pattern_26')>pattern_26 (1)</span> 
+<span class=pattern onclick=sp('pattern_27')>pattern_27 (16)</span> 
+<span class=pattern onclick=sp('pattern_28')>pattern_28 (3)</span> 
+<span class=pattern onclick=sp('pattern_29')>pattern_29 (2)</span> 
+<span class=pattern onclick=sp('pattern_30')>pattern_30 (1)</span> 
+<span class=pattern onclick=sp('pattern_31')>pattern_31 (1)</span> 
+<span class=pattern onclick=sp('pattern_32')>pattern_32 (9)</span> 
+<span class=pattern onclick=sp('pattern_33')>pattern_33 (1)</span> 
+<span class=pattern onclick=sp('pattern_34')>pattern_34 (1)</span> 
+<span class=pattern onclick=sp('pattern_35')>pattern_35 (14)</span> 
+<span class=pattern onclick=sp('pattern_36')>pattern_36 (3)</span> 
+<div class=client data-type=books data-client=OHO data-pattern=><h2>OHO - books</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\books\oho\config.xml</p>
+<div class=client data-type=books data-client=OSO data-pattern=><h2>OSO - books</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\books\oso\config.xml</p>
+<div class=client data-type=books data-client=TNF data-pattern=><h2>TNF - books</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\books\tnf\config.xml</p>
+<div class=client data-type=journals data-client=ACS data-pattern=><h2>ACS - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\acs\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>JCIM</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>JCIM</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>JCIM</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>JCIM</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>JCIM</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>JCIM</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>JCIM</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>JCIM</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>JCIM</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>JCIM</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>JCIM</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>JCIM</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>sup</td><td>JCIM</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>JCIM</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>JCIM</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>JCIM</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>JCIM</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=BRILL data-pattern=><h2>BRILL - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\brill\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>PUAN</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>PUAN</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>PUAN</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>PUAN</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>PUAN</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>PUAN</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>PUAN</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>PUAN</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>PUAN</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>PUAN</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>PUAN</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>PUAN</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>PUAN</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=INTELLECT data-pattern=><h2>INTELLECT - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\intellect\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>AJR, EJAC, FSPC, IJFD, JGS, JMTE, JWCP, VI</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=LWW data-pattern=><h2>LWW - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\lww\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>and</td><td>ACD, ACI, AH9, ALN, ANE, ATV, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, DCR, EDE, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, ST9, STR, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>AS9, AUD, CRD, CU9, EE9, HCR, NEP, SK9, TJX, TPA, TXD</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>ACD, ACI, AH9, ALN, ANE, AS9, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HCO, HCR, HD9, HJH, HM9, HP, HPC, HRP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, SHK, ST9, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>through</td><td>ATV, CIR, HAE, HCG, HCI, HCQ, HCV, HHF, HYP, RES, SK9, STR</td></tr>
+<tr><td>Figure.dircite.openwrap</td><td>(</td><td>HCR</td></tr>
+<tr><td>Figure.dircite.closewrap</td><td>)</td><td>HCR</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>and</td><td>ACD, ACI, AH9, ALN, ANE, ATV, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, DCR, EDE, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, ST9, STR, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>AS9, AUD, CRD, CU9, EE9, HCR, MAT, NEP, SK9, TJX, TPA</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>ACD, ACI, AH9, ALN, ANE, AS9, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HCO, HCR, HD9, HJH, HM9, HP, HPC, HRP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, SHK, ST9, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>through</td><td>ATV, CIR, HAE, HCG, HCI, HCQ, HCV, HHF, HYP, RES, SK9, STR</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>and</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>ACD, ACI, AH9, ALN, ANE, AS9, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCO, HCR, HD9, HJH, HM9, HP, HPC, HRP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, SHK, ST9, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>to</td><td>AUD</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>through</td><td>ATV, CIR, HCG, HCI, HCQ, HCV, HHF, HYP, RES, SK9, STR</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>and</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>ACD, ACI, AH9, ALN, ANE, AS9, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCO, HCR, HD9, HJH, HM9, HP, HPC, HRP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, SHK, ST9, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>to</td><td>AUD</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>through</td><td>ATV, CIR, HCG, HCI, HCQ, HCV, HHF, HYP, RES, SK9, STR</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, AUD, BC9, BOR, BPHARM, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CD, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJCP, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HP, HPC, HRP, HYP, IA9, ICP, ICU, IJRR, IM9, IN9, INF, IOP, JAN, JCM, JCN, JD9, JDN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NEP, NJH, NMC, NR, ON9, OPX, PA9, PCC, PG, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>ACD, ACI, AUD, BOR, BPHARM, BPMJ, CAD, CAEN, CCM, CCO, CCX, CD, CO9, COAN, COH, COOG, EJCP, EJEM, EM9, FIT, HCO, HJH, HP, ICP, ICU, IJRR, IM9, JAN, JDN, JES, JPOB, MBC, MCC, MCO, MCP, MED, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NEP, NMC, NR, ON9, PA9, PCC, PG, PGEN, PXH, QAD, QCO, SHK, WCO, YCO</td></tr>
+<tr><td>Reference.text-format</td><td>sup</td><td>AH9, ALN, ANE, AS9, ATV, BC9, BR9, BS9, CA9, CIR, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, FAD, FS9, GOX, HAE, HCG, HCI, HCQ, HCR, HCV, HD9, HHF, HM9, HPC, HRP, HYP, IA9, IN9, INF, IOP, JCM, JCN, JD9, JMQ, JP9, JV9, JW9, MAT, MD, MD9, MM9, NCC, NJH, OPX, PN9, PQS, PRS, RD9, RE9, RES, SK9, ST9, STR, TJX, TPA, TXD, US9, XAA, XCS, XEB</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, BC9, BOR, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HPC, HRP, HYP, IA9, ICU, IJRR, IM9, IN9, INF, IOP, JCM, JCN, JD9, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NJH, NMC, NR, ON9, OPX, PA9, PCC, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, BC9, BOR, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HPC, HRP, HYP, IA9, ICU, IJRR, IM9, IN9, INF, IOP, JCM, JCN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NJH, NMC, NR, ON9, OPX, PA9, PCC, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>-</td><td>JD9</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>â€“</td><td>SK9</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>[</td><td>ACD, ACI, AH9, BC9, BOR, BPMJ, BR9, CAD, CAEN, CCO, CO9, COAN, COH, COOG, CP9, CU9, EH9, EJEM, EJGH, FS9, HCO, HJH, HM9, ICU, IJRR, IN9, JP9, JPOB, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, NMC, NR, PA9, PGEN, PN9, PXH, QAD, QCO, RD9, RE9, ST9, WCO, YCO</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>(</td><td>CCM, CCX, EM9, FIT, JES, MSS, ON9, PCC, SHK, TJX</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>]</td><td>ACD, ACI, AH9, BC9, BOR, BPMJ, BR9, CAD, CAEN, CCO, CO9, COAN, COH, COOG, CP9, CU9, EH9, EJEM, EJGH, FS9, HCO, HJH, HM9, ICU, IJRR, IN9, JP9, JPOB, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, NMC, NR, PA9, PGEN, PN9, PXH, QAD, QCO, RD9, RE9, ST9, WCO, YCO</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>)</td><td>CCM, CCX, EM9, FIT, JES, MSS, ON9, PCC, SHK, TJX</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, BC9, BOR, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HPC, HRP, HYP, IA9, ICU, IJRR, IM9, IN9, INF, IOP, JCM, JCN, JD9, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NJH, NMC, NR, ON9, OPX, PA9, PCC, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, SK9, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>ACD, ACI, AH9, ALN, ANE, AS9, ATV, BC9, BOR, BPMJ, BR9, BS9, CA9, CAD, CAEN, CCM, CCO, CCX, CIR, CO9, COAN, COH, COOG, CP9, CR9, CRD, CU9, DCR, EDE, EE9, EH9, EJA, EJAIC, EJEM, EJGH, EM9, FAD, FIT, FS9, GOX, HAE, HCG, HCI, HCO, HCQ, HCR, HCV, HD9, HHF, HJH, HM9, HPC, HRP, HYP, IA9, ICU, IJRR, IM9, IN9, INF, IOP, JCM, JCN, JES, JMQ, JP9, JPOB, JV9, JW9, MAT, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, MSS, NCC, NJH, NMC, NR, ON9, OPX, PA9, PCC, PGEN, PN9, PQS, PRS, PXH, QAD, QCO, RD9, RE9, RES, SHK, ST9, STR, TJX, TPA, TXD, US9, WCO, XAA, XCS, XEB, YCO</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>-</td><td>JD9</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>â€“</td><td>SK9</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>[</td><td>ACD, ACI, AH9, BC9, BOR, BPMJ, BR9, CAD, CAEN, CCO, CO9, COAN, COH, COOG, CP9, CU9, EH9, EJEM, EJGH, FS9, HCO, HJH, HM9, ICU, IJRR, IN9, JP9, JPOB, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, NMC, NR, PA9, PGEN, PN9, PXH, QAD, QCO, RD9, RE9, ST9, WCO, YCO</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>(</td><td>CCM, CCX, EM9, FIT, JES, MSS, ON9, PCC, SHK, TJX</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>]</td><td>ACD, ACI, AH9, BC9, BOR, BPMJ, BR9, CAD, CAEN, CCO, CO9, COAN, COH, COOG, CP9, CU9, EH9, EJEM, EJGH, FS9, HCO, HJH, HM9, ICU, IJRR, IN9, JP9, JPOB, MBC, MCC, MCO, MCP, MD, MD9, MED, MM9, MNH, MOG, MOH, MOL, MOO, MOP, MOT, MOU, MR, MRM, NMC, NR, PA9, PGEN, PN9, PXH, QAD, QCO, RD9, RE9, ST9, WCO, YCO</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>)</td><td>CCM, CCX, EM9, FIT, JES, MSS, ON9, PCC, SHK, TJX</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=MEDKNOW data-pattern=><h2>MEDKNOW - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\medknow\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>JMCU, JWAS</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>[</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>JMCU, JWAS</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>]</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>JMCU, JWAS</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>[</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>JMCU, JWAS</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>]</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JOSH, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>sup</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>JOSH</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>[</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>]</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOMS, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>[</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>]</td><td>ACCR, AJEM, AJIM, AJRGE, AMAS, AMJM, AMSR, AOHN, AOMD, AORA, BGJ, BJEM, BJOA, BJOC, DYPJ, EHSJ, EJRJ, EYEQuest, HFJI, HJHS, HJOP, ICRS, IJDD, IJEMCR, IJHR, IJMH, IJNO, IJORS, IJRU, IJYN, INJO, INSJ, JAHAS, JASU, JBJD, JCDM, JCOS, JDRA, JIMH, JIMP, JIOH, JISPCD, JLV, JMCU, JMSO, JMUPM, JNAM, JOASIS, JOCY, JODB, JOMM, JOPN, JOPP, JOPS, JOR, JPBI, JRAS, JRSM, JSIP, JSPF, JTOS, JUOA, JWAS, KHJ, MGMJ, MJBL, MLDN, MTSP, NJCT, NJOM, NJVD, PEDC, PNJB, PRCM, RHAW, RRPE, SJCP, SJOB, TOPH, TUMJ</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=NIHR data-pattern=><h2>NIHR - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\nihr\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>sup</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>EME, GHR, HSDR, HTA, PGfAR, PHR</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=OUP data-pattern=><h2>OUP - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\oup\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>-</td><td>AMJHSP, ARBINT</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>-</td><td>AMJHSP, ARBINT</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>[</td><td>ECCOJC</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>]</td><td>ECCOJC</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>ABMEDI, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Table.dircite.double_sep</td><td>and</td><td>EVOLIN, THEOLJ</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>-</td><td>AMJHSP</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>ABMEDI, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>and</td><td>EVOLIN, THEOLJ</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECCOJC, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>-</td><td>AMJHSP</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>[</td><td>ECCOJC</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, AJCPAT, AJHYPE, ALECON, AMJHSP, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CROCOL, CWWRIT, CZOOLO, DESIGN, DISCIM, DNARES, EARLYJ, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FAMPRJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IBDJNL, IJCLAW, IJNPPY, IJPPHA, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBCRES, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPHSRE, JPIDSJ, JPORGA, JPPHAR, JVCULT, LABMED, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, STCLTM, STMCLS, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>]</td><td>ECCOJC</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>ABMEDI, ADAPTA, AESAME, AESTHJ, AJCLAW, ALECON, AMTEST, ANALYS, ANFRON, ANNBOT, ANNWEH, AOBPLA, APPLIJ, ARBINT, ARISOC, ARISUP, AUKJNL, BEHECO, BICSTU, BIOLIN, BOTLIN, CAMECO, CAMRES, CARCIN, CHEMSE, CHRIBI, CLEANE, CLEXIM, CLINID, CLPROB, CLRECJ, CONDOR, CRIMIN, CWWRIT, CZOOLO, DESIGN, DISCIM, EARLYJ, ECOPOL, EJILAW, EMPHEA, ENGHIS, ENVENT, ENVLAW, EORTHO, ESCRIT, EURSOJ, EVLETT, EVOLIN, EVOLUT, EXBOTJ, FORSCI, FQSAFE, FREBUL, FRENCH, FRESTU, GERHIS, GERONA, GERONB, GERONI_AMA, GERONI_APA, GERONT, GRUINT, HEAPRO, HISCOL, HISRES, IJCLAW, IMMADV, INDLAW, INFDIS, INSILC, INTIMM, INTPOR, INTTEC, ISDIVE, JAAREL, JALSCI, JANSCI, JBREIM, JCAGAS, JCBIOL, JEENTO, JEVBIO, JHERED, JHINDU, JHUMAN, JIPMAN, JISESA, JLAJ, JMAMMA, JMENTO, JMPHIL, JMTHER, JOAAAC, JOFORE, JOLEVO, JOPART, JPECOL, JPORGA, JPPHAR, JVCULT, LEXICO, LIFMED, LIFMET, LITMAG, LITTHE, MELUSJ, MODJUD, MONIST, MSPECI, MTPERS, MTSPEC, MUTAGE, OCCMED, OFIDIS, OXJLSJ, PARLIJ, PCHEAL, PETHIC, POLICE, PPAREP, PPMGOV, PROCEL, REFLAW, SLEEPJ, SLEEPO, SOCHIS, SOCPRO, SOCREL, SSJAPJ, STALAW, SYSBIO, TBMEDI, THEOLJ, TRANAS, WHQUAR, WORKAR, ZOOLIN</td></tr>
+<tr><td>Reference.text-format</td><td>sup</td><td>AJCPAT, AJHYPE, AMJHSP, CROCOL, DNARES, ECCOJC, FAMPRJ, IBDJNL, IJNPPY, IJPPHA, JBCRES, JPHSRE, JPIDSJ, LABMED, NEUONC, NICTOB, NOAJNL, NOPRAC, ONCOLO, RPSPPR, SBOPEN, SCHBUL, STCLTM, STMCLS</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>ABMEDI, AJCPAT, AJHYPE, AMJHSP, CARCIN, CLEANE, CLEXIM, CLINID, CROCOL, DISCIM, DNARES, ECCOJC, EMPHEA, EORTHO, FAMPRJ, GERONA, GERONI_AMA, IBDJNL, IJPPHA, IMMADV, INFDIS, INTIMM, JBCRES, JBREIM, JCAGAS, JPHSRE, JPIDSJ, JPPHAR, LABMED, LIFMED, LIFMET, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, ONCOLO, PCHEAL, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, STCLTM, STMCLS, TBMEDI</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>ABMEDI, AJHYPE, AMJHSP, CARCIN, CLEANE, CLEXIM, CLINID, CROCOL, DISCIM, DNARES, ECCOJC, EMPHEA, EORTHO, FAMPRJ, GERONA, GERONI_AMA, IBDJNL, IJNPPY, IJPPHA, IMMADV, INFDIS, INTIMM, JBCRES, JBREIM, JCAGAS, JPHSRE, JPIDSJ, JPPHAR, LIFMED, LIFMET, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, PCHEAL, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, STCLTM, STMCLS, TBMEDI</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>-</td><td>AJCPAT, LABMED</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>[</td><td>ABMEDI, CLEANE, CLEXIM, CLINID, DISCIM, EMPHEA, IJPPHA, IMMADV, INFDIS, JPHSRE, JPPHAR, LIFMED, LIFMET, MUTAGE, OCCMED, OFIDIS, RPSPPR, SLEEPJ, SLEEPO, TBMEDI</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>(</td><td>CARCIN, EORTHO, GERONA, GERONI_AMA, INTIMM, JBREIM, JCAGAS, PCHEAL</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>]</td><td>ABMEDI, CLEANE, CLEXIM, CLINID, DISCIM, EMPHEA, IJPPHA, IMMADV, INFDIS, JPHSRE, JPPHAR, LIFMED, LIFMET, MUTAGE, OCCMED, OFIDIS, RPSPPR, SLEEPJ, SLEEPO, TBMEDI</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>)</td><td>CARCIN, EORTHO, GERONA, GERONI_AMA, INTIMM, JBREIM, JCAGAS, PCHEAL</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>ABMEDI, AJCPAT, AJHYPE, AMJHSP, CARCIN, CLEANE, CLEXIM, CLINID, CROCOL, DISCIM, DNARES, ECCOJC, EMPHEA, EORTHO, FAMPRJ, GERONA, GERONI_AMA, IBDJNL, IJPPHA, IMMADV, INFDIS, INTIMM, JBCRES, JBREIM, JCAGAS, JPHSRE, JPIDSJ, JPPHAR, LABMED, LIFMED, LIFMET, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, ONCOLO, PCHEAL, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, STCLTM, STMCLS, TBMEDI</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>ABMEDI, AJHYPE, AMJHSP, CARCIN, CLEANE, CLEXIM, CLINID, CROCOL, DISCIM, DNARES, ECCOJC, EMPHEA, EORTHO, FAMPRJ, GERONA, GERONI_AMA, IBDJNL, IJNPPY, IJPPHA, IMMADV, INFDIS, INTIMM, JBCRES, JBREIM, JCAGAS, JPHSRE, JPIDSJ, JPPHAR, LIFMED, LIFMET, MUTAGE, NEUONC, NICTOB, NOAJNL, NOPRAC, OCCMED, OFIDIS, ONCOLO, PCHEAL, RPSPPR, SBOPEN, SCHBUL, SLEEPJ, SLEEPO, STCLTM, STMCLS, TBMEDI</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>-</td><td>AJCPAT, LABMED</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>[</td><td>ABMEDI, CLEANE, CLEXIM, CLINID, DISCIM, EMPHEA, IJPPHA, IMMADV, INFDIS, JPHSRE, JPPHAR, LIFMED, LIFMET, MUTAGE, OCCMED, OFIDIS, RPSPPR, SLEEPJ, SLEEPO, TBMEDI</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>(</td><td>CARCIN, EORTHO, GERONA, GERONI_AMA, INTIMM, JBREIM, JCAGAS, PCHEAL</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>]</td><td>ABMEDI, CLEANE, CLEXIM, CLINID, DISCIM, EMPHEA, IJPPHA, IMMADV, INFDIS, JPHSRE, JPPHAR, LIFMED, LIFMET, MUTAGE, OCCMED, OFIDIS, RPSPPR, SLEEPJ, SLEEPO, TBMEDI</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>)</td><td>CARCIN, EORTHO, GERONA, GERONI_AMA, INTIMM, JBREIM, JCAGAS, PCHEAL</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=PLOS data-pattern=><h2>PLOS - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\plos\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>[</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>]</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>[</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>]</td><td>PBIO, PCBI, PCLM, PCSY, PDIG, PGEN, PGPH, PMED, PMEN, PNTD, PONE, PPAT, PSTR, PWAT</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=SANDBOX data-pattern=><h2>SANDBOX - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\sandbox\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>AJP, FOCUS, STL</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>AJP</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>to</td><td>FOCUS, STL</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>AJP</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>to</td><td>FOCUS, STL</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>AJP, FOCUS, STL</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>AJP, FOCUS, STL</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>AJP</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>AJP</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>(</td><td>AJP</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>)</td><td>AJP</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>AJP</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>AJP</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>(</td><td>AJP</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>)</td><td>AJP</td></tr>
+</table></div>
+<div class=client data-type=journals data-client=TNFJOURNALS data-pattern=><h2>TNFJOURNALS - journals</h2><p>C:\_IMPACT\tomcat\webapps\impactweb_live\src\clientconfig\journals\tnfjournals\config.xml</p>
+<h3>Figure</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Figure.dircite.double_sep</td><td>,</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Figure.dircite.range_sep</td><td>–</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Figure.indircite.double_sep</td><td>,</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Figure.indircite.range_sep</td><td>–</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Figure.indircite.openwrap</td><td>(</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Figure.indircite.closewrap</td><td>)</td><td>IFSO, OAMA, YTCR</td></tr>
+</table></div>
+<h3>Table</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Table.dircite.double_sep</td><td>,</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>–</td><td>IFSO, OAMA</td></tr>
+<tr><td>Table.dircite.range_sep</td><td>to</td><td>YTCR</td></tr>
+<tr><td>Table.indircite.double_sep</td><td>,</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>–</td><td>IFSO, OAMA</td></tr>
+<tr><td>Table.indircite.range_sep</td><td>to</td><td>YTCR</td></tr>
+<tr><td>Table.indircite.openwrap</td><td>(</td><td>IFSO, OAMA, YTCR</td></tr>
+<tr><td>Table.indircite.closewrap</td><td>)</td><td>IFSO, OAMA, YTCR</td></tr>
+</table></div>
+<h3>Reference</h3><table><tr><th>Attr</th><th>Val</th><th>Journals</th></tr>
+<tr><td>Reference.text-format</td><td>false</td><td>OAMA, YTCR</td></tr>
+<tr><td>Reference.dircite.double_sep</td><td>,</td><td>IFSO</td></tr>
+<tr><td>Reference.dircite.range_sep</td><td>–</td><td>IFSO</td></tr>
+<tr><td>Reference.dircite.openwrap</td><td>[</td><td>IFSO</td></tr>
+<tr><td>Reference.dircite.closewrap</td><td>]</td><td>IFSO</td></tr>
+<tr><td>Reference.indircite.double_sep</td><td>,</td><td>IFSO</td></tr>
+<tr><td>Reference.indircite.range_sep</td><td>–</td><td>IFSO</td></tr>
+<tr><td>Reference.indircite.openwrap</td><td>[</td><td>IFSO</td></tr>
+<tr><td>Reference.indircite.closewrap</td><td>]</td><td>IFSO</td></tr>
+</table></div>
+<script>upd();</script></body></html>

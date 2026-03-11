@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Harvest - Word Compare</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent-success: #10b981;
+            --accent-error: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 95%;
+            height: 98vh;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(15, 23, 42, 0.3);
+        }
+
+        th, td {
+            padding: 0.6rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: #1e293b;
+            color: var(--primary-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .log-scroll {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            background: rgba(15, 23, 42, 0.4);
+        }
+
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .status-checking { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+        .status-is-known { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .status-is-unknown { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+        .sticky-footer {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="glass-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h1 style="margin: 0; font-size: 1.4rem;">Restored Harvesting Review</h1>
+                    <div style="font-size: 0.7rem; color: var(--text-muted);">
+                        Version: <span style="color: var(--primary-color); font-weight: 700;">{{ version }}</span> | Restored Session
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.8rem; align-items: center;">
+                    <div style="display: flex; gap: 0.4rem; align-items: center; background: rgba(255,255,255,0.05); padding: 2px 5px; border-radius: 8px; border: 1px solid var(--glass-border);">
+                        <input type="text" id="singleCheckInput" placeholder="Quick Check..." style="background: transparent; border: none; color: white; outline: none; padding: 4px 8px; font-size: 0.85rem; width: 140px;">
+                        <button type="button" class="btn-primary" style="padding: 0.3rem 0.8rem; font-size: 0.75rem;" onclick="checkSingleWord()">Check</button>
+                    </div>
+                    <button type="button" class="btn-secondary" style="font-size: 0.85rem;" onclick="checkSelectedWords()">Check Selected</button>
+                    <button type="button" id="startBtn" class="btn-primary" onclick="startValidation()">Start Page Flow</button>
+                    <label style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                        <input type="checkbox" id="autoProcess"> Auto
+                    </label>
+                </div>
+            </div>
+
+            <div id="knownWordsArea" style="background: rgba(15, 23, 42, 0.3); padding: 0.5rem 1rem; border-radius: 8px; margin-bottom: 1rem; display: none; border: 1px solid var(--glass-border);">
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 0.5rem;">
+                    <span style="color: var(--primary-color); font-weight: 800;">📖 KNOWN:</span>
+                    <span id="knownWordsList" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                </div>
+            </div>
+
+            <div class="log-scroll">
+                <table id="wordTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+                            <th>Word Flagged</th>
+                            <th>API Status</th>
+                            <th>Dictionary Result</th>
+                            <th style="width: 180px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+
+            <div class="sticky-footer">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn-secondary" onclick="changePage(-1)">Prev</button>
+                    <span class="pageInfo" style="font-size: 0.85rem; color: var(--text-muted); min-width: 150px; text-align: center;">Page 1 of 1</span>
+                    <button class="btn-secondary" onclick="changePage(1)">Next</button>
+                </div>
+
+                <div style="display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 8px; border: 1px solid var(--glass-border); width: 300px;">
+                    <span style="opacity: 0.5; margin-right: 5px;">🔍</span>
+                    <input type="text" id="tableSearch" placeholder="Filter results..." onkeyup="handleSearch()" style="background: transparent; border: none; color: white; outline: none; padding: 6px; font-size: 0.85rem; width: 100%;">
+                </div>
+
+                <div id="bulkActions" style="display: none; gap: 0.4rem; align-items: center;">
+                    <button class="btn-primary" style="background: #9c27b0; font-size: 0.75rem;" onclick="saveByCategory('wiktionary', 'Wiktionary')">Wiki</button>
+                    <button class="btn-primary" style="background: #e91e63; font-size: 0.75rem;" onclick="saveByCategory('Scientific', 'Scientific')">Sci</button>
+                    <button class="btn-primary" style="background: var(--primary-hover); font-size: 0.75rem;" onclick="saveByCategory('General', 'General')">Gen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script id="wordsData" type="application/json">{{ words | tojson }}</script>
+    <script>
+        const allWords = JSON.parse(document.getElementById('wordsData').textContent);
+        let filteredWords = [...allWords];
+        const pageSize = 20;
+        let currentPage = 1;
+
+        const sessionResults = {};
+        const knownWordsSet = new Set();
+
+        function getTotalPages() { return Math.ceil(filteredWords.length / pageSize) || 1; }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageWords = filteredWords.slice(start, end);
+
+            pageWords.forEach(word => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-word', word);
+                const cached = sessionResults[word];
+
+                row.innerHTML = `
+                    <td style="text-align: center;"><input type="checkbox" class="word-checkbox" data-word="${word}"></td>
+                    <td style="font-weight: 600;">${word}</td>
+                    <td class="status-cell">${cached ? `<span class="status-badge ${cached.is_known ? 'status-is-known' : 'status-is-unknown'}">${cached.status_code}</span>` : '<span class="status-badge status-checking">Pending</span>'}</td>
+                    <td class="result-cell" style="font-size: 0.8rem; opacity: 0.8;">${cached ? cached.message : 'Waiting...'}</td>
+                    <td>
+                        <div class="row-actions" style="display: flex; gap: 0.4rem;">
+                            <button type="button" class="btn-primary btn-check-row" style="padding: 3px 8px; font-size: 0.65rem; background: ${cached ? '#94a3b8' : '#6366f1'};" onclick="checkSingleWord('${word}')">${cached ? 'Re-check' : 'Check'}</button>
+                            <div class="save-actions" style="display: ${cached ? 'flex' : 'none'}; gap: 0.4rem;">
+                                <button type="button" class="btn-primary" style="padding: 3px 8px; font-size: 0.65rem; background: var(--accent-success);" onclick="quickAdd(this, '${word}', 'custom')">+Cus</button>
+                                <button type="button" class="btn-primary" style="padding: 3px 8px; font-size: 0.65rem; background: var(--primary-color);" onclick="quickAdd(this, '${word}', 'common')">+Com</button>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.querySelectorAll('.pageInfo').forEach(el => {
+                el.innerText = `Page ${currentPage} of ${getTotalPages()} (${filteredWords.length} items)`;
+            });
+            updateKnownSummary();
+        }
+
+        async function checkSingleWord(manualWord = null) {
+            const wordInput = document.getElementById('singleCheckInput');
+            const word = (manualWord || wordInput.value).trim().toLowerCase();
+            if (!word) return;
+            if (!manualWord) wordInput.value = '';
+
+            const existingResult = sessionResults[word];
+            const rows = document.querySelectorAll(`tr[data-word="${word}"]`);
+            rows.forEach(r => {
+                r.querySelector('.status-cell').innerHTML = '<span class="status-badge status-checking">Checking...</span>';
+                const btn = r.querySelector('.btn-check-row');
+                if (btn) { btn.innerText = '...'; btn.disabled = true; }
+            });
+
+            try {
+                let url = `/api/validate_word?word=${encodeURIComponent(word)}`;
+                if (existingResult) {
+                    url += `&force=true`;
+                    if (existingResult.source) url += `&exclude=${existingResult.source}`;
+                }
+                const response = await fetch(url);
+                const data = await response.json();
+                sessionResults[word] = data;
+                rows.forEach(r => updateRowWithResult(word, data));
+                if (rows.length === 0 && !manualWord) alert(`Word: ${word}\nResult: ${data.message}`);
+            } catch (err) { alert("Check Failed"); }
+            finally { rows.forEach(r => { const btn = r.querySelector('.btn-check-row'); if (btn) btn.disabled = false; }); }
+        }
+
+        function updateRowWithResult(word, data) {
+            const row = document.querySelector(`tr[data-word="${word}"]`);
+            if (!row) return;
+            row.querySelector('.status-cell').innerHTML = `<span class="status-badge ${data.is_known ? 'status-is-known' : 'status-is-unknown'}">${data.status_code}</span>`;
+            row.querySelector('.result-cell').innerHTML = data.message;
+            if (data.is_known) { knownWordsSet.add(word); updateKnownSummary(); }
+            const ra = row.querySelector('.row-actions');
+            if (ra) {
+                const checkBtn = ra.querySelector('.btn-check-row');
+                if (checkBtn) { checkBtn.innerText = 'Re-check'; checkBtn.style.background = '#94a3b8'; }
+                ra.querySelector('.save-actions').style.display = 'flex';
+            }
+        }
+
+        function toggleSelectAll(master) { document.querySelectorAll('.word-checkbox').forEach(cb => cb.checked = master.checked); }
+
+        async function checkSelectedWords() {
+            const words = Array.from(document.querySelectorAll('.word-checkbox:checked')).map(cb => cb.getAttribute('data-word'));
+            if (!words.length) return alert("Select words first");
+            words.forEach(w => {
+                 document.querySelectorAll(`tr[data-word="${w}"]`).forEach(r => r.querySelector('.status-cell').innerHTML = '...');
+            });
+            const data = await (await fetch('/api/validate_batch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({words}) })).json();
+            for (let w in data) { sessionResults[w] = data[w]; updateRowWithResult(w, data[w]); }
+        }
+
+        function handleSearch() {
+            const q = document.getElementById('tableSearch').value.toLowerCase().trim();
+            filteredWords = q ? allWords.filter(w => w.includes(q)) : [...allWords];
+            currentPage = 1; renderTable();
+        }
+
+        function changePage(d) {
+            const next = currentPage + d;
+            if (next >= 1 && next <= getTotalPages()) { currentPage = next; renderTable(); }
+        }
+
+        async function startValidation() {
+            const btn = document.getElementById('startBtn');
+            const autoOn = document.getElementById('autoProcess').checked;
+            btn.disabled = true; btn.innerText = 'Syncing...';
+            
+            const words = Array.from(document.querySelectorAll('#wordTable tbody tr')).map(r => r.getAttribute('data-word')).filter(w => !sessionResults[w]);
+            if (words.length) {
+                const results = await (await fetch('/api/validate_batch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({words}) })).json();
+                for (let w in results) { sessionResults[w] = results[w]; updateRowWithResult(w, results[w]); }
+            }
+            
+            document.getElementById('bulkActions').style.display = 'flex';
+            btn.disabled = false; btn.innerText = 'Start Page Flow';
+
+            if (autoOn && currentPage < getTotalPages()) {
+                setTimeout(() => { changePage(1); startValidation(); }, 500);
+            }
+        }
+
+        function updateKnownSummary() {
+            const area = document.getElementById('knownWordsArea');
+            area.style.display = knownWordsSet.size ? 'block' : 'none';
+            document.getElementById('knownWordsList').innerText = Array.from(knownWordsSet).sort().join(', ');
+        }
+
+        async function quickAdd(btn, word, target) {
+            btn.disabled = true;
+            const formData = new FormData();
+            formData.append('words_to_add', word);
+            formData.append('target', target);
+            if ((await fetch('/save_words', { method: 'POST', body: formData })).ok) {
+                btn.innerText = 'Saved'; btn.style.opacity = '0.5';
+            } else btn.disabled = false;
+        }
+
+        renderTable();
+    </script>
+</body>
+</html>

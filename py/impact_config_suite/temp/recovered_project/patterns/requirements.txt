@@ -1,0 +1,5 @@
+# Pattern Report Tool Dependencies
+
+lxml>=4.9.0
+openpyxl>=3.0.0
+matplotlib>=3.6.0
