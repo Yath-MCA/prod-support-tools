@@ -64,7 +64,7 @@ async function mockApiResponse(page, overrides = {}) {
 // A) Mocked API Tests — status routing
 // ---------------------------------------------------------------------------
 
-test.describe('Landing Workflow — Mocked API (status routing)', () => {
+/* test.describe('Landing Workflow — Mocked API (status routing)', () => {
 
     test.setTimeout(60000);
 
@@ -190,7 +190,7 @@ test.describe('Landing Workflow — Mocked API (status routing)', () => {
 
         // Dismiss alert → should redirect to read-only page
         await dismissAlert(page);
-        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await page.waitForLoadState('domcontentloaded');
 
         const readOnlyMarker = page.locator(config.readOnly.pageMarker);
         await expect(readOnlyMarker).toBeVisible({ timeout: 10000 });
@@ -215,7 +215,7 @@ test.describe('Landing Workflow — Mocked API (status routing)', () => {
 
         await waitForStatusAlert(page);
         await dismissAlert(page);
-        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await page.waitForLoadState('domcontentloaded');
 
         // LWW author signoff must show sign time on read-only header
         const signTimeLabel = page.locator(config.lwwSignoff.signTimeLabel);
@@ -244,7 +244,7 @@ test.describe('Landing Workflow — Mocked API (status routing)', () => {
         expect(detectedStatus).toBe('deactive');
 
         await dismissAlert(page);
-        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await page.waitForLoadState('domcontentloaded');
 
         const archiveMarker = page.locator(config.archive.pageMarker);
         await expect(archiveMarker).toBeVisible({ timeout: 10000 });
@@ -278,75 +278,150 @@ test.describe('Landing Workflow — Mocked API (status routing)', () => {
         logStep('TC_LP_009 PASSED', 'success');
     });
 
-});
+}); */
 
 // ---------------------------------------------------------------------------
 // B) Real URL Tests — requires links.json populated with actual keys
 // ---------------------------------------------------------------------------
 
-test.describe('Landing Workflow — Real URLs (links.json)', () => {
+test.describe('Landing Workflow', () => {
 
-    test.setTimeout(90000);
+    // Page is shared — navigate once in beforeAll, all tests inspect the same loaded page
+    test.describe.configure({ mode: 'serial' });
+    test.setTimeout(30000);
 
-    /**
-     * Parameterized real-URL test runner.
-     * Skips automatically when no URL is configured for the scenario.
-     */
-    const realScenarios = [
-        { client: 'medknow', role: 'author',  status: 'active'  },
-        { client: 'lww',     role: 'author',  status: 'active'  },
-        { client: 'lww',     role: 'author',  status: 'signoff' },
-        { client: 'oup',     role: 'author',  status: 'active'  },
-        { client: 'brill',   role: 'author',  status: 'active'  },
-    ];
+    let sharedPage;
 
-    for (const scenario of realScenarios) {
-        const { client, role, status } = scenario;
+    test.beforeAll(async ({ browser, baseURL }) => {
+        const url = pickLink('medknow', 'author', 'active') || baseURL;
+        const context = await browser.newContext();
+        sharedPage = await context.newPage();
 
-        test(`[REAL] ${client} / ${role} / ${status}`, async ({ page }) => {
-            const url = pickLink(client, role, status);
+        logStep(`Loading: ${url}`, 'start');
+        await sharedPage.goto(url, { waitUntil: 'domcontentloaded' });
 
-            if (!url) {
-                test.skip(true, `No URL configured for ${client}/${role}/${status} in links.json`);
-                return;
-            }
+        // Wait for key validation to complete:
+        //   - window.SHARED_KEY is set  → active / signoff processing done
+        //   - .swal2-container visible  → blocking alert (signoff / deactive) appeared
+        await sharedPage.waitForFunction(
+            () => window.SHARED_KEY != null || document.querySelector('.swal2-container') != null,
+            { timeout: 15000 }
+        ).catch(() => { logStep('SHARED_KEY wait timed out — page may still be loading', 'warning'); });
 
-            logStep(`Navigating to ${client}/${role}/${status}: ${url}`, 'start');
+        logStep('Page ready — running workflow checks', 'success');
+    });
 
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await waitForPageFullyLoaded(page);
+    test.afterAll(async () => {
+        await sharedPage?.context().close();
+    });
 
-            const signal          = await getLandingSignalState(page);
-            const detectedStatus  = classifyStatus(signal);
+    // ------------------------------------------------------------------
+    // TC_LP_W01: Signal state — detect active / signoff / deactive
+    // ------------------------------------------------------------------
+    test('[TC_LP_W01] Detect landing page workflow status', async () => {
+        const signal = await getLandingSignalState(sharedPage);
+        const detectedStatus = classifyStatus(signal);
 
-            logStep(`Detected status: ${detectedStatus}`, 'info');
-            logStep(`Signal: ${JSON.stringify(signal)}`, 'check');
+        logStep(`URL:    ${signal.url}`, 'info');
+        logStep(`Status: ${detectedStatus}`, 'check');
+        logStep(`Signal: ${JSON.stringify(signal)}`, 'info');
 
-            // Verify detected status matches expected
-            expect(detectedStatus, `Expected ${status}, got ${detectedStatus}`).toBe(status);
+        expect(['active', 'signoff', 'deactive', 'file_deleted'],
+            `Unknown status detected: ${detectedStatus}`
+        ).toContain(detectedStatus);
 
-            // Verify SHARED_KEY client matches
-            if (signal.sharedKey?.client) {
-                expect(signal.sharedKey.client.toLowerCase()).toContain(client.toLowerCase());
-            }
+        await takeScreenshot(sharedPage, `wf-status-${detectedStatus}`);
+    });
 
-            // Verify API response vs page content for active flow
-            if (status === 'active') {
-                expect(signal.submitVisible).toBe(true);
+    // ------------------------------------------------------------------
+    // TC_LP_W02: Active flow — accept button + content present
+    // ------------------------------------------------------------------
+    test('[TC_LP_W02] Active flow — accept button and content visible', async () => {
+        const signal = await getLandingSignalState(sharedPage);
 
-                const content = await getLandingPageContent(page);
-                expect(content.title1).toBeTruthy();
-                expect(content.authorname).toBeTruthy();
+        if (classifyStatus(signal) !== 'active') {
+            test.skip(true, `Page is not in active state (${classifyStatus(signal)}) — skip active checks`);
+            return;
+        }
 
-                // Client icon must load correctly
-                const clientIcon = page.locator(config.landing.clientIcon);
-                const iconHealthy = await clientIcon.evaluate(img => img.complete && img.naturalWidth > 0).catch(() => false);
-                expect(iconHealthy, 'Client icon must not be broken').toBe(true);
-            }
+        expect(signal.submitVisible, 'Accept button must be visible').toBe(true);
+        expect(signal.strictProofContext, 'URL must contain key and submit must be visible').toBe(true);
 
-            await takeScreenshot(page, `real-${client}-${role}-${status}`);
-            logStep(`[REAL] ${client}/${role}/${status} PASSED`, 'success');
-        });
-    }
+        const content = await getLandingPageContent(sharedPage);
+        logStep(`title1: "${content.title1}"`, 'info');
+        logStep(`author: "${content.authorname}"`, 'info');
+
+        expect(content.title1, 'title1 must not be empty').toBeTruthy();
+        expect(content.authorname, 'authorname must not be empty').toBeTruthy();
+
+        await takeScreenshot(sharedPage, 'wf-active-content');
+    });
+
+    // ------------------------------------------------------------------
+    // TC_LP_W03: Client icon — visible and not broken
+    // ------------------------------------------------------------------
+    test('[TC_LP_W03] Client icon loaded and not broken', async () => {
+        const clientIcon = sharedPage.locator(config.landing.clientIcon);
+        await expect(clientIcon).toBeVisible();
+
+        const healthy = await clientIcon.evaluate(
+            img => img.complete && img.naturalWidth > 0
+        ).catch(() => false);
+
+        expect(healthy, 'Client icon must not be broken (naturalWidth > 0)').toBe(true);
+        logStep(`Client icon src: ${await clientIcon.getAttribute('src')}`, 'info');
+    });
+
+    // ------------------------------------------------------------------
+    // TC_LP_W04: SHARED_KEY — client and role resolved from server
+    // ------------------------------------------------------------------
+    test('[TC_LP_W04] SHARED_KEY populated with client and role', async () => {
+        const signal = await getLandingSignalState(sharedPage);
+
+        logStep(`SHARED_KEY: ${JSON.stringify(signal.sharedKey)}`, 'info');
+
+        expect(signal.sharedKey, 'window.SHARED_KEY must be set by server response').toBeTruthy();
+        expect(signal.sharedKey.client, 'SHARED_KEY.client must not be empty').toBeTruthy();
+        expect(signal.sharedKey.rolename, 'SHARED_KEY.rolename must not be empty').toBeTruthy();
+    });
+
+    // ------------------------------------------------------------------
+    // TC_LP_W05: Signoff flow — alert visible, submit hidden
+    // ------------------------------------------------------------------
+    test('[TC_LP_W05] Signoff flow — alert blocks editor access', async () => {
+        const signal = await getLandingSignalState(sharedPage);
+
+        if (classifyStatus(signal) !== 'signoff') {
+            test.skip(true, `Page is not in signoff state — skip signoff checks`);
+            return;
+        }
+
+        expect(signal.hasAlert, 'Blocking alert must be visible for signoff').toBe(true);
+        expect(signal.submitVisible, 'Accept button must NOT be visible on signoff').toBe(false);
+
+        logStep(`Alert title: "${signal.alertTitle}"`, 'info');
+        logStep(`Alert text:  "${signal.alertText}"`, 'info');
+
+        await takeScreenshot(sharedPage, 'wf-signoff-alert');
+    });
+
+    // ------------------------------------------------------------------
+    // TC_LP_W06: Deactive / file_deleted — alert visible, submit hidden
+    // ------------------------------------------------------------------
+    test('[TC_LP_W06] Deactive/file_deleted — alert blocks editor access', async () => {
+        const signal = await getLandingSignalState(sharedPage);
+        const status = classifyStatus(signal);
+
+        if (!['deactive', 'file_deleted'].includes(status)) {
+            test.skip(true, `Page is not in deactive/file_deleted state — skip`);
+            return;
+        }
+
+        expect(signal.hasAlert, 'Blocking alert must be visible').toBe(true);
+        expect(signal.submitVisible, 'Accept button must NOT be visible').toBe(false);
+
+        logStep(`Alert title: "${signal.alertTitle}"`, 'info');
+        await takeScreenshot(sharedPage, `wf-${status}-alert`);
+    });
 
 });

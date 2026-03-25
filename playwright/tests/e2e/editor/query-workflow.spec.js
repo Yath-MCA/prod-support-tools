@@ -25,9 +25,9 @@ import {
     takeScreenshot,
     logStep,
     config
-} from './helpers/test-helpers.js';
+} from '../helpers/test-helpers.js';
 
-const allSelectors = JSON.parse(fs.readFileSync('./tests/selectors.json', 'utf8'));
+const allSelectors = JSON.parse(fs.readFileSync('./tests/e2e/data/selectors.json', 'utf8'));
 const landingSelectors = allSelectors.landing;
 
 let initializeLandingEditorSession;

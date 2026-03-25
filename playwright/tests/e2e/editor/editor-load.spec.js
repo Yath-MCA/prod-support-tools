@@ -20,7 +20,7 @@ import {
     takeScreenshot,
     logStep,
     config
-} from './helpers/test-helpers.js';
+} from '../helpers/test-helpers.js';
 
 test.describe('IMPACT Editor Load & Query Panel Tests', () => {
 
@@ -61,7 +61,7 @@ test.describe('IMPACT Editor Load & Query Panel Tests', () => {
         if (isVisible) {
             logStep(`Accept button found: ${config.landing.acceptButton}`, 'success');
             await acceptBtn.click();
-            await page.waitForLoadState('networkidle', { timeout: 30000 });
+            await page.waitForLoadState('domcontentloaded');
             await takeScreenshot(page, 'tc002-after-accept');
         } else {
             logStep('Accept button not found — may be auto-redirect flow', 'warning');
@@ -81,7 +81,7 @@ test.describe('IMPACT Editor Load & Query Panel Tests', () => {
 
         try {
             await clickAcceptButton(page);
-            await page.waitForLoadState('networkidle', { timeout: 30000 });
+            await page.waitForLoadState('domcontentloaded');
         } catch {
             logStep('Accept button flow skipped', 'info');
         }
@@ -109,7 +109,7 @@ test.describe('IMPACT Editor Load & Query Panel Tests', () => {
 
         try {
             await clickAcceptButton(page);
-            await page.waitForLoadState('networkidle', { timeout: 30000 });
+            await page.waitForLoadState('domcontentloaded');
         } catch {
             logStep('Accept button not required', 'info');
         }
@@ -176,7 +176,7 @@ test.describe('IMPACT Editor Load & Query Panel Tests', () => {
 
         try {
             await clickAcceptButton(page);
-            await page.waitForLoadState('networkidle', { timeout: 30000 });
+            await page.waitForLoadState('domcontentloaded');
             await takeScreenshot(page, 'tc005-step3-accepted');
         } catch {
             logStep('No accept button needed', 'info');

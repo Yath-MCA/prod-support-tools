@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loadSelectors } from "./helpers/config.helper.js";
+import { loadSelectors } from "../helpers/config.helper.js";
 import {
     initializeLandingEditorSession,
     cleanupLandingEditorSession
-} from "./helpers/session-baseline.helper.js";
+} from "../helpers/session-baseline.helper.js";
 
 const selectors = loadSelectors("landing");
 

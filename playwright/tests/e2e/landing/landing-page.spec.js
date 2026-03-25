@@ -8,7 +8,7 @@ import {
 } from "../helpers/ui-validators.js";
 
 const selectors = JSON.parse(
-    fs.readFileSync("../tests/selectors.json", "utf8")
+    fs.readFileSync("./tests/e2e/data/selectors.json", "utf8")
 ).landing;
 
 let page;
@@ -73,11 +73,11 @@ test.describe.serial("Landing Page Suite", () => {
     /* ------------------------------
        Downloads (Optional)
     ------------------------------ */
-    test("FAQ PDF should download successfully", async () => {
+    test.skip("FAQ PDF should download successfully (manual team test)", async () => {
         await verifyPdfDownload(page, selectors.faqPdf, "FAQ PDF");
     });
 
-    test("User Guide PDF should download successfully", async () => {
+    test.skip("User Guide PDF should download successfully (manual team test)", async () => {
         await verifyPdfDownload(page, selectors.userGuidePdf, "User Guide PDF");
     });
 

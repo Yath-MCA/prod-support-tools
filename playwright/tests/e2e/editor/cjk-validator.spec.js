@@ -13,12 +13,12 @@ import { test, expect } from "@playwright/test";
 import {
     waitForCJKValidator,
     verifyCJKCount
-} from "./helpers/ui-validators.js";
-import { loadSelectors } from "./helpers/config.helper.js";
+} from "../helpers/ui-validators.js";
+import { loadSelectors } from "../helpers/config.helper.js";
 import {
     initializeLandingEditorSession,
     cleanupLandingEditorSession
-} from "./helpers/session-baseline.helper.js";
+} from "../helpers/session-baseline.helper.js";
 
 const landingSelectors = loadSelectors("landing");
 

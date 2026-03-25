@@ -9,22 +9,28 @@ import config from '../fixtures/test-config.js';
  * Checks for InitialLoadDialog.FullyLoaded flag.
  */
 export async function waitForPageFullyLoaded(page, timeout = config.timeouts.pageLoad) {
-    console.log('⏳ Waiting for page to fully load...');
-
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForLoadState('networkidle', { timeout });
 
-    await page.waitForFunction(() => {
-        return (
-            typeof window.InitialLoadDialog !== 'undefined' &&
-            window.InitialLoadDialog.FullyLoaded === true
-        );
-    }, { timeout });
+    // If already loaded (reused page from previous spec), skip the wait immediately
+    const alreadyLoaded = await page.evaluate(() =>
+        window.InitialLoadDialog?.FullyLoaded === true
+    ).catch(() => false);
+
+    if (alreadyLoaded) {
+        console.log('✅ Page already fully loaded');
+        return;
+    }
+
+    console.log('⏳ Waiting for InitialLoadDialog.FullyLoaded...');
+
+    // networkidle intentionally skipped — apps with WebSocket/polling never reach it
+    await page.waitForFunction(() =>
+        typeof window.InitialLoadDialog !== 'undefined' &&
+        window.InitialLoadDialog.FullyLoaded === true
+    , { timeout });
 
     const overlay = page.locator(config.initialLoad.overlay);
-    await overlay.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {
-        console.log('Loading overlay already hidden or not present');
-    });
+    await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => { });
 
     console.log('✅ Page fully loaded');
 }
@@ -73,22 +79,22 @@ export async function waitForQueryPanelReady(page, timeout = config.timeouts.pan
 export async function getEditorStats(page) {
     return page.evaluate(() => {
         const stats = {
-            editorExists:           false,
-            editorDocument:         false,
-            queryModuleExists:      false,
+            editorExists: false,
+            editorDocument: false,
+            queryModuleExists: false,
             queryModuleInitialized: false,
-            panelModuleExists:      false
+            panelModuleExists: false
         };
 
         if (typeof GlobalEditor !== 'undefined' && GlobalEditor) {
-            stats.editorExists    = true;
-            stats.editorDocument  = !!(GlobalEditor.document && GlobalEditor.document.$);
+            stats.editorExists = true;
+            stats.editorDocument = !!(GlobalEditor.document && GlobalEditor.document.$);
         }
 
         if (typeof window.queryModule !== 'undefined' && window.queryModule) {
-            stats.queryModuleExists      = true;
+            stats.queryModuleExists = true;
             stats.queryModuleInitialized = window.queryModule.initialized === true;
-            stats.panelModuleExists      = !!(window.queryModule.panelModule);
+            stats.panelModuleExists = !!(window.queryModule.panelModule);
         }
 
         return stats;
@@ -101,9 +107,9 @@ export async function getEditorStats(page) {
 export async function getQueryCounts(page) {
     return page.evaluate(() => {
         const counts = {
-            total:   0,
-            open:    0,
-            closed:  0,
+            total: 0,
+            open: 0,
+            closed: 0,
             comments: 0,
             inState: { queries: 0, comments: 0 }
         };
@@ -122,14 +128,14 @@ export async function getQueryCounts(page) {
                 counts.comments++;
             } else {
                 counts.total++;
-                if (status === 'open')   counts.open++;
+                if (status === 'open') counts.open++;
                 else if (status === 'closed') counts.closed++;
             }
         });
 
         if (typeof window.queryModule !== 'undefined' && window.queryModule._state) {
             const state = window.queryModule._state;
-            counts.inState.queries  = state.queries  ? state.queries.size  : 0;
+            counts.inState.queries = state.queries ? state.queries.size : 0;
             counts.inState.comments = state.comments ? state.comments.size : 0;
         }
 
@@ -143,12 +149,12 @@ export async function getQueryCounts(page) {
 export async function getQueryPanelStatus(page) {
     return page.evaluate(() => {
         const status = {
-            isVisible:      false,
-            isInitialized:  false,
-            hasQueries:     false,
-            hasComments:    false,
-            counts:         null,
-            cacheStats:     null
+            isVisible: false,
+            isInitialized: false,
+            hasQueries: false,
+            hasComments: false,
+            counts: null,
+            cacheStats: null
         };
 
         if (typeof window.queryModule !== 'undefined' && window.queryModule) {
@@ -157,12 +163,12 @@ export async function getQueryPanelStatus(page) {
 
             if (qm.panelModule) {
                 status.isVisible = true;
-                if (typeof qm.getCounts === 'function')                  status.counts     = qm.getCounts();
-                if (typeof qm.panelModule.getCacheStats === 'function')  status.cacheStats = qm.panelModule.getCacheStats();
+                if (typeof qm.getCounts === 'function') status.counts = qm.getCounts();
+                if (typeof qm.panelModule.getCacheStats === 'function') status.cacheStats = qm.panelModule.getCacheStats();
             }
 
             if (qm._state) {
-                status.hasQueries  = qm._state.queries  && qm._state.queries.size  > 0;
+                status.hasQueries = qm._state.queries && qm._state.queries.size > 0;
                 status.hasComments = qm._state.comments && qm._state.comments.size > 0;
             }
         }
@@ -188,7 +194,7 @@ export async function clickAcceptButton(page) {
  */
 export async function takeScreenshot(page, name) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename  = `${name}-${timestamp}.png`;
+    const filename = `${name}-${timestamp}.png`;
     await page.screenshot({ path: `tests/reports/screenshots/${filename}`, fullPage: true });
     console.log(`📸 Screenshot saved: ${filename}`);
 }
@@ -198,13 +204,13 @@ export async function takeScreenshot(page, name) {
  */
 export function logStep(step, status = 'info') {
     const icons = {
-        start:   '🚀',
-        info:    'ℹ️',
+        start: '🚀',
+        info: 'ℹ️',
         success: '✅',
-        error:   '❌',
+        error: '❌',
         warning: '⚠️',
-        wait:    '⏳',
-        check:   '🔍'
+        wait: '⏳',
+        check: '🔍'
     };
     console.log(`${icons[status] || icons.info} ${step}`);
 }

@@ -2,15 +2,15 @@ import { test, expect } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { loadSelectors } from "./helpers/config.helper.js";
-import { resolveDocId, getEditorContext } from "./helpers/common.helper.js";
+import { loadSelectors } from "../helpers/config.helper.js";
+import { resolveDocId, getEditorContext } from "../helpers/common.helper.js";
 import {
     expectToastMessage
-} from "./helpers/notification.helper.js";
+} from "../helpers/notification.helper.js";
 import {
     initializeLandingEditorSession,
     cleanupLandingEditorSession
-} from "./helpers/session-baseline.helper.js";
+} from "../helpers/session-baseline.helper.js";
 // import { registerAttachmentValidationCases } from "./comment-dialog-attachment-validation.cases";
 import {
     waitForPageFullyLoaded,
@@ -23,7 +23,7 @@ import {
     takeScreenshot,
     logStep,
     config
-} from './helpers/test-helpers.js';
+} from '../helpers/test-helpers.js';
 
 const landFinders = loadSelectors("landing");
 const editorFinders = loadSelectors("editor6");

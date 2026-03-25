@@ -186,13 +186,13 @@ const config = {
     // Timeouts (ms)
     // ==========================================
     timeouts: {
-        pageLoad:       60000,
-        editorReady:    45000,
-        panelLoad:      30000,
-        elementVisible: 10000,
+        pageLoad:       6000,
+        editorReady:    4500,
+        panelLoad:      3000,
+        elementVisible: 1000,
         animation:      1000,
-        networkIdle:    30000,
-        apiResponse:    15000
+        networkIdle:    5000,
+        apiResponse:    5000
     },
 
     // ==========================================

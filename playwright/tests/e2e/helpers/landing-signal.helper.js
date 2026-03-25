@@ -13,18 +13,18 @@ import path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Primary source: tests/e2e/data/links.json  (client → role name → status)
-const linksPath      = path.join(__dirname, '..', 'data', 'links.json');
+const linksPath = path.join(__dirname, '..', 'data', 'links.json');
 
 // Fallback source: assets/links.json  (client → roleId → status — fully populated)
 const assetsLinksPath = path.join(__dirname, '..', '..', '..', 'assets', 'links.json');
-const rolesPath       = path.join(__dirname, '..', '..', '..', 'assets', 'roles_details.js');
+const rolesPath = path.join(__dirname, '..', '..', '..', 'assets', 'roles_details.js');
 
 /**
  * Build a roleId → shortname map from assets/roles_details.js.
  * e.g. "5b53536b4c4a803e9a5abf70" → "author"
  */
 function buildRoleIdMap() {
-    const raw  = readFileSync(rolesPath, 'utf8');
+    const raw = readFileSync(rolesPath, 'utf8');
     // roles_details.js is a var declaration, not a module — extract the object literal
     const match = raw.match(/var ROLE_IDS\s*=\s*(\{[\s\S]*?\});/);
     if (!match) return {};
@@ -48,9 +48,9 @@ function pickFromAssets(client, role, status) {
         return [];
     }
 
-    const roleIdMap  = buildRoleIdMap();                  // id → "author" | "editor" …
+    const roleIdMap = buildRoleIdMap();                  // id → "author" | "editor" …
     const clientData = assetLinks?.urls?.[client] || {};  // legacy: { roleId: { status: [...] } }
-    const all        = [];
+    const all = [];
 
     for (const [roleId, statusMap] of Object.entries(clientData)) {
         const resolvedRole = roleIdMap[roleId] || roleId;
@@ -76,14 +76,14 @@ function pickFromAssets(client, role, status) {
  */
 export async function getLandingSignalState(page) {
     return page.evaluate(() => {
-        const submitBtn    = document.querySelector('#ValidateBtnOpt');
+        const submitBtn = document.querySelector('#ValidateBtnOpt');
         const submitVisible = !!(submitBtn && submitBtn.offsetParent !== null);
 
         const alertContainer = document.querySelector('.swal2-container');
         const hasAlert = !!(alertContainer && alertContainer.offsetParent !== null);
 
         const alertTitle = document.querySelector('.swal2-title')?.textContent?.trim() || '';
-        const alertText  = document.querySelector('.swal2-html-container')?.textContent?.trim() || '';
+        const alertText = document.querySelector('.swal2-html-container')?.textContent?.trim() || '';
 
         const url = window.location.href;
         const strictProofContext = url.includes('key') && submitVisible;
@@ -138,7 +138,7 @@ export function pickLink(client, role, status) {
     let candidates = [];
     try {
         const links = JSON.parse(readFileSync(linksPath, 'utf8'));
-        candidates  = links[client]?.[role]?.[status] || [];
+        candidates = links[client]?.[role]?.[status] || [];
     } catch { /* file missing or malformed — fall through */ }
 
     // 2 — fallback to assets/links.json resolved via roleId map
@@ -155,7 +155,7 @@ export function pickLink(client, role, status) {
  * Useful for running tests against the full URL pool.
  */
 export function getAllLinks(client, role, status) {
-    const primary  = (() => {
+    const primary = (() => {
         try {
             const links = JSON.parse(readFileSync(linksPath, 'utf8'));
             return links[client]?.[role]?.[status] || [];
@@ -204,8 +204,8 @@ export async function dismissAlert(page) {
  */
 export async function getLandingPageContent(page) {
     return page.evaluate(() => ({
-        title1:     document.querySelector('#title1')?.textContent?.trim()     || '',
-        title2:     document.querySelector('#title2')?.textContent?.trim()     || '',
+        title1: document.querySelector('#title1')?.textContent?.trim() || '',
+        title2: document.querySelector('#title2')?.textContent?.trim() || '',
         authorname: document.querySelector('#authorname')?.textContent?.trim() || '',
         supportEmail: document.querySelector('#support_mail_id')?.textContent?.trim() || '',
         clientIconSrc: document.querySelector('.navbar-brand img')?.src || ''
