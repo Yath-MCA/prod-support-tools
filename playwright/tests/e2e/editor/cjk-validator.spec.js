@@ -13,7 +13,7 @@ import { test, expect } from "@playwright/test";
 import {
     waitForCJKValidator,
     verifyCJKCount
-} from "./helpers/ui-validators.js.js";
+} from "./helpers/ui-validators.js";
 import { loadSelectors } from "./helpers/config.helper.js";
 import {
     initializeLandingEditorSession,

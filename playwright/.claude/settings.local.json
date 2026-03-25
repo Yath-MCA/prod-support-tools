@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npx --version)",
       "Bash(npm install:*)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "Bash(cd:*)",
+      "Bash(ls \"D:/PERSONAL/LIVE_PROJECTS/prod-support-tools/playwright/tests/e2e/\"*.spec.js)",
+      "Bash(ls \"D:/PERSONAL/LIVE_PROJECTS/prod-support-tools/playwright/tests/e2e/landing/\"*.spec.js)"
     ]
   }
 }
