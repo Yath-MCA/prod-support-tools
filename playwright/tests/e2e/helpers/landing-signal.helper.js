@@ -11,7 +11,56 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const linksPath = path.join(__dirname, '..', 'data', 'links.json');
+
+// Primary source: tests/e2e/data/links.json  (client → role name → status)
+const linksPath      = path.join(__dirname, '..', 'data', 'links.json');
+
+// Fallback source: assets/links.json  (client → roleId → status — fully populated)
+const assetsLinksPath = path.join(__dirname, '..', '..', '..', 'assets', 'links.json');
+const rolesPath       = path.join(__dirname, '..', '..', '..', 'assets', 'roles_details.js');
+
+/**
+ * Build a roleId → shortname map from assets/roles_details.js.
+ * e.g. "5b53536b4c4a803e9a5abf70" → "author"
+ */
+function buildRoleIdMap() {
+    const raw  = readFileSync(rolesPath, 'utf8');
+    // roles_details.js is a var declaration, not a module — extract the object literal
+    const match = raw.match(/var ROLE_IDS\s*=\s*(\{[\s\S]*?\});/);
+    if (!match) return {};
+    const roleIds = JSON.parse(match[1].replace(/,\s*XML[\s\S]*$/, '}'));
+    const map = {};
+    for (const [id, data] of Object.entries(roleIds)) {
+        if (data.pubkit_name) map[id] = data.pubkit_name.toLowerCase(); // e.g. "author"
+    }
+    return map;
+}
+
+/**
+ * Resolve URLs from assets/links.json using roleId → role name mapping.
+ * Returns all URLs for client + role + status, or [] if none found.
+ */
+function pickFromAssets(client, role, status) {
+    let assetLinks;
+    try {
+        assetLinks = JSON.parse(readFileSync(assetsLinksPath, 'utf8'));
+    } catch {
+        return [];
+    }
+
+    const roleIdMap  = buildRoleIdMap();                  // id → "author" | "editor" …
+    const clientData = assetLinks?.urls?.[client] || {};  // legacy: { roleId: { status: [...] } }
+    const all        = [];
+
+    for (const [roleId, statusMap] of Object.entries(clientData)) {
+        const resolvedRole = roleIdMap[roleId] || roleId;
+        if (resolvedRole.toLowerCase() !== role.toLowerCase()) continue;
+        const urls = statusMap[status] || [];
+        all.push(...urls);
+    }
+
+    return all;
+}
 
 /**
  * Evaluate the landing page DOM to determine workflow state.
@@ -76,15 +125,47 @@ export function classifyStatus(signal) {
 }
 
 /**
- * Pick a URL from links.json for the given client + role + status.
- * Falls back to null if no URLs are configured.
+ * Pick a URL for the given client + role + status.
+ *
+ * Resolution order:
+ *   1. tests/e2e/data/links.json  (client → role name → status)
+ *   2. assets/links.json          (client → roleId → status, resolved via roles_details.js)
+ *
+ * Returns a random URL from the matched pool, or null if none found.
  */
 export function pickLink(client, role, status) {
-    const links = JSON.parse(readFileSync(linksPath, 'utf8'));
-    const candidates = links[client]?.[role]?.[status] || [];
+    // 1 — check primary source
+    let candidates = [];
+    try {
+        const links = JSON.parse(readFileSync(linksPath, 'utf8'));
+        candidates  = links[client]?.[role]?.[status] || [];
+    } catch { /* file missing or malformed — fall through */ }
+
+    // 2 — fallback to assets/links.json resolved via roleId map
+    if (!candidates.length) {
+        candidates = pickFromAssets(client, role, status);
+    }
+
     if (!candidates.length) return null;
-    // Pick a random entry from the list (matches Java's random selection pattern)
     return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+/**
+ * Return ALL URLs for client + role + status (both sources merged).
+ * Useful for running tests against the full URL pool.
+ */
+export function getAllLinks(client, role, status) {
+    const primary  = (() => {
+        try {
+            const links = JSON.parse(readFileSync(linksPath, 'utf8'));
+            return links[client]?.[role]?.[status] || [];
+        } catch { return []; }
+    })();
+
+    const fallback = pickFromAssets(client, role, status);
+
+    // deduplicate
+    return [...new Set([...primary, ...fallback])];
 }
 
 /**

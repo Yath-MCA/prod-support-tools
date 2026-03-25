@@ -1,4 +1,4 @@
-import { FullConfig } from "@playwright/test";
+import { chromium } from "@playwright/test";
 import { killChromium } from "./kill-chromium.js";
 
 async function globalSetup(config) {

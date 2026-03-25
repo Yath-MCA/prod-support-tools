@@ -5,10 +5,10 @@ import {
     checkImageHealthy,
     verifyMailLink,
     verifyPdfDownload
-} from "./helpers/ui-validators.js";
+} from "../helpers/ui-validators.js";
 
 const selectors = JSON.parse(
-    fs.readFileSync("./tests/selectors.json", "utf8")
+    fs.readFileSync("../tests/selectors.json", "utf8")
 ).landing;
 
 let page;

@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { loadSelectors } from "./helpers/config.helper.js";
-import { workflowConfig } from "./config/workflow.config";
+import { loadSelectors } from "../helpers/config.helper.js";
+import { workflowConfig } from "../config/workflow.config";
 import {
     initializeLandingEditorSession,
     cleanupLandingEditorSession
-} from "./helpers/session-baseline.helper.js";
+} from "../helpers/session-baseline.helper.js";
 import {
     createWorkflowReporter,
     writeWorkflowReport
-} from "./helpers/workflow-report.helper.js";
+} from "../helpers/workflow-report.helper.js";
 
 const selectors = loadSelectors("landing");
 const reporter = createWorkflowReporter("basic-workflow");
