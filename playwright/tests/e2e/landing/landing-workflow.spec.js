@@ -17,6 +17,7 @@ import {
     getLandingSignalState,
     classifyStatus,
     pickLink,
+    pickLinkFromData,
     waitForStatusAlert,
     dismissAlert,
     getLandingPageContent
@@ -284,31 +285,57 @@ async function mockApiResponse(page, overrides = {}) {
 // B) Real URL Tests — requires links.json populated with actual keys
 // ---------------------------------------------------------------------------
 
+/**
+ * Navigate sharedPage to a URL and wait for key validation to complete.
+ * Returns the classified status string, or null on timeout.
+ */
+async function navigateTo(page, url) {
+    logStep(`Loading: ${url}`, 'start');
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+        () => window.SHARED_KEY != null || document.querySelector('.swal2-container') != null,
+        { timeout: 15000 }
+    ).catch(() => { logStep('SHARED_KEY wait timed out', 'warning'); });
+}
+
+/**
+ * Try clients in order until a URL is found for the given role + status.
+ *
+ * For 'active': uses pickLink (includes assets fallback — more URLs available).
+ * For other statuses (signoff / deactive): uses pickLinkFromData only —
+ *   assets/links.json can contain stale entries where the real status has changed.
+ */
+function pickAnyLink(role, status) {
+    const clients = ['lww',  'oup',]; //'medknow', 'brill', 'plos'
+    for (const client of clients) {
+        const url = status === 'active'
+            ? pickLink(client, role, status)
+            : pickLinkFromData(client, role, status);
+        if (url) return { url, client };
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+
 test.describe('Landing Workflow', () => {
 
-    // Page is shared — navigate once in beforeAll, all tests inspect the same loaded page
+    // Serial mode — tests run in order, sharedPage is reused
     test.describe.configure({ mode: 'serial' });
     test.setTimeout(30000);
 
     let sharedPage;
 
     test.beforeAll(async ({ browser, baseURL }) => {
-        const url = pickLink('medknow', 'author', 'active') || baseURL;
         const context = await browser.newContext();
         sharedPage = await context.newPage();
 
-        logStep(`Loading: ${url}`, 'start');
-        await sharedPage.goto(url, { waitUntil: 'domcontentloaded' });
+        // Load an active URL for W01–W04  (tries lww → medknow → oup → …)
+        const found = pickAnyLink('author', 'active');
+        const url = found?.url || baseURL;
+        await navigateTo(sharedPage, url);
 
-        // Wait for key validation to complete:
-        //   - window.SHARED_KEY is set  → active / signoff processing done
-        //   - .swal2-container visible  → blocking alert (signoff / deactive) appeared
-        await sharedPage.waitForFunction(
-            () => window.SHARED_KEY != null || document.querySelector('.swal2-container') != null,
-            { timeout: 15000 }
-        ).catch(() => { logStep('SHARED_KEY wait timed out — page may still be loading', 'warning'); });
-
-        logStep('Page ready — running workflow checks', 'success');
+        logStep('Active page ready', 'success');
     });
 
     test.afterAll(async () => {
@@ -324,7 +351,6 @@ test.describe('Landing Workflow', () => {
 
         logStep(`URL:    ${signal.url}`, 'info');
         logStep(`Status: ${detectedStatus}`, 'check');
-        logStep(`Signal: ${JSON.stringify(signal)}`, 'info');
 
         expect(['active', 'signoff', 'deactive', 'file_deleted'],
             `Unknown status detected: ${detectedStatus}`
@@ -340,7 +366,7 @@ test.describe('Landing Workflow', () => {
         const signal = await getLandingSignalState(sharedPage);
 
         if (classifyStatus(signal) !== 'active') {
-            test.skip(true, `Page is not in active state (${classifyStatus(signal)}) — skip active checks`);
+            test.skip(true, `Active URL not loaded (${classifyStatus(signal)}) — add an active URL to links.json`);
             return;
         }
 
@@ -378,21 +404,31 @@ test.describe('Landing Workflow', () => {
     test('[TC_LP_W04] SHARED_KEY populated with client and role', async () => {
         const signal = await getLandingSignalState(sharedPage);
 
-        logStep(`SHARED_KEY: ${JSON.stringify(signal.sharedKey)}`, 'info');
-
         expect(signal.sharedKey, 'window.SHARED_KEY must be set by server response').toBeTruthy();
         expect(signal.sharedKey.client, 'SHARED_KEY.client must not be empty').toBeTruthy();
         expect(signal.sharedKey.rolename, 'SHARED_KEY.rolename must not be empty').toBeTruthy();
+
+        logStep(`client: ${signal.sharedKey.client}  role: ${signal.sharedKey.rolename}`, 'info');
     });
 
     // ------------------------------------------------------------------
-    // TC_LP_W05: Signoff flow — alert visible, submit hidden
+    // TC_LP_W05: Signoff flow — navigate to a signoff URL, alert visible
     // ------------------------------------------------------------------
     test('[TC_LP_W05] Signoff flow — alert blocks editor access', async () => {
-        const signal = await getLandingSignalState(sharedPage);
+        const found = pickAnyLink('author', 'signoff') || pickAnyLink('editor', 'signoff');
+        if (!found) {
+            test.skip(true, 'No signoff URL in links.json — add one to run this test');
+            return;
+        }
 
-        if (classifyStatus(signal) !== 'signoff') {
-            test.skip(true, `Page is not in signoff state — skip signoff checks`);
+        await navigateTo(sharedPage, found.url);
+        logStep(`Loaded signoff URL (${found.client})`, 'info');
+
+        const signal = await getLandingSignalState(sharedPage);
+        const actualStatus = classifyStatus(signal);
+
+        if (actualStatus !== 'signoff') {
+            test.skip(true, `URL now shows "${actualStatus}" — update links.json[${found.client}].author.signoff with a current signoff URL`);
             return;
         }
 
@@ -406,14 +442,23 @@ test.describe('Landing Workflow', () => {
     });
 
     // ------------------------------------------------------------------
-    // TC_LP_W06: Deactive / file_deleted — alert visible, submit hidden
+    // TC_LP_W06: Deactive / file_deleted — navigate to deactive URL
     // ------------------------------------------------------------------
     test('[TC_LP_W06] Deactive/file_deleted — alert blocks editor access', async () => {
-        const signal = await getLandingSignalState(sharedPage);
-        const status = classifyStatus(signal);
+        const found = pickAnyLink('author', 'deactive') || pickAnyLink('editor', 'deactive');
+        if (!found) {
+            test.skip(true, 'No deactive URL in links.json — add one to run this test');
+            return;
+        }
 
-        if (!['deactive', 'file_deleted'].includes(status)) {
-            test.skip(true, `Page is not in deactive/file_deleted state — skip`);
+        await navigateTo(sharedPage, found.url);
+        logStep(`Loaded deactive URL (${found.client})`, 'info');
+
+        const signal = await getLandingSignalState(sharedPage);
+        const actualStatus = classifyStatus(signal);
+
+        if (!['deactive', 'file_deleted'].includes(actualStatus)) {
+            test.skip(true, `URL now shows "${actualStatus}" — update links.json[${found.client}].author.deactive with a current deactive URL`);
             return;
         }
 
@@ -421,7 +466,7 @@ test.describe('Landing Workflow', () => {
         expect(signal.submitVisible, 'Accept button must NOT be visible').toBe(false);
 
         logStep(`Alert title: "${signal.alertTitle}"`, 'info');
-        await takeScreenshot(sharedPage, `wf-${status}-alert`);
+        await takeScreenshot(sharedPage, `wf-${actualStatus}-alert`);
     });
 
 });

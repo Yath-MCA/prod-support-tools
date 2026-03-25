@@ -20,18 +20,20 @@ const assetsLinksPath = path.join(__dirname, '..', '..', '..', 'assets', 'links.
 const rolesPath = path.join(__dirname, '..', '..', '..', 'assets', 'roles_details.js');
 
 /**
- * Build a roleId → shortname map from assets/roles_details.js.
+ * Build a roleId → pubkit_name map from assets/roles_details.js.
  * e.g. "5b53536b4c4a803e9a5abf70" → "author"
+ *
+ * roles_details.js uses unquoted JS object keys — not valid JSON.
+ * Use a targeted regex to extract only the fields we need.
  */
 function buildRoleIdMap() {
-    const raw = readFileSync(rolesPath, 'utf8');
-    // roles_details.js is a var declaration, not a module — extract the object literal
-    const match = raw.match(/var ROLE_IDS\s*=\s*(\{[\s\S]*?\});/);
-    if (!match) return {};
-    const roleIds = JSON.parse(match[1].replace(/,\s*XML[\s\S]*$/, '}'));
+    let raw;
+    try { raw = readFileSync(rolesPath, 'utf8'); } catch { return {}; }
     const map = {};
-    for (const [id, data] of Object.entries(roleIds)) {
-        if (data.pubkit_name) map[id] = data.pubkit_name.toLowerCase(); // e.g. "author"
+    const re = /"([a-f0-9]{24})":\s*\{[^}]*pubkit_name:\s*"([^"]+)"/g;
+    let m;
+    while ((m = re.exec(raw)) !== null) {
+        map[m[1]] = m[2].toLowerCase();
     }
     return map;
 }
@@ -148,6 +150,22 @@ export function pickLink(client, role, status) {
 
     if (!candidates.length) return null;
     return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+/**
+ * Pick a URL from data/links.json only — no assets fallback.
+ * Use this when you need a URL with a known, confirmed status
+ * (e.g. signoff / deactive) and don't want stale assets URLs.
+ *
+ * Returns null if not found in data/links.json.
+ */
+export function pickLinkFromData(client, role, status) {
+    try {
+        const links = JSON.parse(readFileSync(linksPath, 'utf8'));
+        const candidates = links[client]?.[role]?.[status] || [];
+        if (!candidates.length) return null;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    } catch { return null; }
 }
 
 /**
