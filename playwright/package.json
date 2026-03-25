@@ -1,0 +1,20 @@
+{
+  "name": "impact-playwright-tests",
+  "version": "1.0.0",
+  "description": "IMPACT Editor E2E test suite — Playwright JS",
+  "type": "module",
+  "scripts": {
+    "test":          "playwright test",
+    "test:landing":  "playwright test tests/e2e/landing/",
+    "test:editor":   "playwright test tests/e2e/editor-load.spec.js",
+    "test:cjk":      "playwright test tests/e2e/cjk-validator.spec.js",
+    "test:matrix":   "node tests/e2e/config/run-execution-matrix.mjs",
+    "test:smoke":    "playwright test --grep @smoke",
+    "report":        "playwright show-report",
+    "test:bs":       "playwright test --config=browserstack.config.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "xml2js": "^0.6.2"
+  }
+}

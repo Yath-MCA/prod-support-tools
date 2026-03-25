@@ -1,0 +1,137 @@
+{
+  "meta": {
+    "name": "IMPACT E2E Execution Matrix",
+    "version": "1.0.0",
+    "createdOn": "2026-02-28",
+    "source": "workflow.config.js + user-defined combination axes",
+    "notes": [
+      "This file defines combinations only. It does not auto-run tests.",
+      "Use this matrix as the single source for workflow -> role -> testing type -> browser profile selection."
+    ]
+  },
+  "combinationAxes": {
+    "workflows": [
+      {
+        "id": "author-editor-collator",
+        "label": "Author-Editor-Collator",
+        "sequence": ["Author", "Editor", "Collator"]
+      },
+      {
+        "id": "editor-author-collator",
+        "label": "Editor-Author-Collator",
+        "sequence": ["Editor", "Author", "Collator"]
+      }
+    ],
+    "roles": [
+      "Author",
+      "Co-Author",
+      "Editor",
+      "Co-Editor",
+      "Collator",
+      "Editor2"
+    ],
+    "testingTypes": [
+      {
+        "id": "comment-basic",
+        "specs": [
+          "tests/e2e/insert-comment-basic.spec.js"
+        ],
+        "tags": ["basic", "comment"]
+      },
+      {
+        "id": "query-regression",
+        "specs": [
+          "tests/e2e/landing-to-editor-query.spec.js",
+          "tests/e2e/query-workflow.spec.js",
+          "tests/e2e/query-comment.spec.js"
+        ],
+        "tags": ["regression", "query"]
+      },
+      {
+        "id": "track-full",
+        "specs": [
+          "tests/e2e/tracked_changes_test.js",
+          "tests/e2e/cjk-validator.spec.js"
+        ],
+        "tags": ["full", "tracking"]
+      },
+      {
+        "id": "all-basic",
+        "specs": [
+          "tests/e2e/landing-editor-module-basic.spec.js",
+          "tests/e2e/insert-comment-basic.spec.js"
+        ],
+        "tags": ["basic", "all"]
+      },
+      {
+        "id": "all-regression",
+        "specs": [
+          "tests/e2e/landing-editor-module-basic.spec.js",
+          "tests/e2e/landing-to-editor6.spec.js",
+          "tests/e2e/landing-to-editor-query.spec.js",
+          "tests/e2e/landing-to-editor-comment.spec.js",
+          "tests/e2e/query-workflow.spec.js",
+          "tests/e2e/query-comment.spec.js",
+          "tests/e2e/insert-comment-basic.spec.js"
+        ],
+        "tags": ["regression", "all"]
+      }
+    ],
+    "browsers": [
+      {
+        "id": "chrome",
+        "playwrightProject": "chromium",
+        "engine": "chromium",
+        "channel": "chrome",
+        "status": "supported"
+      },
+      {
+        "id": "firebox",
+        "aliasOf": "firefox",
+        "playwrightProject": "firefox",
+        "engine": "firefox",
+        "status": "supported-with-alias"
+      },
+      {
+        "id": "opera",
+        "playwrightProject": "chromium",
+        "engine": "chromium",
+        "status": "custom-path-needed",
+        "notes": "Use Chromium project with Opera executablePath in a custom Playwright project."
+      },
+      {
+        "id": "brave",
+        "playwrightProject": "chromium",
+        "engine": "chromium",
+        "status": "custom-path-needed",
+        "notes": "Use Chromium project with Brave executablePath in a custom Playwright project."
+      },
+      {
+        "id": "edge",
+        "playwrightProject": "chromium",
+        "engine": "chromium",
+        "channel": "msedge",
+        "status": "supported"
+      }
+    ]
+  },
+  "selectionOrder": [
+    "workflow",
+    "role",
+    "testingType",
+    "browser"
+  ],
+  "profileTemplate": "{workflow}.{role}.{testingType}.{browser}",
+  "exampleProfiles": [
+    "author-editor-collator.Author.comment-basic.chrome",
+    "author-editor-collator.Editor.query-regression.edge",
+    "editor-author-collator.Co-Author.all-basic.firebox",
+    "editor-author-collator.Collator.all-regression.chrome"
+  ],
+  "defaults": {
+    "workflow": "author-editor-collator",
+    "role": "Author",
+    "testingType": "comment-basic",
+    "browser": "chrome"
+  }
+}

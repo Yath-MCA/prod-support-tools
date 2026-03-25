@@ -1,0 +1,12 @@
+# Test reports and artifacts
+tests/reports/
+test-results/
+playwright-report/
+
+# Screenshots and videos
+tests/e2e/**/*.png
+tests/e2e/**/*.mp4
+tests/e2e/**/*.webm
+
+# Playwright cache
+.playwright/

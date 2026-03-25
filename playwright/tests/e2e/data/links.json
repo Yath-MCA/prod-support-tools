@@ -1,0 +1,74 @@
+{
+  "_format": "client → role → status → [urls]. Role is determined by what window.SHARED_KEY.rolename returns when the URL is loaded. Populate from assets/links.json after navigating each URL to confirm the role.",
+  "_source": "Real URLs with real keys live in playwright/assets/links.json (legacy format: client → articleId → status). Use that file as the authoritative URL pool until this file is fully populated per role.",
+
+  "lww": {
+    "author": {
+      "active":   [
+        "http://localhost/impactweb_live/dist/validateurllww.html?key=HgnqXDUGGRmt5M585EzdEpXKK6kNtQ688UCY8t-_7P_80rnnHfmyNjiEOm41p5A4apYW3qAffNk4nHO9Y5sAKZN_m9rqnZ7PsbbsHDYyuiByQ08bXZqIkzNZBHiJhIm1wMODt9gupFC0",
+        "http://localhost/impactweb_live/dist/validateurllww.html?key=HgnqXDUGGRmt5M585EzdEpXKK6kNtQ688UCY8t-_7P_80rnnHfmyNjiEOm41p5A4apYW3qAffNme-thlUXsuQGmTys20FAkqycqxNmYLyS1hCbzv_mthM6tpvs7zZgO5MODt9gupFC0"
+      ],
+      "signoff":  [
+        "http://localhost/impactweb_live/dist/validateurllww.html?key=HgnqXDUGGRmt5M585EzdEpXKK6kNtQ688UCY8t-_7P_80rnnHfmyNjiEOm41p5A4apYW3qAffNlEyb5sAGA8acDy7uu3h1l_K-ltEJG_KoTr2xXzMLiXtK_sThjEpl0dMODt9gupFC0"
+      ],
+      "deactive": []
+    },
+    "editor": {
+      "active":   [],
+      "signoff":  [
+        "http://localhost/impactweb_live/dist/validateurllww.html?key=HgnqXDUGGRmt5M585EzdEpXKK6kNtQ688UCY8t-_7P_80rnnHfmyNjiEOm41p5A4apYW3qAffNm5F-cobT8Q5LHRP7K6ukUlGivoC0D_GqRutHz37n59sIHfXTM-ws-oMODt9gupFC0"
+      ],
+      "deactive": []
+    },
+    "collator": {
+      "active":   [],
+      "signoff":  []
+    }
+  },
+
+  "medknow": {
+    "author": {
+      "active":   [
+        "http://localhost/impactweb_live/dist/validateurlmedknow.html?key=HgnqXDUGGRmt5M585EzdEpXKK6kNtQ688UCY8t-_7P_80rnnHfmyNjiEOm41p5A4apYW3qAffNm436NTgvhJ2JH3FhVCcXE5sV6VLgGjdQJWI-kiInLAO78VX06GrBrXMODt9gupFC0"
+      ],
+      "signoff":  [],
+      "deactive": []
+    },
+    "editor": {
+      "active":   [],
+      "signoff":  []
+    }
+  },
+
+  "oup": {
+    "author": {
+      "active":   [],
+      "signoff":  [],
+      "deactive": []
+    },
+    "editor": {
+      "active":   [],
+      "signoff":  []
+    }
+  },
+
+  "plos": {
+    "author": {
+      "active":   [],
+      "signoff":  [],
+      "deactive": []
+    }
+  },
+
+  "brill": {
+    "author": {
+      "active":   [],
+      "signoff":  [],
+      "deactive": []
+    },
+    "editor": {
+      "active":   [],
+      "signoff":  []
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+    "local": {
+        "baseURL": "http://localhost/impactweb_live/dist/validateurlmedknow.html?key=HgnqXDUGGRmt5M585EzdEpXKK6kNtQ688UCY8t-_7P_80rnnHfmyNjiEOm41p5A4apYW3qAffNm436NTgvhJ2JH3FhVCcXE5sV6VLgGjdQJWI-kiInLAO78VX06GrBrXMODt9gupFC0",
+        "browser": "chromium"
+    },
+    "dev": {
+        "baseURL": "https://dev.example.com/",
+        "browser": "chromium"
+    },
+    "uat": {
+        "baseURL": "https://uat.example.com/",
+        "browser": "firefox"
+    },
+    "replica": {
+        "baseURL": "https://replica.example.com/",
+        "browser": "webkit"
+    },
+    "prod": {
+        "baseURL": "https://example.com/",
+        "browser": "chromium"
+    },
+    "ci": {
+        "baseURL": "",
+        "browser": "chromium",
+        "headless": true,
+        "retries": 1,
+        "workers": 2
+    }
+}

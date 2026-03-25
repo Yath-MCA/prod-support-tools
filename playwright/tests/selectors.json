@@ -1,0 +1,103 @@
+{
+    "landing": {
+        "clientIcon": ".navbar-brand img",
+        "submit": "[id='ValidateBtnOpt']",
+        "title1": "#title1",
+        "title2": "#title2",
+        "authorname": "#authorname",
+        "faqPdf": "a[title='Frequently Asked Questions']",
+        "userGuidePdf": "a[title='User Guide']",
+        "supportEmail": "#support_mail_id"
+    },
+    "editor": {
+        "save": "#filesaving",
+        "profileMenu": "#profileGroup",
+        "logout": "#log_out_btn",
+        "toaster": ".swal2-popup",
+        "toasterContent": ".swal2-content",
+        "toasterConfirm": ".swal2-confirm",
+        "editorInstance": ".cke_editable, #cke_mainDiv, [contenteditable='true']",
+        "editorIframe": "iframe.cke_wysiwyg_frame",
+        "insertTag": "insert",
+        "delTag": "del",
+        "trackChanges": "[data-hid]"
+    },
+    "editor6": {
+        "save": "#filesaving",
+        "profileMenu": "#profileGroup",
+        "logout": "#log_out_btn",
+        "toaster": ".swal2-popup",
+        "toasterContent": ".swal2-content",
+        "toasterConfirm": ".swal2-confirm",
+        "editorInstance": ".cke_editable, #cke_mainDiv, [contenteditable='true']",
+        "editorIframe": "iframe.cke_wysiwyg_frame",
+        "insertTag": "insert",
+        "delTag": "del",
+        "trackChanges": "[data-hid]"
+    },
+    "queryPanel": {
+        "container": "#queryPanel, .query-panel, [data-panel='query']",
+        "tabQueries": ".tab-queries, [data-tab='queries']",
+        "tabComments": ".tab-comments, [data-tab='comments']",
+        "queryItem": ".query-item, [data-query-id]",
+        "queryLabel": ".data-label, .query-label",
+        "queryStatus": ".query-status, [data-status]",
+        "totalCount": ".total-count, #totalQueries",
+        "openCount": ".open-count, #openQueries",
+        "closedCount": ".closed-count, #closedQueries",
+        "commentCount": ".comment-count, #totalComments",
+        "refreshButton": ".refresh-btn, [data-action='refresh']",
+        "expandAllButton": ".expand-all, [data-action='expand-all']",
+        "collapseAllButton": ".collapse-all, [data-action='collapse-all']",
+        "comment_tab": "[id^='btn_cts']",
+        "add_comment": "[id^='addcmt']"
+    },
+    "query_comment_dialog": {
+        "root": "#queryDialog",
+        "header": "#header_text",
+        "label": ".user-detail-info[data-role], .user-detail-info",
+
+        "commentInput": "#queryDialog #dialog-reply-input",
+        "attachBtn": "#queryDialog .attach-btn",
+        "clearBtn": "#queryDialog .clear-btn, #queryDialog .delete-btn",
+        "insertBtn": "#queryDialog .save-btn",
+
+        "closeIcon": "#queryDialog .closeIcons img.n_Img, #queryDialog .closeIcons",
+        "fileInput": "#queryDialog input.file-input[type='file']",
+
+        "attachmentPreview": "#queryDialog .attachment-preview, #queryDialog .file-attachment-preview, #queryDialog .query-file-preview, #queryDialog .query-attachment-container",
+        "attachmentCount": "#queryDialog .attach-counts, #queryDialog .attachment-count, #queryDialog .file-count, #queryDialog .query-attachment-count",
+        "attachmentItem": "#queryDialog .attachment-preview-item, #queryDialog [data-filename], #queryDialog .attachment-item, #queryDialog .query-file-item",
+        "attachmentItemName": "#queryDialog .attachment-preview-item span[data-trim='yes']",
+        "attachmentItemSize": "#queryDialog .attachment-preview-item .text-muted",
+        "attachmentRemoveBtn": "#queryDialog .remove-attachment, #queryDialog .remove-btn, #queryDialog .delete-attachment",
+        "attachmentIcon": "#queryDialog .fa-paperclip, #queryDialog .paperclip-icon"
+    },
+    "sweetToaster": {
+        "root": ".swal2-popup, .toast-notification",
+        "message": ".swal2-html-container, .swal2-content",
+        "confirmButton": ".swal2-confirm"
+    },
+    "alert_dialog": {
+        "root": "#AlertNewDialogModule, .AlertNewDialogModule",
+        "message": "#AlertNewDialogModule .swal2-html-container, .AlertNewDialogModule .swal2-content",
+        "okButton": "#AlertNewDialogModule button, #AlertNewDialogModule .btn",
+        "outlineDangerBtn": "#outline-danger",
+        "dangerBtn": "#danger",
+        "successBtn": "#sucess"
+    },
+    "commentPanel": {
+        "comment_tab": "[id^='btn_cts']",
+        "add_comment": "[id^='addcmt']",
+        "group": ".comment-group#comment",
+        "total": "[id='cTotal']",
+        "comment_list": ".comment-list",
+        "comment_item": ".query-item[data-status='comment']"
+    },
+    "cjk": {
+        "insertTag": "insert",
+        "delTag": "del",
+        "nestedInsertInDel": "del insert",
+        "nestedDelInInsert": "insert del"
+    }
+}
