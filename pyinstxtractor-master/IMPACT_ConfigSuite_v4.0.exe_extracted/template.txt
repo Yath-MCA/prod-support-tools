@@ -1,0 +1,9 @@
+JSR
+table-wrap//tr/th/italic=bolditalic
+table-wrap-foot/fn/label=sup
+contrib/xref/sup=sup
+contrib//x[@xml:space=","]=sup
+contrib/xref/x=sup
+aff//label=sup
+underline=Underline
+disp-formula/label=eqnlabel(rightalign)

@@ -1,0 +1,2655 @@
+{
+  "main": {
+    "file": "main.pyc",
+    "classes": {
+      "__init__": {
+        "doc": "IMPACT Configuration Suite v3.0",
+        "line": 23,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root"
+        ],
+        "names_used": [
+          "root",
+          "title",
+          "geometry",
+          "minsize",
+          "dark_mode",
+          "dark_theme",
+          "light_theme",
+          "load_branding_images",
+          "ttk",
+          "Style",
+          "style",
+          "apply_theme",
+          "Frame",
+          "header_frame",
+          "pack",
+          "tk",
+          "TOP",
+          "X",
+          "hasattr",
+          "Label"
+        ]
+      },
+      "on_closing": {
+        "doc": "Cleanup on application exit",
+        "line": 101,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "hasattr",
+          "search_app",
+          "on_closing",
+          "root",
+          "destroy"
+        ]
+      },
+      "load_branding_images": {
+        "doc": "Load global logos and application icon",
+        "line": 107,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "logo_folder",
+          "impact_path",
+          "img",
+          "newgen_path",
+          "icon_path",
+          "icon_img",
+          "photo",
+          "e"
+        ],
+        "names_used": [
+          "os",
+          "path",
+          "join",
+          "dirname",
+          "abspath",
+          "__file__",
+          "exists",
+          "Image",
+          "open",
+          "resize",
+          "LANCZOS",
+          "ImageTk",
+          "PhotoImage",
+          "logo_img",
+          "newgen_img",
+          "root",
+          "wm_iconphoto",
+          "app_icon",
+          "Exception",
+          "print"
+        ]
+      },
+      "apply_theme": {
+        "doc": "Apply the current theme to the application",
+        "line": 135,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "available",
+          "target",
+          "fallback"
+        ],
+        "names_used": [
+          "HAS_THEMES",
+          "root",
+          "get_themes",
+          "dark_mode",
+          "dark_theme",
+          "light_theme",
+          "set_theme",
+          "style",
+          "theme_use"
+        ]
+      },
+      "toggle_theme": {
+        "doc": "Toggle between light and dark themes",
+        "line": 150,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "app_name",
+          "sub_app"
+        ],
+        "names_used": [
+          "dark_mode",
+          "apply_theme",
+          "hasattr",
+          "getattr",
+          "refresh_theme",
+          "theme_btn",
+          "config",
+          "status_var",
+          "set"
+        ]
+      }
+    },
+    "functions": {
+      "ImpactConfigSuite": {
+        "doc": "ImpactConfigSuite",
+        "line": 22,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__init__",
+          "on_closing",
+          "load_branding_images",
+          "apply_theme",
+          "toggle_theme",
+          "__static_attributes__"
+        ]
+      },
+      "main": {
+        "doc": "",
+        "line": 169,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "root",
+          "app"
+        ],
+        "names_used": [
+          "HAS_THEMES",
+          "ThemedTk",
+          "tk",
+          "Tk",
+          "ImpactConfigSuite",
+          "mainloop"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "main.py",
+    "names": [
+      "tkinter",
+      "tk",
+      "ttk",
+      "messagebox",
+      "os",
+      "sys",
+      "path",
+      "append",
+      "dirname",
+      "abspath",
+      "__file__",
+      "ttkthemes",
+      "ThemedTk",
+      "HAS_THEMES",
+      "ImportError",
+      "PIL",
+      "Image",
+      "ImageTk",
+      "ImageSequence",
+      "editor_app",
+      "XMLConfigEditor",
+      "tools_app",
+      "ConfigToolsApp",
+      "analyses_tab",
+      "AnalysesTab",
+      "patterns_tab",
+      "PatternsTab",
+      "search_tab",
+      "SearchTab",
+      "ImpactConfigSuite"
+    ],
+    "strings": [
+      "ImpactConfigSuite"
+    ]
+  },
+  "book_analyzer": {
+    "file": "analyses/__pycache__/book_analyzer.cpython-313.pyc",
+    "classes": {
+      "__init__": {
+        "doc": "",
+        "line": 781,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "config",
+          "cache",
+          "analyzer",
+          "logger",
+          "config_parser"
+        ],
+        "names_used": [
+          "root",
+          "config",
+          "cache",
+          "analyzer",
+          "logger",
+          "config_parser",
+          "_setup_window",
+          "_setup_widgets",
+          "_load_last_session"
+        ]
+      },
+      "_ensure_dirs": {
+        "doc": "Create necessary directories.",
+        "line": 61,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "LOG_DIR",
+          "mkdir"
+        ]
+      },
+      "load": {
+        "doc": "Load configuration from file.",
+        "line": 65,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "f",
+          "e"
+        ],
+        "names_used": [
+          "CONFIG_FILE",
+          "exists",
+          "open",
+          "json",
+          "load",
+          "_config",
+          "Exception",
+          "print"
+        ]
+      },
+      "save": {
+        "doc": "Save cache to file with size limit.",
+        "line": 155,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "sorted_keys",
+          "k",
+          "f",
+          "e"
+        ],
+        "names_used": [
+          "len",
+          "data",
+          "max_items",
+          "sorted",
+          "keys",
+          "open",
+          "cache_file",
+          "json",
+          "dump",
+          "Exception",
+          "print"
+        ]
+      },
+      "get": {
+        "doc": "Get cached value.",
+        "line": 171,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "key"
+        ],
+        "names_used": [
+          "data",
+          "get"
+        ]
+      },
+      "get_log_path": {
+        "doc": "Get today's log file path.",
+        "line": 88,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "LOG_DIR",
+          "datetime",
+          "now",
+          "strftime"
+        ]
+      },
+      "_setup": {
+        "doc": "Configure logging.",
+        "line": 109,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "config",
+          "log_file"
+        ],
+        "names_used": [
+          "get_log_path",
+          "logging",
+          "basicConfig",
+          "INFO",
+          "getLogger",
+          "__name__",
+          "logger"
+        ]
+      },
+      "info": {
+        "doc": "",
+        "line": 120,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "msg"
+        ],
+        "names_used": [
+          "logger",
+          "info"
+        ]
+      },
+      "error": {
+        "doc": "",
+        "line": 123,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "msg"
+        ],
+        "names_used": [
+          "logger",
+          "error"
+        ]
+      },
+      "warning": {
+        "doc": "",
+        "line": 126,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "msg"
+        ],
+        "names_used": [
+          "logger",
+          "warning"
+        ]
+      },
+      "_load": {
+        "doc": "Load cache from file.",
+        "line": 145,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "f"
+        ],
+        "names_used": [
+          "cache_file",
+          "exists",
+          "open",
+          "json",
+          "load",
+          "Exception"
+        ]
+      },
+      "set": {
+        "doc": "Set cache value.",
+        "line": 175,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "key",
+          "value",
+          "timestamp"
+        ],
+        "names_used": [
+          "datetime",
+          "now",
+          "timestamp",
+          "data",
+          "save"
+        ]
+      },
+      "clear": {
+        "doc": "Clear all cache.",
+        "line": 183,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "data",
+          "cache_file",
+          "exists",
+          "unlink"
+        ]
+      },
+      "__len__": {
+        "doc": "",
+        "line": 189,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "len",
+          "data"
+        ]
+      },
+      "_parse": {
+        "doc": "Parse HTML/XML file into DOM tree.",
+        "line": 212,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "f",
+          "raw_bytes",
+          "parser",
+          "e"
+        ],
+        "names_used": [
+          "open",
+          "file_path",
+          "read",
+          "lx_etree",
+          "HTMLParser",
+          "fromstring",
+          "tree",
+          "root",
+          "logger",
+          "info",
+          "Exception",
+          "error"
+        ]
+      },
+      "query": {
+        "doc": "Execute XPath query on document.",
+        "line": 229,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "xpath_expr",
+          "e"
+        ],
+        "names_used": [
+          "tree",
+          "xpath",
+          "Exception",
+          "logger",
+          "error"
+        ]
+      },
+      "query_one": {
+        "doc": "Execute XPath query and get first result.",
+        "line": 240,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "xpath_expr",
+          "results"
+        ],
+        "names_used": [
+          "query"
+        ]
+      },
+      "get_text": {
+        "doc": "Extract all text content from element.",
+        "line": 245,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element"
+        ],
+        "names_used": [
+          "isinstance",
+          "list",
+          "join",
+          "itertext",
+          "strip"
+        ]
+      },
+      "get_clean_text": {
+        "doc": "Extract text but avoid slurping entire content if tags are unclosed.",
+        "line": 254,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element",
+          "max_len",
+          "text_parts",
+          "text",
+          "result"
+        ],
+        "names_used": [
+          "isinstance",
+          "list",
+          "itertext",
+          "append",
+          "sum",
+          "join",
+          "strip",
+          "len"
+        ]
+      },
+      "get_attribute": {
+        "doc": "Get attribute value from element.",
+        "line": 272,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element",
+          "attr_name"
+        ],
+        "names_used": [
+          "isinstance",
+          "list",
+          "get"
+        ]
+      },
+      "element_to_string": {
+        "doc": "Convert element to string.",
+        "line": 279,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element"
+        ],
+        "names_used": [
+          "isinstance",
+          "list",
+          "lx_etree",
+          "tostring"
+        ]
+      },
+      "get_title_text": {
+        "doc": "Specifically extract title text, ignoring nested figures/tables.",
+        "line": 287,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element",
+          "max_len",
+          "text_parts",
+          "skip_tags",
+          "node",
+          "result"
+        ],
+        "names_used": [
+          "isinstance",
+          "list",
+          "print",
+          "hasattr",
+          "tag",
+          "iter",
+          "text",
+          "append",
+          "tail",
+          "sum",
+          "join",
+          "split",
+          "strip",
+          "len"
+        ]
+      },
+      "find_all": {
+        "doc": "Find all elements matching selector.",
+        "line": 337,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "selector_name"
+        ],
+        "names_used": [
+          "SELECTORS",
+          "ValueError",
+          "dom",
+          "query"
+        ]
+      },
+      "find_in_element": {
+        "doc": "Find elements within a specific element.",
+        "line": 343,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element",
+          "selector_name",
+          "xpath"
+        ],
+        "names_used": [
+          "SELECTORS",
+          "ValueError",
+          "xpath",
+          "Exception"
+        ]
+      },
+      "find_by_id": {
+        "doc": "Find element by ID attribute.",
+        "line": 354,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element_id"
+        ],
+        "names_used": [
+          "dom",
+          "query_one"
+        ]
+      },
+      "find_children_with_attr": {
+        "doc": "Find children with specific attribute value.",
+        "line": 358,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element",
+          "attr_name",
+          "attr_value",
+          "xpath"
+        ],
+        "names_used": [
+          "xpath"
+        ]
+      },
+      "get_custom": {
+        "doc": "Execute custom XPath expression.",
+        "line": 363,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "xpath_expr"
+        ],
+        "names_used": [
+          "dom",
+          "query"
+        ]
+      },
+      "extract": {
+        "doc": "Extract all chapters.",
+        "line": 516,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "chapters",
+          "chapter_elements",
+          "i",
+          "chapter",
+          "chapter_data"
+        ],
+        "names_used": [
+          "selector",
+          "find_all",
+          "enumerate",
+          "_extract_chapter_data",
+          "append",
+          "logger",
+          "info",
+          "len"
+        ]
+      },
+      "extract_all": {
+        "doc": "Extract all element categories.",
+        "line": 438,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "results",
+          "key",
+          "config"
+        ],
+        "names_used": [
+          "ELEMENT_CONFIGS",
+          "items",
+          "_extract_category"
+        ]
+      },
+      "_extract_category": {
+        "doc": "Extract items for a specific category.",
+        "line": 449,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "selector_name",
+          "items",
+          "found_ids",
+          "elements",
+          "element",
+          "elem_id",
+          "label",
+          "citations"
+        ],
+        "names_used": [
+          "set",
+          "selector",
+          "find_all",
+          "dom",
+          "get_attribute",
+          "add",
+          "_extract_label",
+          "citation_map",
+          "get",
+          "append",
+          "len"
+        ]
+      },
+      "_extract_label": {
+        "doc": "Extract label text from element using DOM queries.",
+        "line": 483,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "element",
+          "label_elem",
+          "caption_elem",
+          "span_label",
+          "text"
+        ],
+        "names_used": [
+          "xpath",
+          "dom",
+          "get_text"
+        ]
+      },
+      "_extract_chapter_data": {
+        "doc": "Extract data from a single chapter element.",
+        "line": 531,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "chapter_elem",
+          "index",
+          "title_node",
+          "chap_title",
+          "label_node",
+          "chap_label",
+          "fig_count",
+          "tab_count",
+          "ref_count"
+        ],
+        "names_used": [
+          "selector",
+          "find_in_element",
+          "dom",
+          "get_title_text",
+          "len",
+          "strip"
+        ]
+      },
+      "parse": {
+        "doc": "Extract client and file ID from config file.",
+        "line": 564,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "doc_dir",
+          "config_path",
+          "result",
+          "dom",
+          "client_elem",
+          "file_id_elem",
+          "e"
+        ],
+        "names_used": [
+          "Path",
+          "exists",
+          "DOMParser",
+          "logger",
+          "query_one",
+          "get_text",
+          "strip",
+          "Exception",
+          "error"
+        ]
+      },
+      "analyze": {
+        "doc": "Analyze document directory.",
+        "line": 602,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "doc_dir",
+          "doc_id",
+          "is_specific",
+          "content_file",
+          "mtime",
+          "cache_key",
+          "cached",
+          "dom",
+          "selector"
+        ],
+        "names_used": [
+          "_find_content_file",
+          "logger",
+          "warning",
+          "os",
+          "path",
+          "getmtime",
+          "cache",
+          "get",
+          "info",
+          "DOMParser",
+          "DOMQuerySelector",
+          "CitationExtractor",
+          "extract",
+          "ElementExtractor",
+          "extract_all",
+          "ChapterExtractor",
+          "len",
+          "set",
+          "Exception",
+          "error"
+        ]
+      },
+      "_find_content_file": {
+        "doc": "Find content file in directory.",
+        "line": 650,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "doc_dir",
+          "doc_id",
+          "is_specific",
+          "doc_path",
+          "orig",
+          "f"
+        ],
+        "names_used": [
+          "Path",
+          "exists",
+          "glob",
+          "name"
+        ]
+      },
+      "find_doc_dirs": {
+        "doc": "Find all document directories.",
+        "line": 671,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "recursive",
+          "docs",
+          "root_path",
+          "item"
+        ],
+        "names_used": [
+          "Path",
+          "rglob",
+          "append",
+          "parent",
+          "iterdir",
+          "is_dir",
+          "exists",
+          "sorted"
+        ]
+      },
+      "_setup_window": {
+        "doc": "Setup main window.",
+        "line": 793,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "root",
+          "title",
+          "geometry",
+          "configure"
+        ]
+      },
+      "_setup_widgets": {
+        "doc": "Create UI widgets.",
+        "line": 799,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "main_frame",
+          "path_frame",
+          "btn_frame"
+        ],
+        "names_used": [
+          "tk",
+          "Frame",
+          "root",
+          "pack",
+          "Label",
+          "StringVar",
+          "config",
+          "get",
+          "path_var",
+          "Entry",
+          "Button",
+          "_browse_path",
+          "param_var",
+          "BooleanVar",
+          "recursive_var",
+          "Checkbutton",
+          "_run_analysis",
+          "_clear_cache",
+          "status_var",
+          "len"
+        ]
+      },
+      "_load_last_session": {
+        "doc": "Load previous session data.",
+        "line": 831,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": []
+      },
+      "_browse_path": {
+        "doc": "",
+        "line": 835,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "path"
+        ],
+        "names_used": [
+          "filedialog",
+          "askdirectory",
+          "path_var",
+          "set"
+        ]
+      },
+      "_clear_cache": {
+        "doc": "Cache cleared.",
+        "line": 840,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "cache",
+          "clear",
+          "cache_info",
+          "config",
+          "messagebox",
+          "showinfo"
+        ]
+      },
+      "_run_analysis": {
+        "doc": "Execute analysis.",
+        "line": 845,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root_path",
+          "parameter",
+          "recursive",
+          "pot_doc",
+          "is_id_mode",
+          "all_dirs",
+          "doc_results",
+          "global_stats",
+          "target_client"
+        ],
+        "names_used": [
+          "path_var",
+          "get",
+          "strip",
+          "param_var",
+          "recursive_var",
+          "Path",
+          "exists",
+          "messagebox",
+          "showerror",
+          "config",
+          "save",
+          "status_var",
+          "set",
+          "root",
+          "update",
+          "is_dir",
+          "analyzer",
+          "find_doc_dirs",
+          "config_parser",
+          "parse"
+        ]
+      }
+    },
+    "functions": {
+      "track_performance": {
+        "doc": "Decorator to log function start/end times and save to file.",
+        "line": 18,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "func",
+          "wrapper"
+        ],
+        "names_used": [
+          "functools",
+          "wraps"
+        ]
+      },
+      "wrapper": {
+        "doc": "function_logs.txt",
+        "line": 20,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "args",
+          "kwargs",
+          "log_file",
+          "start_time",
+          "start_ts",
+          "f",
+          "result",
+          "end_time",
+          "end_ts",
+          "duration"
+        ],
+        "names_used": [
+          "Path",
+          "__file__",
+          "parent",
+          "time",
+          "datetime",
+          "now",
+          "strftime",
+          "print",
+          "__name__",
+          "open",
+          "write"
+        ]
+      },
+      "Config": {
+        "doc": "Centralized configuration management.",
+        "line": 42,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "Path",
+          "__file__",
+          "parent",
+          "absolute",
+          "BASE_DIR",
+          "CACHE_FILE",
+          "CONFIG_FILE",
+          "LOG_DIR",
+          "DEFAULTS",
+          "__init__",
+          "_ensure_dirs",
+          "load",
+          "save",
+          "get",
+          "get_log_path"
+        ]
+      },
+      "Logger": {
+        "doc": "Logging setup and management.",
+        "line": 98,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "_instance",
+          "__new__",
+          "_setup",
+          "info",
+          "error",
+          "warning",
+          "__static_attributes__",
+          "__classcell__"
+        ]
+      },
+      "__new__": {
+        "doc": "",
+        "line": 103,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "cls",
+          "config"
+        ],
+        "names_used": [
+          "_instance",
+          "super",
+          "Logger",
+          "__new__",
+          "_setup"
+        ]
+      },
+      "Cache": {
+        "doc": "Cache management with size limits.",
+        "line": 137,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "__init__",
+          "_load",
+          "save",
+          "get",
+          "set",
+          "clear",
+          "__len__",
+          "__static_attributes__"
+        ]
+      },
+      "DOMParser": {
+        "doc": "Parse HTML/XML using LXML DOM and XPath queries.",
+        "line": 201,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "track_performance",
+          "__init__",
+          "_parse",
+          "query",
+          "query_one",
+          "get_text",
+          "get_clean_text",
+          "get_attribute",
+          "element_to_string",
+          "get_title_text",
+          "__static_attributes__"
+        ]
+      },
+      "DOMQuerySelector": {
+        "doc": "DOMQuerySelector",
+        "line": 319,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "SELECTORS",
+          "__init__",
+          "find_all",
+          "find_in_element",
+          "find_by_id",
+          "find_children_with_attr",
+          "get_custom",
+          "__static_attributes__"
+        ]
+      },
+      "CitationExtractor": {
+        "doc": "CitationExtractor",
+        "line": 371,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "__init__",
+          "track_performance",
+          "extract",
+          "__static_attributes__"
+        ]
+      },
+      "ElementExtractor": {
+        "doc": "ElementExtractor",
+        "line": 410,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "ELEMENT_CONFIGS",
+          "__init__",
+          "track_performance",
+          "extract_all",
+          "_extract_category",
+          "_extract_label",
+          "__static_attributes__"
+        ]
+      },
+      "ChapterExtractor": {
+        "doc": "ChapterExtractor",
+        "line": 508,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "__init__",
+          "track_performance",
+          "extract",
+          "_extract_chapter_data",
+          "__static_attributes__"
+        ]
+      },
+      "ConfigParser": {
+        "doc": "ConfigParser",
+        "line": 558,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "__init__",
+          "parse",
+          "__static_attributes__"
+        ]
+      },
+      "ContentAnalyzer": {
+        "doc": "ContentAnalyzer",
+        "line": 595,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "__init__",
+          "track_performance",
+          "analyze",
+          "_find_content_file",
+          "find_doc_dirs",
+          "__static_attributes__"
+        ]
+      },
+      "ReportGenerator": {
+        "doc": "ReportGenerator",
+        "line": 693,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "track_performance",
+          "staticmethod",
+          "build_doc_blocks",
+          "_build_doc_section",
+          "save_report",
+          "__static_attributes__"
+        ]
+      },
+      "build_doc_blocks": {
+        "doc": "Build HTML blocks for each document.",
+        "line": 696,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "doc_results",
+          "blocks",
+          "dr",
+          "doc_id"
+        ],
+        "names_used": [
+          "replace",
+          "ReportGenerator",
+          "_build_doc_section"
+        ]
+      },
+      "_build_doc_section": {
+        "doc": "Build single document section HTML.",
+        "line": 706,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "doc",
+          "doc_id",
+          "ch_summary_html",
+          "ch",
+          "tabs_header",
+          "content_html",
+          "key",
+          "cat",
+          "rows",
+          "itm"
+        ],
+        "names_used": [
+          "get",
+          "items",
+          "len",
+          "replace"
+        ]
+      },
+      "save_report": {
+        "doc": "Save report to file(s).",
+        "line": 757,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "report",
+          "filename",
+          "additional_paths",
+          "main_path",
+          "path"
+        ],
+        "names_used": [
+          "Path",
+          "write_text"
+        ]
+      },
+      "BookAnalyzerUI": {
+        "doc": "BookAnalyzerUI",
+        "line": 778,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "__doc__",
+          "__init__",
+          "_setup_window",
+          "_setup_widgets",
+          "_load_last_session",
+          "_browse_path",
+          "_clear_cache",
+          "_run_analysis",
+          "__static_attributes__"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\analyses\\book_analyzer.py",
+    "names": [
+      "os",
+      "json",
+      "time",
+      "logging",
+      "functools",
+      "datetime",
+      "pathlib",
+      "Path",
+      "track_performance",
+      "Config",
+      "Logger",
+      "Cache",
+      "lxml",
+      "etree",
+      "lx_etree",
+      "collections",
+      "defaultdict",
+      "DOMParser",
+      "DOMQuerySelector",
+      "CitationExtractor",
+      "ElementExtractor",
+      "ChapterExtractor",
+      "ConfigParser",
+      "ContentAnalyzer",
+      "ReportGenerator",
+      "tkinter",
+      "tk",
+      "filedialog",
+      "messagebox",
+      "webbrowser"
+    ],
+    "strings": [
+      "DOMQuerySelector",
+      "CitationExtractor",
+      "ElementExtractor",
+      "ChapterExtractor",
+      "ConfigParser",
+      "ContentAnalyzer",
+      "ReportGenerator",
+      "BookAnalyzerUI"
+    ]
+  },
+  "config_loader": {
+    "file": "core/__pycache__/config_loader.cpython-313.pyc",
+    "classes": {
+      "__init__": {
+        "doc": "config.json",
+        "line": 7,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "config_path",
+          "base_dir"
+        ],
+        "names_used": [
+          "os",
+          "path",
+          "dirname",
+          "abspath",
+          "__file__",
+          "join",
+          "config_path",
+          "load_config",
+          "config"
+        ]
+      },
+      "load_config": {
+        "doc": "Load configuration from JSON file",
+        "line": 17,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "f",
+          "e"
+        ],
+        "names_used": [
+          "open",
+          "config_path",
+          "json",
+          "load",
+          "FileNotFoundError",
+          "print",
+          "get_default_config",
+          "JSONDecodeError"
+        ]
+      },
+      "get_default_config": {
+        "doc": "Return default configuration",
+        "line": 29,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": []
+      },
+      "get_domain_url": {
+        "doc": "Get URL for a specific domain",
+        "line": 77,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "domain"
+        ],
+        "names_used": [
+          "config",
+          "get"
+        ]
+      },
+      "get_default_author": {
+        "doc": "Get default author information",
+        "line": 81,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "config"
+        ]
+      },
+      "get_file_pattern": {
+        "doc": "Get file pattern template",
+        "line": 85,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "config"
+        ]
+      },
+      "get_config_filename": {
+        "doc": "Get main config filename",
+        "line": 89,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "config"
+        ]
+      },
+      "get_excluded_files": {
+        "doc": "Get list of files to exclude from archiving",
+        "line": 93,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self"
+        ],
+        "names_used": [
+          "config"
+        ]
+      }
+    },
+    "functions": {
+      "ConfigLoader": {
+        "doc": "ConfigLoader",
+        "line": 6,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "str",
+          "__init__",
+          "Dict",
+          "Any",
+          "load_config",
+          "get_default_config",
+          "get_domain_url",
+          "get_default_author",
+          "get_file_pattern",
+          "get_config_filename",
+          "list",
+          "get_excluded_files",
+          "__static_attributes__"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_editor\\core\\config_loader.py",
+    "names": [
+      "json",
+      "os",
+      "typing",
+      "Dict",
+      "Any",
+      "ConfigLoader"
+    ],
+    "strings": [
+      "ConfigLoader"
+    ]
+  },
+  "file_manager": {
+    "file": "core/__pycache__/file_manager.cpython-313.pyc",
+    "classes": {
+      "__init__": {
+        "doc": "",
+        "line": 10,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "config"
+        ],
+        "names_used": [
+          "config_obj",
+          "hasattr",
+          "config"
+        ]
+      },
+      "cleanup_existing_archives": {
+        "doc": "\nRemove existing archive files from the folder\nReturns number of files deleted\n",
+        "line": 15,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "folder_path",
+          "file_id",
+          "zip_pattern",
+          "zip_files",
+          "specific_pattern",
+          "specific_files",
+          "deleted_count",
+          "zip_file",
+          "e"
+        ],
+        "names_used": [
+          "os",
+          "path",
+          "join",
+          "glob",
+          "extend",
+          "list",
+          "set",
+          "remove",
+          "print",
+          "basename",
+          "Exception"
+        ]
+      },
+      "rename_files_and_create_archive": {
+        "doc": "\nRename all files in folder and create zip archive\nExcludes files matching patterns in exclude_patterns\nOptionally cleans up existing archives first\n",
+        "line": 49,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "folder_path",
+          "file_id",
+          "exclude_patterns",
+          "cleanup_existing",
+          "deleted_count",
+          "all_files",
+          "root",
+          "dirs",
+          "files"
+        ],
+        "names_used": [
+          "cleanup_existing_archives",
+          "print",
+          "os",
+          "walk",
+          "any",
+          "path",
+          "join",
+          "append",
+          "zipfile",
+          "ZipFile",
+          "ZIP_DEFLATED",
+          "Path",
+          "suffix",
+          "write",
+          "Exception"
+        ]
+      },
+      "rename_files_and_create_archive_preserve_structure": {
+        "doc": "\nCreate archive preserving the original folder structure\n",
+        "line": 115,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "folder_path",
+          "file_id",
+          "exclude_patterns",
+          "cleanup_existing",
+          "archive_dir",
+          "archive_path",
+          "zipf",
+          "root",
+          "dirs"
+        ],
+        "names_used": [
+          "cleanup_existing_archives",
+          "os",
+          "path",
+          "join",
+          "zipfile",
+          "ZipFile",
+          "ZIP_DEFLATED",
+          "walk",
+          "any",
+          "relpath",
+          "write",
+          "print",
+          "Exception"
+        ]
+      },
+      "get_folder_summary": {
+        "doc": "Get summary of files in folder (excluding backups and archives)",
+        "line": 156,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "folder_path",
+          "total_files",
+          "total_folders",
+          "xml_files",
+          "pdf_files",
+          "archive_files",
+          "root",
+          "dirs",
+          "files"
+        ],
+        "names_used": [
+          "os",
+          "path",
+          "exists",
+          "walk",
+          "len",
+          "endswith"
+        ]
+      },
+      "create_backup": {
+        "doc": "Create backup of a file",
+        "line": 191,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "file_path",
+          "backup_path"
+        ],
+        "names_used": [
+          "config",
+          "shutil",
+          "copy2"
+        ]
+      },
+      "cleanup_temp_files": {
+        "doc": "Cleanup temporary files",
+        "line": 197,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "folder_path",
+          "file_id",
+          "temp_dir"
+        ],
+        "names_used": [
+          "os",
+          "path",
+          "join",
+          "exists",
+          "shutil",
+          "rmtree"
+        ]
+      },
+      "get_existing_archives": {
+        "doc": "Get list of existing archive files in folder",
+        "line": 203,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "folder_path",
+          "zip_pattern"
+        ],
+        "names_used": [
+          "os",
+          "path",
+          "join",
+          "glob"
+        ]
+      }
+    },
+    "functions": {
+      "FileManager": {
+        "doc": "FileManager",
+        "line": 9,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "Any",
+          "__init__",
+          "str",
+          "int",
+          "cleanup_existing_archives",
+          "List",
+          "bool",
+          "Optional",
+          "rename_files_and_create_archive",
+          "rename_files_and_create_archive_preserve_structure",
+          "Dict",
+          "get_folder_summary",
+          "create_backup",
+          "cleanup_temp_files",
+          "get_existing_archives",
+          "__static_attributes__"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "d:\\NEW_GEN\\LIVE_SUPPORT_2026\\MATH_WIRIS_MATH_LIVE\\xml_config_editor\\core\\file_manager.py",
+    "names": [
+      "os",
+      "shutil",
+      "zipfile",
+      "glob",
+      "typing",
+      "Tuple",
+      "Optional",
+      "List",
+      "Dict",
+      "Any",
+      "datetime",
+      "pathlib",
+      "Path",
+      "FileManager"
+    ],
+    "strings": [
+      "FileManager"
+    ]
+  },
+  "xml_processor": {
+    "file": "core/__pycache__/xml_processor.cpython-313.pyc",
+    "classes": {
+      "__init__": {
+        "doc": "",
+        "line": 9,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "config"
+        ],
+        "names_used": [
+          "config"
+        ]
+      },
+      "extract_base_identifier": {
+        "doc": "Extract base identifier from XML content",
+        "line": 12,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "xml_content",
+          "root",
+          "identifier_elem",
+          "file_id_elem",
+          "source_elem",
+          "text",
+          "patterns",
+          "pattern",
+          "match"
+        ],
+        "names_used": [
+          "ET",
+          "fromstring",
+          "find",
+          "text",
+          "re",
+          "match",
+          "group",
+          "endswith",
+          "split",
+          "config",
+          "Exception",
+          "print"
+        ]
+      },
+      "generate_file_id": {
+        "doc": "Generate file ID based on pattern",
+        "line": 54,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "base_id",
+          "domain",
+          "optional_suffix",
+          "current_date",
+          "pattern",
+          "file_id"
+        ],
+        "names_used": [
+          "datetime",
+          "now",
+          "strftime",
+          "config",
+          "get_file_pattern",
+          "format",
+          "strip"
+        ]
+      },
+      "update_contributor_info": {
+        "doc": "Update multiple contributors' information in XML\ncontributor_data: { 'role_name': { 'firstname': '...', ... }, ... }\n",
+        "line": 66,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "contributor_data",
+          "role",
+          "info",
+          "contributor"
+        ],
+        "names_used": [
+          "items",
+          "find",
+          "_update_existing_contributor",
+          "_create_new_contributor"
+        ]
+      },
+      "_create_new_contributor": {
+        "doc": "Create a new contributor element with a specific role following the sample structure",
+        "line": 79,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "role",
+          "info",
+          "contributor",
+          "fn",
+          "ln",
+          "email",
+          "sal",
+          "full_name"
+        ],
+        "names_used": [
+          "ET",
+          "Element",
+          "set",
+          "get",
+          "SubElement",
+          "text",
+          "append"
+        ]
+      },
+      "_update_existing_contributor": {
+        "doc": "Update existing contributor element based on sample structure",
+        "line": 108,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "contributor",
+          "info",
+          "role",
+          "fn",
+          "ln",
+          "email",
+          "sal",
+          "full_name",
+          "tags_needed"
+        ],
+        "names_used": [
+          "get",
+          "attrib",
+          "set",
+          "find",
+          "ET",
+          "SubElement",
+          "text"
+        ]
+      },
+      "update_link_info": {
+        "doc": "Update link-info element in XML",
+        "line": 140,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "link_info",
+          "link_elem"
+        ],
+        "names_used": [
+          "find",
+          "text",
+          "ET",
+          "Element",
+          "append"
+        ]
+      },
+      "update_identifiers": {
+        "doc": "Update identifier and file-id elements in XML",
+        "line": 151,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "file_id",
+          "identifier",
+          "file_id_elem"
+        ],
+        "names_used": [
+          "find",
+          "text",
+          "ET",
+          "Element",
+          "set",
+          "append"
+        ]
+      },
+      "update_visual_editor_settings": {
+        "doc": "Update visual editor settings in XML",
+        "line": 172,
+        "is_class": true,
+        "nested": [],
+        "varnames": [
+          "self",
+          "root",
+          "mathlive_enabled",
+          "mathtype_enabled",
+          "settings_elem",
+          "ml_elem",
+          "mt_elem"
+        ],
+        "names_used": [
+          "find",
+          "ET",
+          "Element",
+          "append",
+          "SubElement",
+          "text"
+        ]
+      }
+    },
+    "functions": {
+      "XMLProcessor": {
+        "doc": "XMLProcessor",
+        "line": 8,
+        "is_class": false,
+        "nested": [],
+        "varnames": [],
+        "names_used": [
+          "__name__",
+          "__module__",
+          "__qualname__",
+          "__firstlineno__",
+          "ConfigLoader",
+          "__init__",
+          "str",
+          "extract_base_identifier",
+          "generate_file_id",
+          "ET",
+          "Element",
+          "dict",
+          "update_contributor_info",
+          "_create_new_contributor",
+          "_update_existing_contributor",
+          "update_link_info",
+          "update_identifiers",
+          "bool",
+          "update_visual_editor_settings",
+          "__static_attributes__"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_editor\\core\\xml_processor.py",
+    "names": [
+      "xml.etree.ElementTree",
+      "etree",
+      "ElementTree",
+      "ET",
+      "re",
+      "datetime",
+      "typing",
+      "Tuple",
+      "Optional",
+      "config_loader",
+      "ConfigLoader",
+      "XMLProcessor"
+    ],
+    "strings": [
+      "XMLProcessor"
+    ]
+  },
+  "report_config": {
+    "file": "patterns/__pycache__/report_config.cpython-313.pyc",
+    "classes": {},
+    "functions": {},
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\patterns\\report_config.py",
+    "names": [
+      "os",
+      "datetime",
+      "path",
+      "dirname",
+      "abspath",
+      "__file__",
+      "CURRENT_DIR",
+      "join",
+      "PROJECT_ROOT",
+      "CLIENTCONFIG_DIR",
+      "SEARCH_PATTERN",
+      "LOG_DIR",
+      "makedirs",
+      "now",
+      "strftime",
+      "RUN_TIMESTAMP",
+      "LOG_FILE",
+      "OUT_JSON",
+      "OUT_HTML",
+      "OUT_XLSX",
+      "OUT_PATTERNS",
+      "IGNORE_CLIENTS",
+      "CITE_ATTRS",
+      "PART_LAB_ATTRS",
+      "LABEL_ATTRS",
+      "REF_ATTRS",
+      "REF_CITATION_ATTRS",
+      "SECTION_TAGS"
+    ],
+    "strings": [
+      "clientconfig",
+      "%Y-%m-%d_%H-%M-%S",
+      "impact_report_",
+      "text-format",
+      "data-label-format"
+    ]
+  },
+  "report_extract": {
+    "file": "patterns/__pycache__/report_extract.cpython-313.pyc",
+    "classes": {},
+    "functions": {
+      "normalize": {
+        "doc": "",
+        "line": 5,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "s"
+        ],
+        "names_used": [
+          "strip"
+        ]
+      },
+      "get_client_and_type": {
+        "doc": "",
+        "line": 7,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "path",
+          "p"
+        ],
+        "names_used": [
+          "replace",
+          "split",
+          "index",
+          "upper"
+        ]
+      },
+      "process_config": {
+        "doc": "Parsing XML: ",
+        "line": 13,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "path",
+          "client",
+          "type_",
+          "root",
+          "e",
+          "report",
+          "t",
+          "agg",
+          "get_display_value",
+          "j"
+        ],
+        "names_used": [
+          "log",
+          "get_client_and_type",
+          "cfg",
+          "IGNORE_CLIENTS",
+          "etree",
+          "parse",
+          "getroot",
+          "Exception",
+          "SECTION_TAGS",
+          "findall",
+          "normalize",
+          "get",
+          "REF_ATTRS",
+          "attrib",
+          "setdefault",
+          "set",
+          "add",
+          "REF_CITATION_ATTRS",
+          "LABEL_ATTRS",
+          "CITE_ATTRS"
+        ]
+      },
+      "get_display_value": {
+        "doc": "Convert raw value to display value, showing ⊘ empty for empty/None strings",
+        "line": 32,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "raw_v",
+          "v"
+        ],
+        "names_used": [
+          "strip"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\patterns\\report_extract.py",
+    "names": [
+      "lxml",
+      "etree",
+      "",
+      "report_config",
+      "cfg",
+      "report_log",
+      "log",
+      "normalize",
+      "get_client_and_type",
+      "process_config"
+    ],
+    "strings": []
+  },
+  "report_log": {
+    "file": "patterns/__pycache__/report_log.cpython-313.pyc",
+    "classes": {},
+    "functions": {
+      "log": {
+        "doc": "%Y-%m-%d %H:%M:%S",
+        "line": 5,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "msg",
+          "ts",
+          "line",
+          "f"
+        ],
+        "names_used": [
+          "datetime",
+          "now",
+          "strftime",
+          "print",
+          "open",
+          "cfg",
+          "LOG_FILE",
+          "write"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\patterns\\report_log.py",
+    "names": [
+      "datetime",
+      "",
+      "report_config",
+      "cfg",
+      "log"
+    ],
+    "strings": []
+  },
+  "report_patterns": {
+    "file": "patterns/__pycache__/report_patterns.cpython-313.pyc",
+    "classes": {},
+    "functions": {
+      "_journal_signatures_by_category": {
+        "doc": "Build separate signatures for Reference categories, Figure/Table, and Part Label",
+        "line": 6,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "items",
+          "ref_numbered_sigs",
+          "ref_unnumbered_sigs",
+          "ref_footnote_sigs",
+          "figtab_sigs",
+          "partlab_figure_sigs",
+          "partlab_table_sigs",
+          "journal_info",
+          "item",
+          "s"
+        ],
+        "names_used": [
+          "get",
+          "items",
+          "setdefault",
+          "append",
+          "cfg",
+          "SECTION_TAGS",
+          "startswith",
+          "join",
+          "sorted"
+        ]
+      },
+      "unify_cite_sig_parts": {
+        "doc": "Merge dircite/indircite signature parts into 'cite' if they have identical values",
+        "line": 105,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "parts",
+          "by_attr",
+          "other_parts",
+          "part",
+          "eq_idx",
+          "key",
+          "val",
+          "base_key",
+          "unified_parts",
+          "cite_vals"
+        ],
+        "names_used": [
+          "index",
+          "replace",
+          "setdefault",
+          "append",
+          "items"
+        ]
+      },
+      "_build_category_patterns": {
+        "doc": "Build patterns from signatures with given prefix",
+        "line": 157,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "sigs",
+          "prefix",
+          "groups",
+          "j",
+          "s",
+          "patterns",
+          "mapping",
+          "idx",
+          "sig",
+          "js"
+        ],
+        "names_used": [
+          "items",
+          "setdefault",
+          "append",
+          "sorted"
+        ]
+      },
+      "build_patterns": {
+        "doc": "Building patterns...",
+        "line": 175,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "items",
+          "ref_num_sigs",
+          "ref_unnum_sigs",
+          "ref_fn_sigs",
+          "figtab_sigs",
+          "partlab_fig_sigs",
+          "partlab_tab_sigs",
+          "journal_info",
+          "ref_num_patterns",
+          "ref_num_mapping"
+        ],
+        "names_used": [
+          "log",
+          "_journal_signatures_by_category",
+          "_build_category_patterns"
+        ]
+      },
+      "save_patterns_json": {
+        "doc": "Patterns saved ",
+        "line": 208,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "patterns",
+          "outpath",
+          "f"
+        ],
+        "names_used": [
+          "open",
+          "json",
+          "dump",
+          "log"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\patterns\\report_patterns.py",
+    "names": [
+      "json",
+      "",
+      "report_config",
+      "cfg",
+      "report_log",
+      "log",
+      "_journal_signatures_by_category",
+      "_build_category_patterns",
+      "build_patterns",
+      "save_patterns_json"
+    ],
+    "strings": []
+  },
+  "report_writer": {
+    "file": "patterns/__pycache__/report_writer.cpython-313.pyc",
+    "classes": {},
+    "functions": {
+      "_calc_category_stats": {
+        "doc": "",
+        "line": 8,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "patterns",
+          "total_in_cat",
+          "pattern_stats",
+          "pname",
+          "journals",
+          "count",
+          "pct",
+          "max_match",
+          "max_pct"
+        ],
+        "names_used": [
+          "sum",
+          "values",
+          "sorted",
+          "items",
+          "len",
+          "append"
+        ]
+      },
+      "write_json": {
+        "doc": "ref_numbered",
+        "line": 22,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "data",
+          "patterns",
+          "path",
+          "stats",
+          "total_ref",
+          "total_figtab",
+          "total_partlab",
+          "grand_total",
+          "out",
+          "f"
+        ],
+        "names_used": [
+          "_calc_category_stats",
+          "get",
+          "open",
+          "json",
+          "dump",
+          "log"
+        ]
+      },
+      "write_html": {
+        "doc": "HTML saved ",
+        "line": 54,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "data",
+          "patterns",
+          "mapping",
+          "sigs",
+          "path",
+          "ts",
+          "html",
+          "f"
+        ],
+        "names_used": [
+          "render_html",
+          "open",
+          "write",
+          "log"
+        ]
+      },
+      "write_excel": {
+        "doc": "ref_numbered",
+        "line": 59,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "data",
+          "patterns",
+          "path",
+          "wb",
+          "calc_category_stats",
+          "total_ref",
+          "total_figtab",
+          "total_partlab",
+          "summary_ws",
+          "c"
+        ],
+        "names_used": [
+          "Workbook",
+          "remove",
+          "active",
+          "get",
+          "create_sheet",
+          "append",
+          "Font",
+          "font",
+          "round",
+          "join",
+          "items",
+          "save",
+          "log"
+        ]
+      },
+      "calc_category_stats": {
+        "doc": "",
+        "line": 63,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "patterns_dict",
+          "total_in_cat",
+          "pattern_stats",
+          "pname",
+          "journals",
+          "count",
+          "pct"
+        ],
+        "names_used": [
+          "sum",
+          "values",
+          "sorted",
+          "items",
+          "len",
+          "append"
+        ]
+      },
+      "top_info": {
+        "doc": "",
+        "line": 91,
+        "is_class": false,
+        "nested": [],
+        "varnames": [
+          "cat_key",
+          "title",
+          "cat",
+          "pats",
+          "top"
+        ],
+        "names_used": [
+          "get",
+          "len",
+          "round"
+        ]
+      }
+    },
+    "constants": [],
+    "filename": "c:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\patterns\\report_writer.py",
+    "names": [
+      "report_log",
+      "log",
+      "report_template",
+      "render_html",
+      "",
+      "report_config",
+      "cfg",
+      "openpyxl",
+      "Workbook",
+      "openpyxl.styles",
+      "Font",
+      "json",
+      "_calc_category_stats",
+      "write_json",
+      "write_html",
+      "write_excel"
+    ],
+    "strings": []
+  }
+}

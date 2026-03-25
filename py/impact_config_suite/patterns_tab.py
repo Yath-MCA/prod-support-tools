@@ -13,6 +13,7 @@ from patterns.report_extract import process_config
 from patterns.report_patterns import build_patterns, save_patterns_json
 from patterns.report_writer import write_json, write_html, write_excel
 
+
 class PatternsTab(ttk.Frame):
     def __init__(self, parent: ttk.Notebook):
         super().__init__(parent)
@@ -23,40 +24,122 @@ class PatternsTab(ttk.Frame):
         main_container.pack(fill="both", expand=True)
 
         # Header
-        tk.Label(main_container, text="JOURNAL PATTERNS REPORTER", font=("Segoe UI", 18, "bold"), fg="#a855f7", bg="#1e293b").pack(pady=(0, 20))
+        tk.Label(
+            main_container,
+            text="JOURNAL PATTERNS REPORTER",
+            font=("Segoe UI", 18, "bold"),
+            fg="#a855f7",
+            bg="#1e293b",
+        ).pack(pady=(0, 20))
 
         # Config Source Path
-        tk.Label(main_container, text="Source Config Directory (src/clientconfig):", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 10)).pack(anchor="w")
+        tk.Label(
+            main_container,
+            text="Source Config Directory (src/clientconfig):",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 10),
+        ).pack(anchor="w")
         self.path_var = tk.StringVar(value=cfg.CLIENTCONFIG_DIR)
         path_frame = tk.Frame(main_container, bg="#1e293b")
         path_frame.pack(fill="x", pady=(5, 10))
-        self.path_entry = tk.Entry(path_frame, textvariable=self.path_var, bg="#334155", fg="white", border=0, font=("Segoe UI", 11))
+        self.path_entry = tk.Entry(
+            path_frame,
+            textvariable=self.path_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 11),
+        )
         self.path_entry.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 10))
-        browse_btn = tk.Button(path_frame, text="Browse", command=self._browse_path, bg="#4f46e5", fg="white", font=("Segoe UI", 10, "bold"), border=0, padx=15)
+        browse_btn = tk.Button(
+            path_frame,
+            text="Browse",
+            command=self._browse_path,
+            bg="#4f46e5",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            border=0,
+            padx=15,
+        )
         browse_btn.pack(side="right")
 
         # Pattern Filter
-        tk.Label(main_container, text="Search Pattern (Glob):", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 10)).pack(anchor="w")
+        tk.Label(
+            main_container,
+            text="Search Pattern (Glob):",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 10),
+        ).pack(anchor="w")
         self.pattern_var = tk.StringVar(value="**/config.xml")
-        self.pattern_entry = tk.Entry(main_container, textvariable=self.pattern_var, bg="#334155", fg="white", border=0, font=("Segoe UI", 11))
+        self.pattern_entry = tk.Entry(
+            main_container,
+            textvariable=self.pattern_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 11),
+        )
         self.pattern_entry.pack(fill="x", pady=(5, 10), ipady=8)
 
         # Action Buttons
         btn_frame = tk.Frame(main_container, bg="#1e293b")
         btn_frame.pack(fill="x", pady=25)
-        
-        self.run_btn = tk.Button(btn_frame, text="📊 GENERATE GLOBAL PATTERNS REPORT", command=self._start_report_thread, 
-                           bg="#a855f7", fg="white", font=("Segoe UI", 12, "bold"), border=0, pady=12)
-        self.run_btn.pack(fill="x", expand=True)
+
+        self.run_btn = tk.Button(
+            btn_frame,
+            text="📊 GENERATE GLOBAL PATTERNS REPORT",
+            command=self._start_report_thread,
+            bg="#a855f7",
+            fg="white",
+            font=("Segoe UI", 12, "bold"),
+            border=0,
+            pady=12,
+        )
+        self.run_btn.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        self.cancel_btn = tk.Button(
+            btn_frame,
+            text="Cancel",
+            command=self._cancel_process,
+            bg="#ef4444",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            border=0,
+            padx=15,
+            pady=10,
+            state="disabled",
+        )
+        self.cancel_btn.pack(side="left")
 
         # Log Display
-        tk.Label(main_container, text="Processing Logs:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 10)).pack(anchor="w", pady=(10,0))
-        self.log_text = tk.Text(main_container, bg="#0f172a", fg="#10b981", border=0, font=("Consolas", 10), height=10)
+        tk.Label(
+            main_container,
+            text="Processing Logs:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 10),
+        ).pack(anchor="w", pady=(10, 0))
+        self.log_text = tk.Text(
+            main_container,
+            bg="#0f172a",
+            fg="#10b981",
+            border=0,
+            font=("Consolas", 10),
+            height=10,
+        )
         self.log_text.pack(fill="both", expand=True, pady=10)
 
         # Status
         self.status_var = tk.StringVar(value="Ready.")
-        status_label = tk.Label(main_container, textvariable=self.status_var, bg="#1e293b", fg="#64748b", font=("Segoe UI", 10, "italic"))
+        status_label = tk.Label(
+            main_container,
+            textvariable=self.status_var,
+            bg="#1e293b",
+            fg="#64748b",
+            font=("Segoe UI", 10, "italic"),
+        )
         status_label.pack()
 
     def _browse_path(self):
@@ -72,41 +155,61 @@ class PatternsTab(ttk.Frame):
 
     def _start_report_thread(self):
         self.run_btn.config(state="disabled", text="PROCESSING...")
+        self.cancel_btn.config(state="normal")
         self.log_text.delete(1.0, tk.END)
+        self.cancelled = False
         threading.Thread(target=self._run_patterns_report, daemon=True).start()
+
+    def _cancel_process(self):
+        self.cancelled = True
+        self._log("\n[CANCELLED] Process cancelled by user.")
+        self.run_btn.config(state="normal", text="📊 GENERATE GLOBAL PATTERNS REPORT")
+        self.cancel_btn.config(state="disabled")
+        self.status_var.set("Process cancelled.")
 
     def _run_patterns_report(self):
         try:
+            if self.cancelled:
+                return
+
             source_dir = self.path_var.get()
             pattern = self.pattern_var.get()
             full_pattern = os.path.join(source_dir, pattern)
-            
+
             self._log(f"Searching for configs in: {source_dir}")
             self._log(f"Pattern: {pattern}")
-            
+
             files = glob.glob(full_pattern, recursive=True)
             self._log(f"Found {len(files)} XML configuration files.")
-            
+
             if not files:
                 self.status_var.set("No files found.")
-                self.run_btn.config(state="normal", text="📊 GENERATE GLOBAL PATTERNS REPORT")
+                self.run_btn.config(
+                    state="normal", text="📊 GENERATE GLOBAL PATTERNS REPORT"
+                )
+                self.cancel_btn.config(state="disabled")
                 return
 
             self.status_var.set(f"Processing {len(files)} files...")
             reps = []
             for i, f in enumerate(files):
-                self._log(f"[{i+1}/{len(files)}] Processing {os.path.basename(os.path.dirname(f))}")
+                if self.cancelled:
+                    return
+                self._log(
+                    f"[{i + 1}/{len(files)}] Processing {os.path.basename(os.path.dirname(f))}"
+                )
                 r = process_config(f)
-                if r: reps.append(r)
+                if r:
+                    reps.append(r)
 
             self._log("Analyzing pattern signatures...")
             patterns, mapping, sigs = build_patterns(reps)
-            
+
             # Setup output paths
             run_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             out_dir = os.path.join(os.path.dirname(cfg.OUT_HTML), "reports")
             os.makedirs(out_dir, exist_ok=True)
-            
+
             out_html = os.path.join(out_dir, f"Patterns_Report_{run_ts}.html")
             out_json = os.path.join(out_dir, f"Patterns_Data_{run_ts}.json")
             out_xlsx = os.path.join(out_dir, f"Patterns_Audit_{run_ts}.xlsx")
@@ -116,7 +219,7 @@ class PatternsTab(ttk.Frame):
             save_patterns_json(patterns, out_pats)
             write_json(reps, patterns, out_json)
             write_html(reps, patterns, mapping, sigs, out_html, run_ts)
-            
+
             # Excel might fail if open or missing openpyxl
             try:
                 write_excel(reps, patterns, out_xlsx)
@@ -124,14 +227,19 @@ class PatternsTab(ttk.Frame):
                 self._log(f"Excel generation skipped: {e}")
 
             self._log(f"Done! Report saved to: {os.path.basename(out_html)}")
-            self.status_var.set("✅ Report Generated.")
-            
-            if messagebox.askyesno("Success", f"Report generated successfully.\nView report now?"):
+            self.status_var.set("Report Generated.")
+
+            if messagebox.askyesno(
+                "Success", f"Report generated successfully.\nView report now?"
+            ):
                 webbrowser.open(f"file:///{os.path.abspath(out_html)}")
 
         except Exception as e:
             self._log(f"ERROR: {str(e)}")
-            self.status_var.set("❌ Report failed.")
+            self.status_var.set("Report failed.")
             messagebox.showerror("Error", f"Pattern analysis failed: {e}")
         finally:
-            self.run_btn.config(state="normal", text="📊 GENERATE GLOBAL PATTERNS REPORT")
+            self.run_btn.config(
+                state="normal", text="📊 GENERATE GLOBAL PATTERNS REPORT"
+            )
+            self.cancel_btn.config(state="disabled")

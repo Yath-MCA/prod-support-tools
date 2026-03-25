@@ -1,0 +1,132 @@
+Extracting strings...
+Found 36992 strings
+
+============================================================
+SEARCHING FOR EDITOR_APP RELATED CONTENT
+============================================================
+
+'validate': 1 matches
+  InvalidateRect
+
+'WF': 11 matches
+  mBWF!.1
+  'l&WFdb
+  WF=Tjd
+
+'import': 25 matches
+  site_import
+  Failed to set 'site_import': %s
+  importlib)
+
+'Import': 3 matches
+  PyImport_AddModule
+  PyImport_ExecCodeModule
+  PyImport_ImportModule
+
+'tree': 109 matches
+  xml.etree)
+  xml.etree.ElementInclude)
+  xml.etree.ElementPath)
+
+'Tree': 2 matches
+  xml.etree.ElementTree)
+  xml.etree.cElementTree)
+
+'scroll': 69 matches
+  b_tk_data\ttk\scrollbar.tcl
+  bttkthemes\gif\adapta\adapta\scroll-horiz-bg-insensitive.gif
+  bttkthemes\gif\adapta\adapta\scroll-horiz-bg.gif
+
+'text': 13 matches
+  status_text
+  text file busy
+  .text$mn
+
+'Text': 1 matches
+  DrawTextW
+
+'entry': 175 matches
+  Failed to extract %s: failed to seek to the entry's data!
+  Failed to extract entry: %s.
+  PYZ archive entry not found in the TOC!
+
+'Entry': 1 matches
+  RtlLookupFunctionEntry
+
+'button': 365 matches
+  b_tk_data\button.tcl
+  b_tk_data\ttk\button.tcl
+  b_tk_data\ttk\menubutton.tcl
+
+'widget': 2 matches
+  ttkthemes._widget)
+  b_tk_data\megawidget.tcl
+
+'frame': 28 matches
+  bttkthemes\gif\arc\arc\frame-gap-end.gif
+  bttkthemes\gif\arc\arc\frame-gap-start.gif
+  bttkthemes\gif\arc\arc\frame.gif
+
+'window': 7 matches
+  pyi-disable-windowed-traceback
+  invalid window size
+      <windowsSettings>
+
+'Window': 10 matches
+  Tk_GetNumMainWindows
+  CreateWindowExW
+  MoveWindow
+
+'menu': 61 matches
+  b_tk_data\menu.tcl
+  b_tk_data\ttk\menubutton.tcl
+  bttkthemes\gif\arc\arc\menu-arrow-prelight.gif
+
+'Menu': 3 matches
+  b_tk_data\optMenu.tcl
+  bttkthemes\themes\winxpblue\winxpblue\pullDownMenu.gif
+  bttkthemes\themes\winxpblue\winxpblue\pullDownMenuPrelight.gif
+
+'context': 2 matches
+  contextlib)
+  contextvars)
+
+'Context': 1 matches
+  RtlCaptureContext
+
+============================================================
+SOURCE FILE PATHS
+============================================================
+%s%c%s.py
+bPIL\_avif.cp313-win_amd64.pyd
+bPIL\_imaging.cp313-win_amd64.pyd
+bPIL\_imagingcms.cp313-win_amd64.pyd
+bPIL\_imagingmath.cp313-win_amd64.pyd
+bPIL\_imagingtk.cp313-win_amd64.pyd
+bPIL\_webp.cp313-win_amd64.pyd
+b_bz2.pyd
+b_ctypes.pyd
+b_decimal.pyd
+b_elementtree.pyd
+b_hashlib.pyd
+b_lzma.pyd
+b_socket.pyd
+b_ssl.pyd
+b_tkinter.pyd
+bcore\__init__.py
+bcore\__pycache__\__init__.cpython-313.pyc
+bcore\__pycache__\config_loader.cpython-313.pyc
+bcore\__pycache__\file_manager.cpython-313.pyc
+bcore\__pycache__\xml_processor.cpython-313.pyc
+bcore\archive_builder.py
+bcore\config_loader.py
+bcore\file_manager.py
+bcore\xml_processor.py
+bpyexpat.pyd
+bselect.pyd
+bunicodedata.pyd
+zPYZ.pyz
+
+============================================================
+LOOKING FOR editor_app.py
+============================================================

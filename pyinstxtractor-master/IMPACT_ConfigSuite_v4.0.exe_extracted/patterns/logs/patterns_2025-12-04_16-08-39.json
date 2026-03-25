@@ -1,0 +1,3048 @@
+{
+  "ref_numbered": {
+    "ref_numbered_pattern_1": [
+      "JCIM_ACS"
+    ],
+    "ref_numbered_pattern_2": [
+      "ACD_LWW",
+      "BPMJ_LWW",
+      "CAD_LWW",
+      "CAEN_LWW",
+      "CLEANE_OUP",
+      "EJEM_LWW",
+      "IJRR_LWW",
+      "JPOB_LWW",
+      "JPPHAR_OUP",
+      "MBC_LWW",
+      "MRM_LWW",
+      "MR_LWW",
+      "MUTAGE_OUP",
+      "NMC_LWW",
+      "NR_LWW",
+      "PA9_LWW",
+      "PGEN_LWW"
+    ],
+    "ref_numbered_pattern_3": [
+      "AJHYPE_OUP",
+      "AMJHSP_OUP",
+      "BS9_LWW",
+      "CA9_LWW",
+      "CIR_LWW",
+      "CR9_LWW",
+      "EJAIC_LWW",
+      "EJA_LWW",
+      "HAE_LWW",
+      "HCQ_LWW",
+      "JCM_LWW",
+      "JV9_LWW",
+      "JW9_LWW",
+      "MAT_LWW",
+      "NOAJNL_OUP",
+      "NOPRAC_OUP",
+      "ONCOLO_OUP",
+      "STCLTM_OUP",
+      "STMCLS_OUP",
+      "TPA_LWW"
+    ],
+    "ref_numbered_pattern_4": [
+      "AJP_SANDBOX",
+      "CCX_LWW",
+      "GERONA_OUP",
+      "GERONI_AMA_OUP",
+      "INTIMM_OUP",
+      "ON9_LWW"
+    ],
+    "ref_numbered_pattern_5": [
+      "EJGH_LWW"
+    ],
+    "ref_numbered_pattern_6": [
+      "AH9_LWW",
+      "BC9_LWW",
+      "BR9_LWW",
+      "CP9_LWW",
+      "CU9_LWW",
+      "EH9_LWW",
+      "FS9_LWW",
+      "IN9_LWW",
+      "JP9_LWW",
+      "MD9_LWW",
+      "MD_LWW",
+      "RE9_LWW"
+    ],
+    "ref_numbered_pattern_7": [
+      "JD9_LWW"
+    ],
+    "ref_numbered_pattern_8": [
+      "ABMEDI_OUP",
+      "ACI_LWW",
+      "BOR_LWW",
+      "CCO_LWW",
+      "CLEXIM_OUP",
+      "CLINID_OUP",
+      "CO9_LWW",
+      "COAN_LWW",
+      "COH_LWW",
+      "COOG_LWW",
+      "DISCIM_OUP",
+      "EMPHEA_OUP",
+      "HCO_LWW",
+      "HJH_LWW",
+      "ICU_LWW",
+      "IMMADV_OUP",
+      "INFDIS_OUP",
+      "LIFMED_OUP",
+      "LIFMET_OUP",
+      "MCC_LWW",
+      "MCO_LWW",
+      "MCP_LWW",
+      "MED_LWW",
+      "MNH_LWW",
+      "MOG_LWW",
+      "MOH_LWW",
+      "MOL_LWW",
+      "MOO_LWW",
+      "MOP_LWW",
+      "MOT_LWW",
+      "MOU_LWW",
+      "OCCMED_OUP",
+      "PXH_LWW",
+      "QAD_LWW",
+      "QCO_LWW",
+      "SLEEPJ_OUP",
+      "SLEEPO_OUP",
+      "TBMEDI_OUP",
+      "WCO_LWW",
+      "YCO_LWW"
+    ],
+    "ref_numbered_pattern_9": [
+      "ALN_LWW",
+      "ANE_LWW",
+      "AS9_LWW",
+      "ATV_LWW",
+      "CRD_LWW",
+      "CROCOL_OUP",
+      "DCR_LWW",
+      "DNARES_OUP",
+      "ECCOJC_OUP",
+      "EDE_LWW",
+      "EE9_LWW",
+      "EME_NIHR",
+      "FAD_LWW",
+      "FAMPRJ_OUP",
+      "GHR_NIHR",
+      "GOX_LWW",
+      "HCG_LWW",
+      "HCI_LWW",
+      "HCR_LWW",
+      "HCV_LWW",
+      "HD9_LWW",
+      "HHF_LWW",
+      "HPC_LWW",
+      "HRP_LWW",
+      "HSDR_NIHR",
+      "HTA_NIHR",
+      "HYP_LWW",
+      "IA9_LWW",
+      "IBDJNL_OUP",
+      "INF_LWW",
+      "IOP_LWW",
+      "JBCRES_OUP",
+      "JCN_LWW",
+      "JMQ_LWW",
+      "JOMS_MEDKNOW",
+      "JPIDSJ_OUP",
+      "NCC_LWW",
+      "NEUONC_OUP",
+      "NICTOB_OUP",
+      "NJH_LWW",
+      "OPX_LWW",
+      "PGfAR_NIHR",
+      "PHR_NIHR",
+      "PQS_LWW",
+      "PRS_LWW",
+      "RES_LWW",
+      "SBOPEN_OUP",
+      "SCHBUL_OUP",
+      "STR_LWW",
+      "TXD_LWW",
+      "US9_LWW",
+      "XAA_LWW",
+      "XCS_LWW",
+      "XEB_LWW"
+    ],
+    "ref_numbered_pattern_10": [
+      "CARCIN_OUP",
+      "CCM_LWW",
+      "EM9_LWW",
+      "EORTHO_OUP",
+      "FIT_LWW",
+      "JBREIM_OUP",
+      "JCAGAS_OUP",
+      "JES_LWW",
+      "MSS_LWW",
+      "PCC_LWW",
+      "PCHEAL_OUP",
+      "SHK_LWW"
+    ],
+    "ref_numbered_pattern_11": [
+      "ACCR_MEDKNOW",
+      "AJEM_MEDKNOW",
+      "AJIM_MEDKNOW",
+      "AJRGE_MEDKNOW",
+      "AMAS_MEDKNOW",
+      "AMJM_MEDKNOW",
+      "AMSR_MEDKNOW",
+      "AOHN_MEDKNOW",
+      "AOMD_MEDKNOW",
+      "AORA_MEDKNOW",
+      "BGJ_MEDKNOW",
+      "BJEM_MEDKNOW",
+      "BJOA_MEDKNOW",
+      "BJOC_MEDKNOW",
+      "DYPJ_MEDKNOW",
+      "EHSJ_MEDKNOW",
+      "EJRJ_MEDKNOW",
+      "EYEQuest_MEDKNOW",
+      "HFJI_MEDKNOW",
+      "HJHS_MEDKNOW",
+      "HJOP_MEDKNOW",
+      "HM9_LWW",
+      "ICRS_MEDKNOW",
+      "IJDD_MEDKNOW",
+      "IJEMCR_MEDKNOW",
+      "IJHR_MEDKNOW",
+      "IJMH_MEDKNOW",
+      "IJNO_MEDKNOW",
+      "IJORS_MEDKNOW",
+      "IJPPHA_OUP",
+      "IJRU_MEDKNOW",
+      "IJYN_MEDKNOW",
+      "INJO_MEDKNOW",
+      "INSJ_MEDKNOW",
+      "JAHAS_MEDKNOW",
+      "JASU_MEDKNOW",
+      "JBJD_MEDKNOW",
+      "JCDM_MEDKNOW",
+      "JCOS_MEDKNOW",
+      "JDRA_MEDKNOW",
+      "JIMH_MEDKNOW",
+      "JIMP_MEDKNOW",
+      "JIOH_MEDKNOW",
+      "JISPCD_MEDKNOW",
+      "JLV_MEDKNOW",
+      "JMCU_MEDKNOW",
+      "JMSO_MEDKNOW",
+      "JMUPM_MEDKNOW",
+      "JNAM_MEDKNOW",
+      "JOASIS_MEDKNOW",
+      "JOCY_MEDKNOW",
+      "JODB_MEDKNOW",
+      "JOMM_MEDKNOW",
+      "JOPN_MEDKNOW",
+      "JOPP_MEDKNOW",
+      "JOPS_MEDKNOW",
+      "JOR_MEDKNOW",
+      "JPBI_MEDKNOW",
+      "JPHSRE_OUP",
+      "JRAS_MEDKNOW",
+      "JRSM_MEDKNOW",
+      "JSIP_MEDKNOW",
+      "JSPF_MEDKNOW",
+      "JTOS_MEDKNOW",
+      "JUOA_MEDKNOW",
+      "JWAS_MEDKNOW",
+      "KHJ_MEDKNOW",
+      "MGMJ_MEDKNOW",
+      "MJBL_MEDKNOW",
+      "MLDN_MEDKNOW",
+      "MM9_LWW",
+      "MTSP_MEDKNOW",
+      "NJCT_MEDKNOW",
+      "NJOM_MEDKNOW",
+      "NJVD_MEDKNOW",
+      "PEDC_MEDKNOW",
+      "PN9_LWW",
+      "PNJB_MEDKNOW",
+      "PRCM_MEDKNOW",
+      "RD9_LWW",
+      "RHAW_MEDKNOW",
+      "RRPE_MEDKNOW",
+      "SJCP_MEDKNOW",
+      "SJOB_MEDKNOW",
+      "TOPH_MEDKNOW",
+      "TUMJ_MEDKNOW"
+    ],
+    "ref_numbered_pattern_12": [
+      "SK9_LWW"
+    ],
+    "ref_numbered_pattern_13": [
+      "TJX_LWW"
+    ],
+    "ref_numbered_pattern_14": [
+      "ST9_LWW"
+    ],
+    "ref_numbered_pattern_15": [
+      "IM9_LWW"
+    ],
+    "ref_numbered_pattern_16": [
+      "AJCPAT_OUP",
+      "LABMED_OUP"
+    ],
+    "ref_numbered_pattern_17": [
+      "IJNPPY_OUP"
+    ],
+    "ref_numbered_pattern_18": [
+      "OFIDIS_OUP"
+    ],
+    "ref_numbered_pattern_19": [
+      "RPSPPR_OUP"
+    ],
+    "ref_numbered_pattern_20": [
+      "IFSO_TNFJOURNALS",
+      "PBIO_PLOS",
+      "PCBI_PLOS",
+      "PCLM_PLOS",
+      "PCSY_PLOS",
+      "PDIG_PLOS",
+      "PGEN_PLOS",
+      "PGPH_PLOS",
+      "PMED_PLOS",
+      "PMEN_PLOS",
+      "PNTD_PLOS",
+      "PONE_PLOS",
+      "PPAT_PLOS",
+      "PSTR_PLOS",
+      "PWAT_PLOS"
+    ]
+  },
+  "ref_unnumbered": {
+    "ref_unnumbered_pattern_1": [
+      "AESAME_OUP",
+      "AESTHJ_OUP",
+      "AJR_INTELLECT",
+      "ALECON_OUP",
+      "AMTEST_OUP",
+      "ANALYS_OUP",
+      "ANFRON_OUP",
+      "ANNBOT_OUP",
+      "ANNWEH_OUP",
+      "AOBPLA_OUP",
+      "APPLIJ_OUP",
+      "ARISUP_OUP",
+      "AUD_LWW",
+      "AUKJNL_OUP",
+      "BEHECO_OUP",
+      "BIOLIN_OUP",
+      "BOTLIN_OUP",
+      "BPHARM_LWW",
+      "CAMECO_OUP",
+      "CAMRES_OUP",
+      "CD_LWW",
+      "CHEMSE_OUP",
+      "CHRIBI_OUP",
+      "CLRECJ_OUP",
+      "CONDOR_OUP",
+      "CRIMIN_OUP",
+      "CZOOLO_OUP",
+      "ECOPOL_OUP",
+      "EJAC_INTELLECT",
+      "EJCP_LWW",
+      "ENVENT_OUP",
+      "EURSOJ_OUP",
+      "EVLETT_OUP",
+      "EVOLIN_OUP",
+      "EVOLUT_OUP",
+      "EXBOTJ_OUP",
+      "FQSAFE_OUP",
+      "FSPC_INTELLECT",
+      "HEAPRO_OUP",
+      "HP_LWW",
+      "ICP_LWW",
+      "IJFD_INTELLECT",
+      "INSILC_OUP",
+      "ISDIVE_OUP",
+      "JANSCI_OUP",
+      "JAN_LWW",
+      "JCBIOL_OUP",
+      "JDN_LWW",
+      "JEENTO_OUP",
+      "JEVBIO_OUP",
+      "JGS_INTELLECT",
+      "JHERED_OUP",
+      "JHINDU_OUP",
+      "JHUMAN_OUP",
+      "JIPMAN_OUP",
+      "JISESA_OUP",
+      "JLAJ_OUP",
+      "JMAMMA_OUP",
+      "JMENTO_OUP",
+      "JMPHIL_OUP",
+      "JMTE_INTELLECT",
+      "JMTHER_OUP",
+      "JOAAAC_OUP",
+      "JOSH_MEDKNOW",
+      "JPORGA_OUP",
+      "JWCP_INTELLECT",
+      "LEXICO_OUP",
+      "MONIST_OUP",
+      "NEP_LWW",
+      "PARLIJ_OUP",
+      "PETHIC_OUP",
+      "PG_LWW",
+      "POLICE_OUP",
+      "PROCEL_OUP",
+      "SOCREL_OUP",
+      "SSJAPJ_OUP",
+      "SYSBIO_OUP",
+      "TRANAS_OUP",
+      "VI_INTELLECT",
+      "WORKAR_OUP",
+      "YTCR_TNFJOURNALS",
+      "ZOOLIN_OUP"
+    ],
+    "ref_unnumbered_pattern_2": [
+      "ARISOC_OUP",
+      "JOLEVO_OUP"
+    ],
+    "ref_unnumbered_pattern_3": [
+      "FOCUS_SANDBOX",
+      "FORSCI_OUP",
+      "GERONB_OUP",
+      "GERONI_APA_OUP",
+      "GERONT_OUP",
+      "INTPOR_OUP",
+      "JAAREL_OUP",
+      "JOFORE_OUP",
+      "JOPART_OUP",
+      "JPECOL_OUP",
+      "MSPECI_OUP",
+      "MTPERS_OUP",
+      "OAMA_TNFJOURNALS",
+      "PPAREP_OUP",
+      "PPMGOV_OUP",
+      "SOCPRO_OUP",
+      "STL_SANDBOX"
+    ],
+    "ref_unnumbered_pattern_4": [
+      "MELUSJ_OUP"
+    ]
+  },
+  "ref_footnote": {
+    "ref_footnote_pattern_1": [
+      "AJCLAW_OUP",
+      "BICSTU_OUP",
+      "CLPROB_OUP",
+      "DESIGN_OUP",
+      "EARLYJ_OUP",
+      "EJILAW_OUP",
+      "ENGHIS_OUP",
+      "ENVLAW_OUP",
+      "ESCRIT_OUP",
+      "FREBUL_OUP",
+      "FRENCH_OUP",
+      "FRESTU_OUP",
+      "GRUINT_OUP",
+      "HISRES_OUP",
+      "IJCLAW_OUP",
+      "INDLAW_OUP",
+      "INTTEC_OUP",
+      "JALSCI_OUP",
+      "JVCULT_OUP",
+      "LITMAG_OUP",
+      "LITTHE_OUP",
+      "MODJUD_OUP",
+      "MTSPEC_OUP",
+      "OXJLSJ_OUP",
+      "PUAN_BRILL",
+      "REFLAW_OUP",
+      "SOCHIS_OUP",
+      "STALAW_OUP",
+      "THEOLJ_OUP",
+      "WHQUAR_OUP"
+    ],
+    "ref_footnote_pattern_2": [
+      "ADAPTA_OUP",
+      "ARBINT_OUP",
+      "CWWRIT_OUP",
+      "GERHIS_OUP",
+      "HISCOL_OUP"
+    ]
+  },
+  "figtab": {
+    "figtab_pattern_1": [
+      "ABMEDI_OUP",
+      "AESAME_OUP",
+      "AESTHJ_OUP",
+      "AJCLAW_OUP",
+      "AJCPAT_OUP",
+      "AJHYPE_OUP",
+      "AJP_SANDBOX",
+      "AJR_INTELLECT",
+      "ALECON_OUP",
+      "AMTEST_OUP",
+      "ANALYS_OUP",
+      "ANFRON_OUP",
+      "ANNBOT_OUP",
+      "ANNWEH_OUP",
+      "AOBPLA_OUP",
+      "APPLIJ_OUP",
+      "ARISOC_OUP",
+      "ARISUP_OUP",
+      "AUKJNL_OUP",
+      "BEHECO_OUP",
+      "BICSTU_OUP",
+      "BIOLIN_OUP",
+      "BOTLIN_OUP",
+      "CAMECO_OUP",
+      "CAMRES_OUP",
+      "CARCIN_OUP",
+      "CHEMSE_OUP",
+      "CHRIBI_OUP",
+      "CLEANE_OUP",
+      "CLEXIM_OUP",
+      "CLINID_OUP",
+      "CLPROB_OUP",
+      "CLRECJ_OUP",
+      "CONDOR_OUP",
+      "CRIMIN_OUP",
+      "CROCOL_OUP",
+      "CZOOLO_OUP",
+      "DESIGN_OUP",
+      "DISCIM_OUP",
+      "DNARES_OUP",
+      "EARLYJ_OUP",
+      "ECOPOL_OUP",
+      "EJAC_INTELLECT",
+      "EJILAW_OUP",
+      "EME_NIHR",
+      "EMPHEA_OUP",
+      "ENGHIS_OUP",
+      "ENVENT_OUP",
+      "ENVLAW_OUP",
+      "EORTHO_OUP",
+      "ESCRIT_OUP",
+      "EURSOJ_OUP",
+      "EVLETT_OUP",
+      "EVOLUT_OUP",
+      "EXBOTJ_OUP",
+      "FAMPRJ_OUP",
+      "FORSCI_OUP",
+      "FQSAFE_OUP",
+      "FREBUL_OUP",
+      "FRENCH_OUP",
+      "FRESTU_OUP",
+      "FSPC_INTELLECT",
+      "GERHIS_OUP",
+      "GERONA_OUP",
+      "GERONB_OUP",
+      "GERONI_AMA_OUP",
+      "GERONI_APA_OUP",
+      "GERONT_OUP",
+      "GHR_NIHR",
+      "GRUINT_OUP",
+      "HEAPRO_OUP",
+      "HISCOL_OUP",
+      "HISRES_OUP",
+      "HSDR_NIHR",
+      "HTA_NIHR",
+      "IBDJNL_OUP",
+      "IFSO_TNFJOURNALS",
+      "IJCLAW_OUP",
+      "IJFD_INTELLECT",
+      "IJNPPY_OUP",
+      "IJPPHA_OUP",
+      "IMMADV_OUP",
+      "INDLAW_OUP",
+      "INFDIS_OUP",
+      "INSILC_OUP",
+      "INTIMM_OUP",
+      "INTPOR_OUP",
+      "INTTEC_OUP",
+      "ISDIVE_OUP",
+      "JAAREL_OUP",
+      "JALSCI_OUP",
+      "JANSCI_OUP",
+      "JBCRES_OUP",
+      "JBREIM_OUP",
+      "JCAGAS_OUP",
+      "JCBIOL_OUP",
+      "JCIM_ACS",
+      "JEENTO_OUP",
+      "JEVBIO_OUP",
+      "JGS_INTELLECT",
+      "JHERED_OUP",
+      "JHUMAN_OUP",
+      "JIPMAN_OUP",
+      "JISESA_OUP",
+      "JLAJ_OUP",
+      "JMAMMA_OUP",
+      "JMCU_MEDKNOW",
+      "JMENTO_OUP",
+      "JMPHIL_OUP",
+      "JMTE_INTELLECT",
+      "JMTHER_OUP",
+      "JOAAAC_OUP",
+      "JOFORE_OUP",
+      "JOLEVO_OUP",
+      "JOPART_OUP",
+      "JPECOL_OUP",
+      "JPHSRE_OUP",
+      "JPIDSJ_OUP",
+      "JPORGA_OUP",
+      "JPPHAR_OUP",
+      "JVCULT_OUP",
+      "JWAS_MEDKNOW",
+      "JWCP_INTELLECT",
+      "LABMED_OUP",
+      "LEXICO_OUP",
+      "LIFMED_OUP",
+      "LIFMET_OUP",
+      "LITMAG_OUP",
+      "LITTHE_OUP",
+      "MELUSJ_OUP",
+      "MODJUD_OUP",
+      "MONIST_OUP",
+      "MSPECI_OUP",
+      "MTPERS_OUP",
+      "MTSPEC_OUP",
+      "MUTAGE_OUP",
+      "NEUONC_OUP",
+      "NICTOB_OUP",
+      "NOAJNL_OUP",
+      "NOPRAC_OUP",
+      "OAMA_TNFJOURNALS",
+      "OCCMED_OUP",
+      "ONCOLO_OUP",
+      "OXJLSJ_OUP",
+      "PARLIJ_OUP",
+      "PBIO_PLOS",
+      "PCBI_PLOS",
+      "PCHEAL_OUP",
+      "PCLM_PLOS",
+      "PCSY_PLOS",
+      "PDIG_PLOS",
+      "PETHIC_OUP",
+      "PGEN_PLOS",
+      "PGPH_PLOS",
+      "PGfAR_NIHR",
+      "PHR_NIHR",
+      "PMED_PLOS",
+      "PMEN_PLOS",
+      "PNTD_PLOS",
+      "POLICE_OUP",
+      "PONE_PLOS",
+      "PPAREP_OUP",
+      "PPAT_PLOS",
+      "PPMGOV_OUP",
+      "PROCEL_OUP",
+      "PSTR_PLOS",
+      "PUAN_BRILL",
+      "PWAT_PLOS",
+      "REFLAW_OUP",
+      "RPSPPR_OUP",
+      "SBOPEN_OUP",
+      "SCHBUL_OUP",
+      "SLEEPJ_OUP",
+      "SLEEPO_OUP",
+      "SOCHIS_OUP",
+      "SOCPRO_OUP",
+      "SOCREL_OUP",
+      "SSJAPJ_OUP",
+      "STALAW_OUP",
+      "STCLTM_OUP",
+      "STMCLS_OUP",
+      "SYSBIO_OUP",
+      "TBMEDI_OUP",
+      "TRANAS_OUP",
+      "VI_INTELLECT",
+      "WHQUAR_OUP",
+      "WORKAR_OUP",
+      "ZOOLIN_OUP"
+    ],
+    "figtab_pattern_2": [
+      "ACD_LWW",
+      "ACI_LWW",
+      "AH9_LWW",
+      "ALN_LWW",
+      "ANE_LWW",
+      "BC9_LWW",
+      "BOR_LWW",
+      "BPHARM_LWW",
+      "BPMJ_LWW",
+      "BR9_LWW",
+      "BS9_LWW",
+      "CA9_LWW",
+      "CAD_LWW",
+      "CAEN_LWW",
+      "CCM_LWW",
+      "CCO_LWW",
+      "CCX_LWW",
+      "CD_LWW",
+      "CO9_LWW",
+      "COAN_LWW",
+      "COH_LWW",
+      "COOG_LWW",
+      "CP9_LWW",
+      "CR9_LWW",
+      "DCR_LWW",
+      "EDE_LWW",
+      "EH9_LWW",
+      "EJAIC_LWW",
+      "EJA_LWW",
+      "EJCP_LWW",
+      "EJEM_LWW",
+      "EJGH_LWW",
+      "EM9_LWW",
+      "FAD_LWW",
+      "FIT_LWW",
+      "FS9_LWW",
+      "GOX_LWW",
+      "HCO_LWW",
+      "HD9_LWW",
+      "HJH_LWW",
+      "HM9_LWW",
+      "HPC_LWW",
+      "HP_LWW",
+      "HRP_LWW",
+      "IA9_LWW",
+      "ICP_LWW",
+      "ICU_LWW",
+      "IJRR_LWW",
+      "IM9_LWW",
+      "IN9_LWW",
+      "INF_LWW",
+      "IOP_LWW",
+      "JAN_LWW",
+      "JCM_LWW",
+      "JCN_LWW",
+      "JD9_LWW",
+      "JDN_LWW",
+      "JES_LWW",
+      "JMQ_LWW",
+      "JP9_LWW",
+      "JPOB_LWW",
+      "JV9_LWW",
+      "JW9_LWW",
+      "MBC_LWW",
+      "MCC_LWW",
+      "MCO_LWW",
+      "MCP_LWW",
+      "MD9_LWW",
+      "MD_LWW",
+      "MED_LWW",
+      "MM9_LWW",
+      "MNH_LWW",
+      "MOG_LWW",
+      "MOH_LWW",
+      "MOL_LWW",
+      "MOO_LWW",
+      "MOP_LWW",
+      "MOT_LWW",
+      "MOU_LWW",
+      "MRM_LWW",
+      "MR_LWW",
+      "MSS_LWW",
+      "NCC_LWW",
+      "NJH_LWW",
+      "NMC_LWW",
+      "NR_LWW",
+      "ON9_LWW",
+      "OPX_LWW",
+      "PA9_LWW",
+      "PCC_LWW",
+      "PGEN_LWW",
+      "PG_LWW",
+      "PN9_LWW",
+      "PQS_LWW",
+      "PRS_LWW",
+      "PXH_LWW",
+      "QAD_LWW",
+      "QCO_LWW",
+      "RD9_LWW",
+      "RE9_LWW",
+      "SHK_LWW",
+      "ST9_LWW",
+      "US9_LWW",
+      "WCO_LWW",
+      "XAA_LWW",
+      "XCS_LWW",
+      "XEB_LWW",
+      "YCO_LWW"
+    ],
+    "figtab_pattern_3": [
+      "ATV_LWW",
+      "CIR_LWW",
+      "HCG_LWW",
+      "HCI_LWW",
+      "HCQ_LWW",
+      "HCV_LWW",
+      "HHF_LWW",
+      "HYP_LWW",
+      "RES_LWW",
+      "STR_LWW"
+    ],
+    "figtab_pattern_4": [
+      "HAE_LWW"
+    ],
+    "figtab_pattern_5": [
+      "MAT_LWW"
+    ],
+    "figtab_pattern_6": [
+      "AS9_LWW",
+      "CRD_LWW",
+      "CU9_LWW",
+      "EE9_LWW",
+      "EVOLIN_OUP",
+      "NEP_LWW",
+      "THEOLJ_OUP",
+      "TJX_LWW",
+      "TPA_LWW"
+    ],
+    "figtab_pattern_7": [
+      "AUD_LWW"
+    ],
+    "figtab_pattern_8": [
+      "HCR_LWW"
+    ],
+    "figtab_pattern_9": [
+      "SK9_LWW"
+    ],
+    "figtab_pattern_10": [
+      "TXD_LWW"
+    ],
+    "figtab_pattern_11": [
+      "ACCR_MEDKNOW",
+      "AJEM_MEDKNOW",
+      "AJIM_MEDKNOW",
+      "AJRGE_MEDKNOW",
+      "AMAS_MEDKNOW",
+      "AMJM_MEDKNOW",
+      "AMSR_MEDKNOW",
+      "AOHN_MEDKNOW",
+      "AOMD_MEDKNOW",
+      "AORA_MEDKNOW",
+      "BGJ_MEDKNOW",
+      "BJEM_MEDKNOW",
+      "BJOA_MEDKNOW",
+      "BJOC_MEDKNOW",
+      "DYPJ_MEDKNOW",
+      "ECCOJC_OUP",
+      "EHSJ_MEDKNOW",
+      "EJRJ_MEDKNOW",
+      "EYEQuest_MEDKNOW",
+      "HFJI_MEDKNOW",
+      "HJHS_MEDKNOW",
+      "HJOP_MEDKNOW",
+      "ICRS_MEDKNOW",
+      "IJDD_MEDKNOW",
+      "IJEMCR_MEDKNOW",
+      "IJHR_MEDKNOW",
+      "IJMH_MEDKNOW",
+      "IJNO_MEDKNOW",
+      "IJORS_MEDKNOW",
+      "IJRU_MEDKNOW",
+      "IJYN_MEDKNOW",
+      "INJO_MEDKNOW",
+      "INSJ_MEDKNOW",
+      "JAHAS_MEDKNOW",
+      "JASU_MEDKNOW",
+      "JBJD_MEDKNOW",
+      "JCDM_MEDKNOW",
+      "JCOS_MEDKNOW",
+      "JDRA_MEDKNOW",
+      "JIMH_MEDKNOW",
+      "JIMP_MEDKNOW",
+      "JIOH_MEDKNOW",
+      "JISPCD_MEDKNOW",
+      "JLV_MEDKNOW",
+      "JMSO_MEDKNOW",
+      "JMUPM_MEDKNOW",
+      "JNAM_MEDKNOW",
+      "JOASIS_MEDKNOW",
+      "JOCY_MEDKNOW",
+      "JODB_MEDKNOW",
+      "JOMM_MEDKNOW",
+      "JOMS_MEDKNOW",
+      "JOPN_MEDKNOW",
+      "JOPP_MEDKNOW",
+      "JOPS_MEDKNOW",
+      "JOR_MEDKNOW",
+      "JOSH_MEDKNOW",
+      "JPBI_MEDKNOW",
+      "JRAS_MEDKNOW",
+      "JRSM_MEDKNOW",
+      "JSIP_MEDKNOW",
+      "JSPF_MEDKNOW",
+      "JTOS_MEDKNOW",
+      "JUOA_MEDKNOW",
+      "KHJ_MEDKNOW",
+      "MGMJ_MEDKNOW",
+      "MJBL_MEDKNOW",
+      "MLDN_MEDKNOW",
+      "MTSP_MEDKNOW",
+      "NJCT_MEDKNOW",
+      "NJOM_MEDKNOW",
+      "NJVD_MEDKNOW",
+      "PEDC_MEDKNOW",
+      "PNJB_MEDKNOW",
+      "PRCM_MEDKNOW",
+      "RHAW_MEDKNOW",
+      "RRPE_MEDKNOW",
+      "SJCP_MEDKNOW",
+      "SJOB_MEDKNOW",
+      "TOPH_MEDKNOW",
+      "TUMJ_MEDKNOW"
+    ],
+    "figtab_pattern_12": [
+      "ADAPTA_OUP",
+      "CWWRIT_OUP",
+      "JHINDU_OUP"
+    ],
+    "figtab_pattern_13": [
+      "AMJHSP_OUP"
+    ],
+    "figtab_pattern_14": [
+      "ARBINT_OUP"
+    ],
+    "figtab_pattern_15": [
+      "OFIDIS_OUP"
+    ],
+    "figtab_pattern_16": [
+      "FOCUS_SANDBOX",
+      "STL_SANDBOX",
+      "YTCR_TNFJOURNALS"
+    ]
+  },
+  "partlab": {
+    "partlab_pattern_1": [
+      "JCIM_ACS"
+    ],
+    "partlab_pattern_2": [
+      "FORSCI_OUP",
+      "JOFORE_OUP",
+      "PUAN_BRILL",
+      "REFLAW_OUP",
+      "STALAW_OUP",
+      "WHQUAR_OUP"
+    ],
+    "partlab_pattern_3": [
+      "AJR_INTELLECT",
+      "EJAC_INTELLECT",
+      "FSPC_INTELLECT",
+      "IJFD_INTELLECT",
+      "JGS_INTELLECT",
+      "JMTE_INTELLECT",
+      "JWCP_INTELLECT",
+      "VI_INTELLECT"
+    ],
+    "partlab_pattern_4": [
+      "ACI_LWW",
+      "BOR_LWW",
+      "CCO_LWW",
+      "CO9_LWW",
+      "COAN_LWW",
+      "COH_LWW",
+      "COOG_LWW",
+      "EJAIC_LWW",
+      "EJA_LWW",
+      "HCO_LWW",
+      "HJH_LWW",
+      "ICU_LWW",
+      "JWAS_MEDKNOW",
+      "MBC_LWW",
+      "MCC_LWW",
+      "MCO_LWW",
+      "MCP_LWW",
+      "MED_LWW",
+      "MNH_LWW",
+      "MOG_LWW",
+      "MOH_LWW",
+      "MOL_LWW",
+      "MOO_LWW",
+      "MOP_LWW",
+      "MOT_LWW",
+      "MOU_LWW",
+      "MRM_LWW",
+      "PXH_LWW",
+      "QCO_LWW",
+      "WCO_LWW",
+      "YCO_LWW"
+    ],
+    "partlab_pattern_5": [
+      "ACCR_MEDKNOW",
+      "AJEM_MEDKNOW",
+      "AJIM_MEDKNOW",
+      "AJRGE_MEDKNOW",
+      "ALN_LWW",
+      "AMAS_MEDKNOW",
+      "AMJM_MEDKNOW",
+      "AMSR_MEDKNOW",
+      "AOHN_MEDKNOW",
+      "AOMD_MEDKNOW",
+      "AORA_MEDKNOW",
+      "BC9_LWW",
+      "BGJ_MEDKNOW",
+      "BJEM_MEDKNOW",
+      "BJOA_MEDKNOW",
+      "BJOC_MEDKNOW",
+      "BR9_LWW",
+      "DYPJ_MEDKNOW",
+      "EH9_LWW",
+      "EHSJ_MEDKNOW",
+      "EJRJ_MEDKNOW",
+      "EYEQuest_MEDKNOW",
+      "FS9_LWW",
+      "GOX_LWW",
+      "HD9_LWW",
+      "HFJI_MEDKNOW",
+      "HJHS_MEDKNOW",
+      "HJOP_MEDKNOW",
+      "HP_LWW",
+      "ICRS_MEDKNOW",
+      "IJDD_MEDKNOW",
+      "IJEMCR_MEDKNOW",
+      "IJHR_MEDKNOW",
+      "IJMH_MEDKNOW",
+      "IJNO_MEDKNOW",
+      "IJORS_MEDKNOW",
+      "IJRU_MEDKNOW",
+      "IJYN_MEDKNOW",
+      "IM9_LWW",
+      "INJO_MEDKNOW",
+      "INSJ_MEDKNOW",
+      "JAHAS_MEDKNOW",
+      "JASU_MEDKNOW",
+      "JBJD_MEDKNOW",
+      "JCDM_MEDKNOW",
+      "JCN_LWW",
+      "JCOS_MEDKNOW",
+      "JDN_LWW",
+      "JDRA_MEDKNOW",
+      "JES_LWW",
+      "JEVBIO_OUP",
+      "JIMH_MEDKNOW",
+      "JIMP_MEDKNOW",
+      "JIOH_MEDKNOW",
+      "JISPCD_MEDKNOW",
+      "JLV_MEDKNOW",
+      "JMCU_MEDKNOW",
+      "JMSO_MEDKNOW",
+      "JMUPM_MEDKNOW",
+      "JNAM_MEDKNOW",
+      "JOASIS_MEDKNOW",
+      "JOCY_MEDKNOW",
+      "JODB_MEDKNOW",
+      "JOMM_MEDKNOW",
+      "JOMS_MEDKNOW",
+      "JOPN_MEDKNOW",
+      "JOPP_MEDKNOW",
+      "JOPS_MEDKNOW",
+      "JOR_MEDKNOW",
+      "JOSH_MEDKNOW",
+      "JPBI_MEDKNOW",
+      "JRAS_MEDKNOW",
+      "JRSM_MEDKNOW",
+      "JSIP_MEDKNOW",
+      "JSPF_MEDKNOW",
+      "JTOS_MEDKNOW",
+      "JUOA_MEDKNOW",
+      "KHJ_MEDKNOW",
+      "MGMJ_MEDKNOW",
+      "MJBL_MEDKNOW",
+      "MLDN_MEDKNOW",
+      "MSS_LWW",
+      "MTSP_MEDKNOW",
+      "NCC_LWW",
+      "NJCT_MEDKNOW",
+      "NJH_LWW",
+      "NJOM_MEDKNOW",
+      "NJVD_MEDKNOW",
+      "OPX_LWW",
+      "PEDC_MEDKNOW",
+      "PNJB_MEDKNOW",
+      "PQS_LWW",
+      "PRCM_MEDKNOW",
+      "RE9_LWW",
+      "RHAW_MEDKNOW",
+      "RRPE_MEDKNOW",
+      "SHK_LWW",
+      "SJCP_MEDKNOW",
+      "SJOB_MEDKNOW",
+      "TOPH_MEDKNOW",
+      "TPA_LWW",
+      "TUMJ_MEDKNOW"
+    ],
+    "partlab_pattern_6": [
+      "AUD_LWW",
+      "CU9_LWW",
+      "EM9_LWW",
+      "FIT_LWW",
+      "FOCUS_SANDBOX",
+      "HCR_LWW",
+      "NEP_LWW",
+      "STL_SANDBOX",
+      "TJX_LWW",
+      "YTCR_TNFJOURNALS"
+    ],
+    "partlab_pattern_7": [
+      "CA9_LWW",
+      "HM9_LWW",
+      "JD9_LWW",
+      "MM9_LWW",
+      "PN9_LWW",
+      "RD9_LWW"
+    ],
+    "partlab_pattern_8": [
+      "CP9_LWW",
+      "DCR_LWW",
+      "IA9_LWW",
+      "IN9_LWW",
+      "IOP_LWW",
+      "MD9_LWW",
+      "TXD_LWW",
+      "XCS_LWW"
+    ],
+    "partlab_pattern_9": [
+      "CR9_LWW"
+    ],
+    "partlab_pattern_10": [
+      "EDE_LWW"
+    ],
+    "partlab_pattern_11": [
+      "FAD_LWW",
+      "JCM_LWW",
+      "QAD_LWW"
+    ],
+    "partlab_pattern_12": [
+      "JAN_LWW"
+    ],
+    "partlab_pattern_13": [
+      "JP9_LWW"
+    ],
+    "partlab_pattern_14": [
+      "PCC_LWW"
+    ],
+    "partlab_pattern_15": [
+      "PG_LWW"
+    ],
+    "partlab_pattern_16": [
+      "XEB_LWW"
+    ],
+    "partlab_pattern_17": [
+      "AH9_LWW"
+    ],
+    "partlab_pattern_18": [
+      "ANE_LWW",
+      "HRP_LWW",
+      "IFSO_TNFJOURNALS",
+      "OAMA_TNFJOURNALS",
+      "PBIO_PLOS",
+      "PCBI_PLOS",
+      "PCLM_PLOS",
+      "PCSY_PLOS",
+      "PDIG_PLOS",
+      "PGEN_PLOS",
+      "PGPH_PLOS",
+      "PMED_PLOS",
+      "PMEN_PLOS",
+      "PNTD_PLOS",
+      "PONE_PLOS",
+      "PPAT_PLOS",
+      "PSTR_PLOS",
+      "PWAT_PLOS",
+      "ST9_LWW",
+      "XAA_LWW"
+    ],
+    "partlab_pattern_19": [
+      "ATV_LWW",
+      "CIR_LWW",
+      "HAE_LWW",
+      "HCG_LWW",
+      "HCI_LWW",
+      "HCQ_LWW",
+      "HCV_LWW",
+      "HHF_LWW",
+      "HYP_LWW",
+      "RES_LWW",
+      "STR_LWW"
+    ],
+    "partlab_pattern_20": [
+      "CCM_LWW"
+    ],
+    "partlab_pattern_21": [
+      "SK9_LWW"
+    ],
+    "partlab_pattern_22": [
+      "PRS_LWW",
+      "US9_LWW"
+    ],
+    "partlab_pattern_23": [
+      "ENGHIS_OUP",
+      "ENVLAW_OUP",
+      "FRENCH_OUP",
+      "FRESTU_OUP",
+      "GRUINT_OUP",
+      "HISRES_OUP"
+    ],
+    "partlab_pattern_24": [
+      "EURSOJ_OUP",
+      "INTPOR_OUP",
+      "MELUSJ_OUP"
+    ],
+    "partlab_pattern_25": [
+      "JMPHIL_OUP"
+    ],
+    "partlab_pattern_26": [
+      "ANALYS_OUP"
+    ],
+    "partlab_pattern_27": [
+      "CLRECJ_OUP"
+    ]
+  },
+  "ref_numbered_mapping": {
+    "ref_numbered_pattern_1": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_squre_bracket;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_2": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_numbered_pattern_3": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_4": "Reference.dircite.closewrap=);Reference.dircite.double_sep=,;Reference.dircite.openwrap=(;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=);Reference.indircite.double_sep=,;Reference.indircite.openwrap=(;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_numbered_pattern_5": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered",
+    "ref_numbered_pattern_6": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_squre_bracket;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_7": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=-;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=-;Reference.ref.data-label-format=numbered_with_squre_bracket;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_8": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_dot;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_numbered_pattern_9": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_dot;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_10": "Reference.dircite.closewrap=);Reference.dircite.double_sep=,;Reference.dircite.openwrap=(;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=);Reference.indircite.double_sep=,;Reference.indircite.openwrap=(;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_dot;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_numbered_pattern_11": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_dot;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_12": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=\u00e2\u20ac\u201c;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=\u00e2\u20ac\u201c;Reference.ref.data-label-format=numbered_with_dot;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_13": "Reference.dircite.closewrap=);Reference.dircite.double_sep=,;Reference.dircite.openwrap=(;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=);Reference.indircite.double_sep=,;Reference.indircite.openwrap=(;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_dot;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_14": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_squarebracket;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_15": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_Squarebracket;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_numbered_pattern_16": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.double_sep=,;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=-;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.double_sep=,;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=-;Reference.ref.data-label-format=numbered;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_17": "Reference.dircite.closewrap=\u2298 empty;Reference.dircite.openwrap=\u2298 empty;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=\u2298 empty;Reference.indircite.openwrap=\u2298 empty;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_18": "Reference.dircite.closewrap=];Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_numbered_pattern_19": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered;Reference.ref.text-format=sup;Reference.text-format=sup",
+    "ref_numbered_pattern_20": "Reference.dircite.closewrap=];Reference.dircite.double_sep=,;Reference.dircite.openwrap=[;Reference.dircite.range_sep=\u2013;Reference.indircite.closewrap=];Reference.indircite.double_sep=,;Reference.indircite.openwrap=[;Reference.indircite.range_sep=\u2013;Reference.ref.data-label-format=numbered_with_dot"
+  },
+  "ref_unnumbered_mapping": {
+    "ref_unnumbered_pattern_1": "Reference.citation.type=CHRON_ASCEND;Reference.ref.data-label-format=unnumbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_unnumbered_pattern_2": "Reference.citation.type=FOLLOW_AUTHOR;Reference.ref.data-label-format=unnumbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_unnumbered_pattern_3": "Reference.citation.type=ALPHA_ASCEND;Reference.ref.data-label-format=unnumbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_unnumbered_pattern_4": "Reference.citation.type=NAME_WITH_PAGE;Reference.ref.data-label-format=unnumbered;Reference.ref.text-format=false;Reference.text-format=false"
+  },
+  "ref_footnote_mapping": {
+    "ref_footnote_pattern_1": "Reference.citation.type=FOOTNOTE;Reference.ref.data-label-format=unnumbered;Reference.ref.text-format=false;Reference.text-format=false",
+    "ref_footnote_pattern_2": "Reference.citation.type=FOOTNOTE;Reference.ref.data-label-format=numbered;Reference.ref.text-format=false;Reference.text-format=false"
+  },
+  "figtab_mapping": {
+    "figtab_pattern_1": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=,;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=,;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_2": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=and;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=and;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_3": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=and;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=through;Figure.indircite.closewrap=);Figure.indircite.double_sep=and;Figure.indircite.openwrap=(;Figure.indircite.range_sep=through;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=through;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=through",
+    "figtab_pattern_4": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=and;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=through;Figure.indircite.closewrap=);Figure.indircite.double_sep=and;Figure.indircite.openwrap=(;Figure.indircite.range_sep=through;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_5": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=and;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_6": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_7": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=to;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=to",
+    "figtab_pattern_8": "Figure.dircite.closewrap=);Figure.dircite.double_sep=,;Figure.dircite.openwrap=(;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_9": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=through;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=through;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=through;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=through",
+    "figtab_pattern_10": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=and;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=and;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=and;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_11": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=];Figure.indircite.double_sep=,;Figure.indircite.openwrap=[;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=,;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=];Table.indircite.double_sep=,;Table.indircite.openwrap=[;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_12": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=\u2298 empty;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=\u2298 empty;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_13": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=-;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=-;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=,;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=-;Table.indircite.closewrap=);Table.indircite.double_sep=,;Table.indircite.openwrap=(;Table.indircite.range_sep=-",
+    "figtab_pattern_14": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=-;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=-;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=,;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.double_sep=,;Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_15": "Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.range_sep=\u2013;Table.indircite.closewrap=);Table.indircite.openwrap=(;Table.indircite.range_sep=\u2013",
+    "figtab_pattern_16": "Figure.dircite.closewrap=\u2298 empty;Figure.dircite.double_sep=,;Figure.dircite.openwrap=\u2298 empty;Figure.dircite.range_sep=\u2013;Figure.indircite.closewrap=);Figure.indircite.double_sep=,;Figure.indircite.openwrap=(;Figure.indircite.range_sep=\u2013;Table.dircite.closewrap=\u2298 empty;Table.dircite.double_sep=,;Table.dircite.openwrap=\u2298 empty;Table.dircite.range_sep=to;Table.indircite.closewrap=);Table.indircite.double_sep=,;Table.indircite.openwrap=(;Table.indircite.range_sep=to"
+  },
+  "partlab_mapping": {
+    "partlab_pattern_1": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_prefix_num=yes",
+    "partlab_pattern_2": "Figure.dircite.part_lab_case=lower;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=lower;Figure.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_3": "Figure.indircite.part_lab_case=\u2298 empty;Figure.indircite.part_lab_double_sep=\u2298 empty",
+    "partlab_pattern_4": "Figure.dircite.part_lab_case=lower;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=lower;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_5": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_6": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=,;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=,;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_7": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=,;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_8": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_format=\u2298 empty;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_format=\u2298 empty;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_9": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_10": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=no;Table.dircite.part_lab_case=upper;Table.dircite.part_lab_double_sep=and;Table.dircite.part_lab_prefix_num=no;Table.indircite.part_lab_case=upper;Table.indircite.part_lab_double_sep=and;Table.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_11": "Figure.dircite.part_lab_case=lower;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=lower;Figure.indircite.part_lab_double_sep=,;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_12": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=,;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_13": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_14": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_format=italic;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_format=italic;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_15": "Figure.dircite.part_lab_case=lower;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=lower;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_16": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=no;Table.indircite.part_lab_case=upper;Table.indircite.part_lab_double_sep=and;Table.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_17": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_18": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_19": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_prefix_num=yes;Table.dircite.part_lab_case=upper;Table.dircite.part_lab_prefix_num=yes;Table.indircite.part_lab_case=upper;Table.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_20": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.dircite.part_lab_format=italic;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and;Figure.indircite.part_lab_format=italic;Figure.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_21": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=,;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=,;Figure.indircite.part_lab_prefix_num=yes",
+    "partlab_pattern_22": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_double_sep=and;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_double_sep=and",
+    "partlab_pattern_23": "Figure.dircite.part_lab_case=follow;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=follow;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_24": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_25": "Figure.dircite.part_lab_case=follow;Figure.dircite.part_lab_prefix_num=no;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_26": "Figure.dircite.part_lab_case=lower;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_prefix_num=no",
+    "partlab_pattern_27": "Figure.dircite.part_lab_case=upper;Figure.dircite.part_lab_prefix_num=yes;Figure.indircite.part_lab_case=upper;Figure.indircite.part_lab_prefix_num=yes"
+  },
+  "journal_info": {
+    "JCIM_ACS": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "PUAN_BRILL": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "AJR_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EJAC_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "FSPC_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "IJFD_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JGS_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JMTE_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JWCP_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "VI_INTELLECT": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ACD_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "BPMJ_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "BS9_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "CA9_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "CAD_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "CAEN_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "CCX_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "CIR_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "CR9_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "EJAIC_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "EJA_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "EJEM_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "EJGH_LWW": {
+      "label_format": "numbered"
+    },
+    "HAE_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "HCQ_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "IJRR_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "JCM_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "JPOB_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "JV9_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "JW9_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "MAT_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "MBC_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "MRM_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "MR_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "NMC_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "NR_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "ON9_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "PA9_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "PGEN_LWW": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "TPA_LWW": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "AH9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "BC9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "BR9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "CP9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "CU9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "EH9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "FS9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "IN9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "JD9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "JP9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "MD9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "MD_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "RE9_LWW": {
+      "label_format": "numbered_with_squre_bracket",
+      "text_format": "sup"
+    },
+    "ACI_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "ALN_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "ANE_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AS9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "ATV_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "BOR_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CCM_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CCO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CO9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "COAN_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "COH_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "COOG_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CRD_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "DCR_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EDE_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EE9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EM9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "FAD_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "FIT_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "GOX_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HCG_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HCI_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HCO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "HCR_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HCV_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HD9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HHF_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HJH_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "HM9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HPC_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HRP_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HYP_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IA9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "ICU_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "INF_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IOP_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JCN_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JES_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "JMQ_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "MCC_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MCO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MCP_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MED_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MM9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "MNH_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOG_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOH_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOL_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOP_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOT_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MOU_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "MSS_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "NCC_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "NJH_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "OPX_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PCC_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "PN9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PQS_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PRS_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PXH_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "QAD_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "QCO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "RD9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "RES_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "SHK_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "SK9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "STR_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "TJX_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "TXD_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "US9_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "WCO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "XAA_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "XCS_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "XEB_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "YCO_LWW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "AUD_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "BPHARM_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CD_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EJCP_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "HP_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ICP_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JAN_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JDN_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "NEP_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "PG_LWW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ST9_LWW": {
+      "label_format": "numbered_with_squarebracket",
+      "text_format": "sup"
+    },
+    "IM9_LWW": {
+      "label_format": "numbered_with_Squarebracket",
+      "text_format": "false"
+    },
+    "ACCR_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AJEM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AJIM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AJRGE_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AMAS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AMJM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AMSR_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AOHN_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AOMD_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "AORA_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "BGJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "BJEM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "BJOA_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "BJOC_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "DYPJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EHSJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EJRJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EYEQuest_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HFJI_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HJHS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HJOP_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "ICRS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJDD_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJEMCR_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJHR_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJMH_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJNO_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJORS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJRU_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJYN_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "INJO_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "INSJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JAHAS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JASU_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JBJD_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JCDM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JCOS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JDRA_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JIMH_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JIMP_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JIOH_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JISPCD_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JLV_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JMCU_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JMSO_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JMUPM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JNAM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOASIS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOCY_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JODB_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOMM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOMS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOPN_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOPP_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOPS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOR_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JPBI_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JRAS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JRSM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JSIP_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JSPF_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JTOS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JUOA_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JWAS_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "KHJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "MGMJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "MJBL_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "MLDN_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "MTSP_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "NJCT_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "NJOM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "NJVD_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PEDC_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PNJB_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PRCM_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "RHAW_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "RRPE_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "SJCP_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "SJOB_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "TOPH_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "TUMJ_MEDKNOW": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JOSH_MEDKNOW": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EME_NIHR": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "GHR_NIHR": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HSDR_NIHR": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "HTA_NIHR": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PGfAR_NIHR": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "PHR_NIHR": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "ABMEDI_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CARCIN_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CLEXIM_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CLINID_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "CROCOL_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "DISCIM_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "DNARES_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "ECCOJC_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "EMPHEA_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "EORTHO_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "FAMPRJ_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IBDJNL_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IJPPHA_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "IMMADV_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "INFDIS_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "JBCRES_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JBREIM_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "JCAGAS_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "JPHSRE_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "JPIDSJ_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "LIFMED_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "LIFMET_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "NEUONC_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "NICTOB_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "OCCMED_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "PCHEAL_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "SBOPEN_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "SCHBUL_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "sup"
+    },
+    "SLEEPJ_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "SLEEPO_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "TBMEDI_OUP": {
+      "label_format": "numbered_with_dot",
+      "text_format": "false"
+    },
+    "ADAPTA_OUP": {
+      "label_format": "numbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "AJCPAT_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "AJHYPE_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "AMJHSP_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "ARBINT_OUP": {
+      "label_format": "numbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "CLEANE_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "CWWRIT_OUP": {
+      "label_format": "numbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "GERHIS_OUP": {
+      "label_format": "numbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "GERONA_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "GERONI_AMA_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "HISCOL_OUP": {
+      "label_format": "numbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "IJNPPY_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "INTIMM_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "JPPHAR_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "LABMED_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "MUTAGE_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "NOAJNL_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "NOPRAC_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "OFIDIS_OUP": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "ONCOLO_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "RPSPPR_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "STCLTM_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "STMCLS_OUP": {
+      "label_format": "numbered",
+      "text_format": "sup"
+    },
+    "AESAME_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "AESTHJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "AJCLAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "ALECON_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "AMTEST_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ANALYS_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ANFRON_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ANNBOT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ANNWEH_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "AOBPLA_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "APPLIJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ARISOC_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOLLOW_AUTHOR"
+    },
+    "ARISUP_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "AUKJNL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "BEHECO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "BICSTU_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "BIOLIN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "BOTLIN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CAMECO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CAMRES_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CHEMSE_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CHRIBI_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CLPROB_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "CLRECJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CONDOR_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CRIMIN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "CZOOLO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "DESIGN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "EARLYJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "ECOPOL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EJILAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "ENGHIS_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "ENVENT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ENVLAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "ESCRIT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "EURSOJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EVLETT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EVOLIN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EVOLUT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "EXBOTJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "FORSCI_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "FQSAFE_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "FREBUL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "FRENCH_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "FRESTU_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "GERONB_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "GERONI_APA_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "GERONT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "GRUINT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "HEAPRO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "HISRES_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "IJCLAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "INDLAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "INSILC_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "INTPOR_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "INTTEC_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "ISDIVE_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JAAREL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "JALSCI_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "JANSCI_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JCBIOL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JEENTO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JEVBIO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JHERED_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JHINDU_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JHUMAN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JIPMAN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JISESA_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JLAJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JMAMMA_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JMENTO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JMPHIL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JMTHER_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JOAAAC_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JOFORE_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "JOLEVO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOLLOW_AUTHOR"
+    },
+    "JOPART_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "JPECOL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "JPORGA_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "JVCULT_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "LEXICO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "LITMAG_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "LITTHE_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "MELUSJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "NAME_WITH_PAGE"
+    },
+    "MODJUD_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "MONIST_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "MSPECI_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "MTPERS_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "MTSPEC_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "OXJLSJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "PARLIJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "PETHIC_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "POLICE_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "PPAREP_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "PPMGOV_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "PROCEL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "REFLAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "SOCHIS_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "SOCPRO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "SOCREL_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "SSJAPJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "STALAW_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "SYSBIO_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "THEOLJ_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "TRANAS_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "WHQUAR_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "FOOTNOTE"
+    },
+    "WORKAR_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "ZOOLIN_OUP": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    },
+    "PBIO_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PCBI_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PCLM_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PCSY_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PDIG_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PGEN_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PGPH_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PMED_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PMEN_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PNTD_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PONE_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PPAT_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PSTR_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "PWAT_PLOS": {
+      "label_format": "numbered_with_dot"
+    },
+    "AJP_SANDBOX": {
+      "label_format": "numbered",
+      "text_format": "false"
+    },
+    "FOCUS_SANDBOX": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "STL_SANDBOX": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "IFSO_TNFJOURNALS": {
+      "label_format": "numbered_with_dot"
+    },
+    "OAMA_TNFJOURNALS": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "ALPHA_ASCEND"
+    },
+    "YTCR_TNFJOURNALS": {
+      "label_format": "unnumbered",
+      "text_format": "false",
+      "citation_type": "CHRON_ASCEND"
+    }
+  }
+}

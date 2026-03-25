@@ -1,0 +1,27 @@
+# IMPACT Config Suite - Main Dependencies
+# Install all with: pip install -r requirements.txt
+
+# GUI Framework
+tkintertable>=0.1  # For table widgets (if used)
+
+# Data Processing
+lxml>=4.9.0        # XML/HTML parsing (analyses, patterns, cjk_checker)
+requests>=2.28.0   # HTTP requests for API calls
+beautifulsoup4>=4.11.0  # HTML parsing fallback
+
+# Database
+pymongo>=4.3.0    # MongoDB connectivity
+
+# Search Service
+fastapi>=0.100.0   # Web API framework
+uvicorn>=0.22.0    # ASGI server
+pydantic>=2.0.0    # Data validation
+jinja2>=3.1.0      # Template engine
+
+# Reports & Export
+openpyxl>=3.1.0    # Excel file generation
+matplotlib>=3.6.0  # Charts and visualization
+pandas>=1.5.0      # Data manipulation
+
+# Utilities
+python-dateutil>=2.8.0  # Date handling

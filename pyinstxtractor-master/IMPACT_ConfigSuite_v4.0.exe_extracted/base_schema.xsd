@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <!-- Root element -->
+  <xs:element name="journal">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="author" type="AuthorType"/>
+        <xs:element name="affiliation" type="AffiliationType"/>
+        <xs:element name="corresp" type="CorrespType"/>
+        <xs:element name="author-notes" type="AuthorNotesType"/>
+        <xs:element name="abstract" type="AbstractType"/>
+        <xs:element name="keywords" type="KeywordsType"/>
+        <xs:element name="p" type="ParagraphType"/>
+        <xs:element name="ciation" type="CiationType"/>
+        <xs:element name="Figure" type="FigureType"/>
+        <xs:element name="Table" type="TableType"/>
+        <xs:element name="notes" type="NotesType"/>
+        <xs:element name="heading" type="HeadingType"/>
+        <xs:element name="dictionary" type="DictionaryType"/>
+        <xs:element name="list" type="ListType"/>
+        <xs:element name="equation" type="EquationType"/>
+        <xs:element name="BackMatter" type="BackMatterType"/>
+        <xs:element name="Reference" type="ReferenceType"/>
+      </xs:sequence>
+      <xs:attribute name="short" type="xs:string" use="optional"/>
+      <xs:attribute name="abbr" type="xs:string" use="optional"/>
+      <xs:attribute name="journal-title" type="xs:string" use="required"/>
+      <xs:attribute name="batch" type="xs:string" use="optional"/>
+      <xs:attribute name="by" type="xs:string" use="optional"/>
+      <xs:attribute name="copy-by" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- Common yes/no enum -->
+  <xs:simpleType name="YesNo">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="yes"/>
+      <xs:enumeration value="no"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Author -->
+  <xs:complexType name="AuthorType">
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="surname" type="YesNo" use="required"/>
+    <xs:attribute name="given-names" type="YesNo" use="required"/>
+    <xs:attribute name="role" type="YesNo" use="required"/>
+    <xs:attribute name="collab" type="YesNo" use="required"/>
+    <xs:attribute name="on-behalf-of" type="YesNo" use="required"/>
+    <xs:attribute name="author-comment" type="YesNo" use="required"/>
+    <xs:attribute name="name-alternatives" type="YesNo" use="required"/>
+    <xs:attribute name="prefix" type="YesNo" use="required"/>
+    <xs:attribute name="suffix" type="YesNo" use="required"/>
+    <xs:attribute name="orcid" type="YesNo" use="required"/>
+    <xs:attribute name="degrees" type="YesNo" use="required"/>
+    <xs:attribute name="author-notes-quees" type="YesNo" use="required"/>
+    <xs:attribute name="corresp-quees" type="YesNo" use="required"/>
+    <xs:attribute name="contribsep" type="xs:string" use="optional"/>
+    <xs:attribute name="surnameSep" type="xs:string" use="optional"/>
+    <xs:attribute name="givennamesep" type="xs:string" use="optional"/>
+    <xs:attribute name="crosslinksep" type="xs:string" use="optional"/>
+    <xs:attribute name="seperator" type="xs:string" use="optional"/>
+    <xs:attribute name="contrib-last-sep" type="xs:string" use="optional"/>
+    <xs:attribute name="crosslink" type="YesNo" use="required"/>
+    <xs:attribute name="pattern" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <!-- Affiliation -->
+  <xs:complexType name="AffiliationType">
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="department" type="YesNo" use="required"/>
+    <xs:attribute name="institution" type="YesNo" use="required"/>
+    <xs:attribute name="city" type="YesNo" use="required"/>
+    <xs:attribute name="state" type="YesNo" use="required"/>
+    <xs:attribute name="country" type="YesNo" use="required"/>
+    <xs:attribute name="postbox" type="YesNo" use="required"/>
+    <xs:attribute name="postcode" type="YesNo" use="required"/>
+    <xs:attribute name="street" type="YesNo" use="required"/>
+    <xs:attribute name="seperator" type="xs:string" use="optional"/>
+    <xs:attribute name="designators" type="xs:string" use="optional"/>
+    <xs:attribute name="single-aff" type="xs:boolean" use="required"/>
+    <xs:attribute name="autoReNumber" type="xs:boolean" use="required"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <!-- Corresponding -->
+  <xs:complexType name="CorrespType">
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="email" type="YesNo" use="required"/>
+    <xs:attribute name="address" type="YesNo" use="required"/>
+    <xs:attribute name="maximum" type="xs:integer" use="optional"/>
+    <xs:attribute name="telephone" type="YesNo" use="required"/>
+    <xs:attribute name="fax" type="YesNo" use="required"/>
+    <xs:attribute name="indicators" type="YesNo" use="required"/>
+    <xs:attribute name="corresp-quees" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <!-- Author notes -->
+  <xs:complexType name="AuthorNotesType">
+    <xs:attribute name="data-name" type="xs:string" use="optional"/>
+    <xs:attribute name="indicators" type="YesNo" use="required"/>
+    <xs:attribute name="author-notes-quees" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <!-- Abstract -->
+  <xs:complexType name="AbstractType">
+    <xs:sequence>
+      <xs:element name="sub" type="AbstractSubType" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="GA" type="YesNo" use="required"/>
+    <xs:attribute name="laysummery" type="YesNo" use="required"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="AbstractSubType">
+    <xs:attribute name="article-type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="Review article"/>
+          <xs:enumeration value="Editorial"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="abstract-type" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+    <xs:attribute name="minwords" type="xs:integer" use="optional"/>
+    <xs:attribute name="maxwords" type="xs:integer" use="optional"/>
+  </xs:complexType>
+
+  <!-- Keywords -->
+  <xs:complexType name="KeywordsType">
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="seperator" type="xs:string" use="optional"/>
+    <xs:attribute name="endperiod" type="xs:string" use="optional"/>
+    <xs:attribute name="minimum" type="xs:string" use="optional"/>
+    <xs:attribute name="maximum" type="xs:string" use="optional"/>
+    <xs:attribute name="limit" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+    <xs:attribute name="order" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Paragraph config -->
+  <xs:complexType name="ParagraphType">
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="merge" type="YesNo" use="required"/>
+    <xs:attribute name="indent" type="YesNo" use="required"/>
+    <xs:attribute name="insfnnotes" type="YesNo" use="required"/>
+    <xs:attribute name="insennotes" type="YesNo" use="required"/>
+    <xs:attribute name="insertpi" type="YesNo" use="required"/>
+    <xs:attribute name="insfig" type="YesNo" use="required"/>
+    <xs:attribute name="instable" type="YesNo" use="required"/>
+    <xs:attribute name="inscitation" type="YesNo" use="required"/>
+    <xs:attribute name="editcitation" type="YesNo" use="required"/>
+    <xs:attribute name="delcitation" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <!-- Ciation (inline citation constraints) -->
+  <xs:complexType name="CiationType">
+    <xs:attribute name="allowedparent" type="xs:string" use="required"/>
+    <xs:attribute name="allowed" type="xs:string" use="required"/>
+    <xs:attribute name="disallowed" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- Figure -->
+  <xs:complexType name="FigureType">
+    <xs:sequence>
+      <xs:element name="caption" type="CaptionType"/>
+      <xs:element name="dircite" type="DirIndirCiteType"/>
+      <xs:element name="indircite" type="DirIndirCiteType"/>
+    </xs:sequence>
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="sentence" type="xs:string" use="required"/>
+    <xs:attribute name="ref-type" type="xs:string" use="required"/>
+    <xs:attribute name="findCaption" type="xs:string" use="required"/>
+    <xs:attribute name="findCaptionInner" type="xs:string" use="required"/>
+    <xs:attribute name="new-item-key" type="xs:string" use="required"/>
+    <xs:attribute name="email" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="CaptionType">
+    <xs:attribute name="label" type="YesNo" use="required"/>
+    <xs:attribute name="label_end_sep" type="xs:string" use="optional"/>
+    <xs:attribute name="end_sep" type="xs:string" use="optional"/>
+    <xs:attribute name="limit" type="xs:integer" use="optional"/>
+  </xs:complexType>
+
+  <xs:complexType name="DirIndirCiteType">
+    <xs:attribute name="beginpara" type="xs:string" use="optional"/>
+    <xs:attribute name="single_prefix" type="xs:string" use="required"/>
+    <xs:attribute name="double_prefix" type="xs:string" use="required"/>
+    <xs:attribute name="double_sep" type="xs:string" use="required"/>
+    <xs:attribute name="last_sep" type="xs:string" use="required"/>
+    <xs:attribute name="multi_prefix" type="xs:string" use="optional"/>
+    <xs:attribute name="range_sep" type="xs:string" use="required"/>
+    <xs:attribute name="openwrap" type="xs:string" use="optional"/>
+    <xs:attribute name="closewrap" type="xs:string" use="optional"/>
+    <xs:attribute name="part_lab_prefix_num" type="YesNo" use="required"/>
+    <xs:attribute name="part_lab_case" type="xs:string" use="required"/>
+    <xs:attribute name="part_lab_double_sep" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- Table -->
+  <xs:complexType name="TableType">
+    <xs:sequence>
+      <xs:element name="caption" type="CaptionType"/>
+      <xs:element name="dircite" type="DirCiteTableType"/>
+      <xs:element name="indircite" type="DirCiteTableType"/>
+    </xs:sequence>
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="sentence" type="xs:string" use="required"/>
+    <xs:attribute name="ref-type" type="xs:string" use="required"/>
+    <xs:attribute name="findCaption" type="xs:string" use="required"/>
+    <xs:attribute name="findCaptionInner" type="xs:string" use="required"/>
+    <xs:attribute name="new-item-key" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="DirCiteTableType">
+    <xs:attribute name="single_prefix" type="xs:string" use="required"/>
+    <xs:attribute name="double_prefix" type="xs:string" use="required"/>
+    <xs:attribute name="double_sep" type="xs:string" use="required"/>
+    <xs:attribute name="last_sep" type="xs:string" use="required"/>
+    <xs:attribute name="range_sep" type="xs:string" use="required"/>
+    <xs:attribute name="openwrap" type="xs:string" use="optional"/>
+    <xs:attribute name="closewrap" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Notes -->
+  <xs:complexType name="NotesType">
+    <xs:attribute name="footnote" type="xs:string" use="required"/>
+    <xs:attribute name="endnote" type="xs:string" use="required"/>
+    <xs:attribute name="note" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Heading -->
+  <xs:complexType name="HeadingType">
+    <xs:sequence>
+      <xs:element name="h1" type="HeadingLevelType"/>
+      <xs:element name="h2" type="HeadingLevelType"/>
+      <xs:element name="h3" type="HeadingLevelType"/>
+      <xs:element name="h4" type="HeadingLevelType"/>
+    </xs:sequence>
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="numbered" type="xs:string" use="required"/>
+    <xs:attribute name="label" type="YesNo" use="required"/>
+    <xs:attribute name="label_suffix" type="xs:string" use="optional"/>
+    <xs:attribute name="maximum" type="xs:integer" use="optional"/>
+    <xs:attribute name="label_between_delim" type="xs:string" use="optional"/>
+    <xs:attribute name="notallowed" type="YesNo" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="HeadingLevelType">
+    <xs:attribute name="style" type="xs:string" use="optional"/>
+    <xs:attribute name="type" type="xs:string" use="optional"/>
+    <xs:attribute name="label_format" type="xs:string" use="optional"/>
+    <xs:attribute name="label_end_delim" type="xs:string" use="optional"/>
+    <xs:attribute name="label_prefix" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Dictionary -->
+  <xs:complexType name="DictionaryType">
+    <xs:attribute name="spelling" type="xs:string" use="required"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="note" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- List -->
+  <xs:complexType name="ListType">
+    <xs:attribute name="label" type="xs:string" use="optional"/>
+    <xs:attribute name="bullet" type="xs:string" use="optional"/>
+    <xs:attribute name="note" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Equation -->
+  <xs:complexType name="EquationType">
+    <xs:attribute name="label" type="xs:string" use="optional"/>
+    <xs:attribute name="note" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Back matter -->
+  <xs:complexType name="BackMatterType">
+    <xs:attribute name="ack" type="xs:string" use="required"/>
+    <xs:attribute name="act" type="xs:string" use="optional"/>
+    <xs:attribute name="coi" type="xs:string" use="optional"/>
+    <xs:attribute name="fund" type="xs:string" use="optional"/>
+    <xs:attribute name="das" type="xs:string" use="optional"/>
+    <xs:attribute name="supp" type="xs:string" use="optional"/>
+    <xs:attribute name="suppcap" type="xs:string" use="optional"/>
+    <xs:attribute name="app" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Reference -->
+  <xs:complexType name="ReferenceType">
+    <xs:sequence>
+      <xs:element name="dircite" type="RefCiteType"/>
+      <xs:element name="indircite" type="RefCiteType"/>
+    </xs:sequence>
+    <xs:attribute name="data-name" type="xs:string" use="required"/>
+    <xs:attribute name="sentence" type="xs:string" use="required"/>
+    <xs:attribute name="ref-type" type="xs:string" use="required"/>
+    <xs:attribute name="data-label-format" type="xs:string" use="required"/>
+    <xs:attribute name="text-format" type="xs:boolean" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="RefCiteType">
+    <xs:attribute name="double_sep" type="xs:string" use="required"/>
+    <xs:attribute name="range_sep" type="xs:string" use="required"/>
+    <xs:attribute name="openwrap" type="xs:string" use="optional"/>
+    <xs:attribute name="closewrap" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+</xs:schema>

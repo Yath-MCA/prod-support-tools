@@ -1,0 +1,90 @@
+{
+  "application": {
+    "name": "XML Configuration Editor",
+    "version": "3.0.0",
+    "description": "XML configuration editor with WinSCP SFTP upload"
+  },
+  "domains": {
+    "UAT": {
+      "url": "https://impact-ops-uat.newgen.co/",
+      "suffix": "UAT",
+      "sftp_host": "sftp.newgen.co",
+      "sftp_base_path": "/home/SFTP_DATA/impact-uat/",
+      "sftp_folder": "in-dev",
+      "winscp_path": "C:\\Program Files (x86)\\WinSCP\\WinSCPnet.dll"
+    },
+    "LIVE": {
+      "url": "https://impact-ops.newgen.co/",
+      "suffix": "LIVE",
+      "sftp_host": "sftp.newgen.co",
+      "sftp_base_path": "/home/SFTP_DATA/impact-live/",
+      "sftp_folder": "in",
+      "winscp_path": "C:\\Program Files (x86)\\WinSCP\\WinSCPnet.dll"
+    },
+    "LIVEREPLICA": {
+      "url": "https://impact-ops-dev.newgen.co:8081/",
+      "suffix": "LIVEREPLICA",
+      "sftp_host": "sftp.newgen.co",
+      "sftp_base_path": "/home/SFTP_DATA/impact-dev/",
+      "sftp_folder": "in-role",
+      "winscp_path": "C:\\Program Files (x86)\\WinSCP\\WinSCPnet.dll"
+    }
+  },
+  "client_settings": {
+    "client_name_xpath": ".//client/name",
+    "default_client": "LWW",
+    "folder_purpose_mapping": {
+      "in-dev": "Development and testing files",
+      "in-role": "Role-based access controlled files",
+      "in": "Production/live deployment files"
+    }
+  },
+  "sftp_credentials": {
+    "username": "impact-uat",
+    "password": "Welcome@123$",
+    "port": 22,
+    "timeout_seconds": 30
+  },
+  "winscp_settings": {
+    "executable_path": "C:\\Program Files (x86)\\WinSCP\\WinSCP.exe",
+    "session_log_enabled": true,
+    "session_log_path": "C:\\Users\\{EMP_ID}\\Documents\\winscp_xml_config.log",
+    "accept_any_host_key": true
+  },
+  "default_values": {
+    "author": {
+      "firstname": "S",
+      "lastname": "Yasar",
+      "email": "yasar.mohideen@nkw.pub",
+      "salutation": "Mr."
+    },
+    "link_info": "pubkitdev",
+    "default_domain": "UAT",
+    "file_pattern": "_DEV_{domain}_{date}",
+    "default_base_id": "EDE24-0438"
+  },
+  "file_handling": {
+    "config_file": "impact_config.xml",
+    "backup_suffix": ".backup",
+    "exclude_files": [
+      "impact_config.xml"
+    ],
+    "supported_extensions": [
+      ".xml",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".png",
+      ".jpg",
+      ".jpeg"
+    ]
+  },
+  "auto_upload": {
+    "enabled": true,
+    "auto_trigger": false,
+    "delete_after_upload": false,
+    "upload_timeout_minutes": 10,
+    "log_file": "logs/sftp_upload.log",
+    "archive_location": "archives/"
+  }
+}

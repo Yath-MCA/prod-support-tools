@@ -1,0 +1,481 @@
+{
+    "_meta": {
+        "description": "Master list of allowed values for journal config validation",
+        "version": "1.0.2",
+        "last_updated": "2025-12-15",
+        "updated_by": "auto-generated"
+    },
+    "Figure": {
+        "dircite": {
+            "single_prefix": [
+                "Figure ",
+                "Fig. ",
+                "figure ",
+                "fig. "
+            ],
+            "double_prefix": [
+                "Figures ",
+                "Figs. ",
+                "Figs ",
+                "figures ",
+                "figs. ",
+                "figs "
+            ],
+            "multi_prefix": [
+                "Figures ",
+                "Figs. ",
+                "Figs ",
+                "Fig. ",
+                "figures ",
+                "figs. ",
+                "figs ",
+                "fig. "
+            ],
+            "double_sep": [
+                ", ",
+                ",",
+                " and ",
+                ", and "
+            ],
+            "last_sep": [
+                " and ",
+                ", and ",
+                ", "
+            ],
+            "range_sep": [
+                "–",
+                "-",
+                " through ",
+                "—"
+            ],
+            "openwrap": [
+                "",
+                "("
+            ],
+            "closewrap": [
+                "",
+                ")"
+            ],
+            "part_lab_prefix_num": [
+                "yes",
+                "no"
+            ],
+            "part_lab_case": [
+                "upper",
+                "lower",
+                "follow"
+            ],
+            "part_lab_format": [
+                "alpha",
+                "roman",
+                "arabic"
+            ],
+            "part_lab_double_sep": [
+                " and ",
+                ", ",
+                ","
+            ],
+            "beginpara": [
+                "Figure ",
+                "Fig. "
+            ]
+        },
+        "indircite": {
+            "single_prefix": [
+                "Figure ",
+                "Fig. ",
+                "figure ",
+                "fig. "
+            ],
+            "double_prefix": [
+                "Figures ",
+                "Figs. ",
+                "Figs ",
+                "figures ",
+                "figs. ",
+                "figs "
+            ],
+            "multi_prefix": [
+                "Figures ",
+                "Figs. ",
+                "Figs ",
+                "Fig. ",
+                "figures ",
+                "figs. ",
+                "figs ",
+                "fig. "
+            ],
+            "double_sep": [
+                ", ",
+                ",",
+                " and ",
+                ", and "
+            ],
+            "last_sep": [
+                " and ",
+                ", and ",
+                ", "
+            ],
+            "range_sep": [
+                "–",
+                "-",
+                " through ",
+                "—"
+            ],
+            "openwrap": [
+                "(",
+                "[",
+                ""
+            ],
+            "closewrap": [
+                ")",
+                "]",
+                ""
+            ],
+            "part_lab_prefix_num": [
+                "yes",
+                "no"
+            ],
+            "part_lab_case": [
+                "upper",
+                "lower",
+                "follow"
+            ],
+            "part_lab_format": [
+                "alpha",
+                "roman",
+                "arabic"
+            ],
+            "part_lab_double_sep": [
+                " and ",
+                ", ",
+                ","
+            ]
+        },
+        "caption": {
+            "label": [
+                "yes",
+                "no"
+            ],
+            "label_end_sep": [
+                ".",
+                ":",
+                " ",
+                ""
+            ],
+            "end_sep": [
+                ".",
+                "",
+                " "
+            ],
+            "limit": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "10",
+                ""
+            ]
+        }
+    },
+    "Table": {
+        "dircite": {
+            "single_prefix": [
+                "Table ",
+                "table ",
+                "Tab. ",
+                "tab. "
+            ],
+            "double_prefix": [
+                "Tables ",
+                "tables ",
+                "Tabs. ",
+                "tabs. "
+            ],
+            "multi_prefix": [
+                "Tables ",
+                "tables ",
+                "Tabs. ",
+                "tabs. ",
+                "Tab. ",
+                "tab. "
+            ],
+            "double_sep": [
+                ", ",
+                ",",
+                " and ",
+                ", and "
+            ],
+            "last_sep": [
+                " and ",
+                ", and ",
+                ", "
+            ],
+            "range_sep": [
+                "–",
+                "-",
+                " through ",
+                "—"
+            ],
+            "openwrap": [
+                "",
+                "("
+            ],
+            "closewrap": [
+                "",
+                ")"
+            ],
+            "part_lab_prefix_num": [
+                "yes",
+                "no"
+            ],
+            "part_lab_case": [
+                "upper",
+                "lower",
+                "follow"
+            ],
+            "part_lab_format": [
+                "alpha",
+                "roman",
+                "arabic"
+            ],
+            "part_lab_double_sep": [
+                " and ",
+                ", ",
+                ","
+            ]
+        },
+        "indircite": {
+            "single_prefix": [
+                "Table ",
+                "table ",
+                "Tab. ",
+                "tab. "
+            ],
+            "double_prefix": [
+                "Tables ",
+                "tables ",
+                "Tabs. ",
+                "tabs. "
+            ],
+            "multi_prefix": [
+                "Tables ",
+                "tables ",
+                "Tabs. ",
+                "tabs. ",
+                "Tab. ",
+                "tab. "
+            ],
+            "double_sep": [
+                ", ",
+                ",",
+                " and ",
+                ", and "
+            ],
+            "last_sep": [
+                " and ",
+                ", and ",
+                ", "
+            ],
+            "range_sep": [
+                "–",
+                "-",
+                " through ",
+                "—"
+            ],
+            "openwrap": [
+                "(",
+                "[",
+                ""
+            ],
+            "closewrap": [
+                ")",
+                "]",
+                ""
+            ],
+            "part_lab_prefix_num": [
+                "yes",
+                "no"
+            ],
+            "part_lab_case": [
+                "upper",
+                "lower",
+                "follow"
+            ],
+            "part_lab_format": [
+                "alpha",
+                "roman",
+                "arabic"
+            ],
+            "part_lab_double_sep": [
+                " and ",
+                ", ",
+                ","
+            ]
+        },
+        "caption": {
+            "label": [
+                "yes",
+                "no"
+            ],
+            "label_end_sep": [
+                ".",
+                ":",
+                " ",
+                ""
+            ],
+            "end_sep": [
+                ".",
+                "",
+                " "
+            ],
+            "limit": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "10",
+                ""
+            ]
+        }
+    },
+    "Reference": {
+        "data-label-format": [
+            "numbered",
+            "numbered_with_squre_bracket",
+            "numbered_with_bracket",
+            "unnumbered"
+        ],
+        "text-format": [
+            "sup",
+            "normal",
+            "sub"
+        ],
+        "dircite": {
+            "double_sep": [
+                ",",
+                ", ",
+                " and ",
+                ", and "
+            ],
+            "range_sep": [
+                "–",
+                "-",
+                "—",
+                " through "
+            ],
+            "openwrap": [
+                "",
+                "(",
+                "["
+            ],
+            "closewrap": [
+                "",
+                ")",
+                "]"
+            ],
+            "separate": [
+                ", ",
+                ","
+            ]
+        },
+        "indircite": {
+            "double_sep": [
+                ",",
+                ", ",
+                " and ",
+                ", and "
+            ],
+            "range_sep": [
+                "–",
+                "-",
+                "—",
+                " through "
+            ],
+            "openwrap": [
+                "(",
+                "[",
+                ""
+            ],
+            "closewrap": [
+                ")",
+                "]",
+                ""
+            ],
+            "separate": [
+                ", ",
+                ","
+            ]
+        },
+        "citation": {
+            "type": [
+                "FOOTNOTE",
+                "NAME_DATE",
+                "NUMBERED",
+                ""
+            ]
+        }
+    },
+    "heading": {
+        "numbered": [
+            "yes",
+            "no"
+        ],
+        "label": [
+            "yes",
+            "no"
+        ],
+        "maximum": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10"
+        ]
+    },
+    "author": {
+        "surname": [
+            "yes",
+            "no"
+        ],
+        "given-names": [
+            "yes",
+            "no"
+        ],
+        "prefix": [
+            "yes",
+            "no"
+        ],
+        "suffix": [
+            "yes",
+            "no"
+        ],
+        "orcid": [
+            "yes",
+            "no"
+        ],
+        "degrees": [
+            "yes",
+            "no"
+        ],
+        "role": [
+            "yes",
+            "no"
+        ],
+        "collab": [
+            "yes",
+            "no"
+        ],
+        "crosslink": [
+            "yes",
+            "no"
+        ]
+    }
+}

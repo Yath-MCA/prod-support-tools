@@ -8,6 +8,7 @@ from analyses_tab import AnalysesTab
 from patterns_tab import PatternsTab
 from search_tab import SearchTab
 from cjk_checker.gui import CJKIntegrityTab
+from data_transfer_tab import DataTransferTab
 
 
 class CommonToolsApp:
@@ -37,6 +38,7 @@ class CommonToolsApp:
         notebook.add(PatternsTab(notebook), text="Patterns")
         notebook.add(SearchTab(notebook), text="Search")
         notebook.add(CJKIntegrityTab(notebook), text="CJK Integrity")
+        notebook.add(DataTransferTab(notebook), text="Data Transfer")
 
     def run(self) -> None:
         self.root.mainloop()
