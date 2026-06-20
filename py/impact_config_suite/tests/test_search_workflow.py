@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from search_service.app.app import app
 from search_service.app.services.file_search import copy_files_for_batch, fetch_doc_ids, search_in_batch
+from core.element_extractor import ElementExtractor
 from search_tab import SearchTab
 from tools_app import CommonToolsApp
 
@@ -223,12 +224,64 @@ class SearchWorkflowTests(unittest.TestCase):
         config = CommonToolsApp._load_navigation_config()
         categories = [item["name"] for item in config["categories"]]
         self.assertIn("Analysis", categories)
+        self.assertIn("Reports / Pattern", categories)
+        self.assertIn("Auto Download", categories)
         analysis = next(item for item in config["categories"] if item["name"] == "Analysis")
-        analysis_tools = [tool["label"] for tool in analysis["tools"]]
-        self.assertEqual(analysis_tools[2], "Search")
+        analysis_tool_ids = [tool["id"] for tool in analysis["tools"]]
+        self.assertIn("search", analysis_tool_ids)
+        extractor = next(item for item in config["categories"] if item["name"] == "Extractor Tools")
+        extractor_tool_ids = [tool["id"] for tool in extractor["tools"]]
+        self.assertIn("element_extractor", extractor_tool_ids)
         self.assertIn("Configuration", categories)
         self.assertEqual(config["default_category"], "Analysis")
         self.assertEqual(config["default_tool"], "analyses")
+
+    def test_app_metadata_is_loadable(self) -> None:
+        metadata = CommonToolsApp._load_app_metadata()
+        self.assertIn("display_name", metadata)
+        self.assertIn("version", metadata)
+        self.assertTrue(metadata["display_name"])
+        self.assertTrue(metadata["version"])
+
+    def test_element_extractor_folder_filter(self) -> None:
+        source = Path(self.temp_dir.name) / "scan"
+        source.mkdir()
+        (source / "doc1_original.html").write_text("<html><body><span>A</span></body></html>", encoding="utf-8")
+        (source / "doc1_updated.html").write_text("<html><body><span>B</span></body></html>", encoding="utf-8")
+        (source / "doc2_original.html").write_text("<html><body><span>C</span></body></html>", encoding="utf-8")
+
+        extractor = ElementExtractor()
+        original_results, _, original_total = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            filename_filter="_original.html",
+        )
+        updated_results, _, updated_total = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            filename_filter="_updated.html",
+        )
+        all_results, _, all_total = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            filename_filter="None",
+        )
+
+        self.assertEqual(original_total, 2)
+        self.assertEqual(updated_total, 1)
+        self.assertEqual(all_total, 3)
+        self.assertEqual(len(original_results), 2)
+        self.assertEqual(len(updated_results), 1)
+        self.assertEqual(len(all_results), 3)
 
     def test_search_tab_port_check(self) -> None:
         port = _free_port()

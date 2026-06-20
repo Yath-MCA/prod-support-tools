@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("common", "cjk")]
+    [ValidateSet("common")]
     [string]$Target = "common",
     [switch]$Clean,
     [switch]$NoConsole,
@@ -11,6 +11,22 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptRoot
 
+$metadataPath = Join-Path $scriptRoot "build_metadata.json"
+$metadata = $null
+if (Test-Path $metadataPath) {
+    try {
+        $metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
+    } catch {
+        Write-Host "Warning: unable to read build_metadata.json, using defaults."
+    }
+}
+
+$targetKey = "common"
+$targetMetadata = $null
+if ($metadata -and $metadata.PSObject -and ($metadata.PSObject.Properties.Name -contains $targetKey)) {
+    $targetMetadata = $metadata.$targetKey
+}
+
 if (Test-Path ".\\.venv\\Scripts\\python.exe") {
     $python = ".\\.venv\\Scripts\\python.exe"
 } elseif (Test-Path "..\\..\\..\\.venv\\Scripts\\python.exe") {
@@ -19,12 +35,18 @@ if (Test-Path ".\\.venv\\Scripts\\python.exe") {
     $python = "python"
 }
 
-$appName = "IMPACT_ConfigSuite_v5.0"
-$entry = "main.py"
-if ($Target -eq "cjk") {
-    $appName = "IMPACT_CJK_Integrity_Checker"
-    $entry = "cjk_checker\\main.py"
+if ($null -ne $targetMetadata) {
+    $productName = [string]$targetMetadata.product_name
+    $version = [string]$targetMetadata.version
+    $displayName = [string]$targetMetadata.display_name
+} else {
+    $productName = "IMPACT_ConfigSuite"
+    $version = "5.1.0"
+    $displayName = "IMPACT_ConfigSuite"
 }
+
+$appName = "${productName}_v${version}"
+$entry = "main.py"
 
 $windowedFlag = "--windowed"
 if ($NoConsole) {
@@ -55,6 +77,8 @@ if ($Clean) {
 Write-Host "Building EXE target: $Target"
 Write-Host "Using Python: $python"
 Write-Host "Entry file: $entry"
+Write-Host "Display name: $displayName"
+Write-Host "Version: $version"
 Write-Host "Legacy refs mode: $LegacyRefs"
 
 & $python @args
@@ -72,34 +96,28 @@ if (Test-Path $navConfig) {
     Write-Host "Navigation config copied to dist\\tools_navigation.json"
 }
 
-if ($LegacyRefs) {
-    $legacyBuildPath = ""
-    $legacyExe = ""
+if (Test-Path $metadataPath) {
+    Copy-Item -Force $metadataPath (Join-Path $scriptRoot "dist\\build_metadata.json")
+    Write-Host "Build metadata copied to dist\\build_metadata.json"
+}
 
-    if ($Target -eq "common") {
-        $legacyBuildPath = Join-Path $scriptRoot "build\impact_suite"
-        $legacyExe = Join-Path $scriptRoot "dist\IMPACT_ConfigSuite_v3.0.exe"
-    }
-    if ($Target -eq "cjk") {
-        $legacyBuildPath = Join-Path $scriptRoot "build\impact_cjk_suite"
-        $legacyExe = Join-Path $scriptRoot "dist\IMPACT_CJK_Integrity_Checker_v1.0.exe"
-    }
+if ($LegacyRefs) {
+    $legacyBuildPath = Join-Path $scriptRoot "build\impact_suite"
+    $legacyExe = Join-Path $scriptRoot "dist\IMPACT_ConfigSuite_v3.0.exe"
 
     $currentBuildPath = Join-Path $scriptRoot "build\$appName"
 
-    if ($legacyBuildPath -ne "") {
-        if (Test-Path $legacyBuildPath) {
-            Remove-Item -Recurse -Force $legacyBuildPath
-        }
-        New-Item -ItemType Directory -Path $legacyBuildPath | Out-Null
+    if (Test-Path $legacyBuildPath) {
+        Remove-Item -Recurse -Force $legacyBuildPath
+    }
+    New-Item -ItemType Directory -Path $legacyBuildPath | Out-Null
 
-        if (Test-Path $currentBuildPath) {
-            Copy-Item -Recurse -Force "$currentBuildPath\*" $legacyBuildPath
-            Write-Host "Legacy build reference updated: $legacyBuildPath"
-        }
+    if (Test-Path $currentBuildPath) {
+        Copy-Item -Recurse -Force "$currentBuildPath\*" $legacyBuildPath
+        Write-Host "Legacy build reference updated: $legacyBuildPath"
     }
 
-    if ($legacyExe -ne "") {
+    if (Test-Path $exePath) {
         Copy-Item -Force $exePath $legacyExe
         Write-Host "Legacy EXE alias updated: $legacyExe"
     }

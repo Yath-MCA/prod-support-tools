@@ -1,10 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
 import webbrowser
+
+from bs4 import BeautifulSoup
 
 from core.element_extractor import ElementExtractor
 
@@ -217,6 +220,7 @@ class ElementExtractorTab(ttk.Frame):
         options_frame = tk.Frame(settings_frame, bg="#1e293b")
         options_frame.grid(row=4, column=1, columnspan=2, sticky="ew", pady=5)
         options_frame.columnconfigure(1, weight=1)
+        options_frame.columnconfigure(2, weight=1)
 
         self.recursive_var = tk.BooleanVar(value=False)
         self.recursive_chk = tk.Checkbutton(
@@ -244,6 +248,25 @@ class ElementExtractorTab(ttk.Frame):
             width=25
         )
         self.ext_entry.grid(row=0, column=2, sticky="ew", ipady=6)
+
+        tk.Label(
+            options_frame,
+            text="Filename Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+
+        self.filename_filter_var = tk.StringVar(value="None")
+        self.filename_filter_combo = ttk.Combobox(
+            options_frame,
+            textvariable=self.filename_filter_var,
+            values=["*_original.html", "*_updated.html", "None"],
+            state="readonly",
+            width=18,
+            font=("Segoe UI", 9),
+        )
+        self.filename_filter_combo.grid(row=1, column=1, columnspan=2, sticky="w", pady=(10, 0))
 
         # 6. Output report path
         tk.Label(
@@ -408,11 +431,13 @@ class ElementExtractorTab(ttk.Frame):
         if mode == "Single File":
             self.recursive_chk.config(state="disabled")
             self.ext_entry.config(state="disabled", bg="#1e293b", fg="#475569")
+            self.filename_filter_combo.config(state="disabled")
             self.path_label.config(text="Source XML/HTML File:")
             self.options_lbl.config(fg="#475569")
         else:
             self.recursive_chk.config(state="normal")
             self.ext_entry.config(state="normal", bg="#334155", fg="white")
+            self.filename_filter_combo.config(state="readonly")
             self.path_label.config(text="Source Folder Path:")
             self.options_lbl.config(fg="#94a3b8")
 
@@ -568,12 +593,17 @@ class ElementExtractorTab(ttk.Frame):
                     
                 recursive = self.recursive_var.get()
                 ext_str = self.extensions_var.get()
+                filename_filter = self.filename_filter_var.get().strip()
                 # Parse extensions (e.g. ".xml, .html")
                 extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
                 
-                self._log(f"Scanning directory with filters: {', '.join(extensions)} (Recursive: {'Yes' if recursive else 'No'})")
+                filter_label = filename_filter if filename_filter != "None" else "No filename filter"
+                self._log(
+                    f"Scanning directory with filters: {', '.join(extensions)} "
+                    f"(Recursive: {'Yes' if recursive else 'No'}, Filename: {filter_label})"
+                )
                 
                 def progress_update(current, total, file_name):
                     percent = int((current / total) * 100)
@@ -582,7 +612,8 @@ class ElementExtractorTab(ttk.Frame):
                     
                 scan_results, total_matches, total_files = self.extractor.scan_directory(
                     source_path, query_type, query_val, attr_name, attr_val,
-                    recursive=recursive, extensions=extensions, progress_callback=progress_update
+                    recursive=recursive, extensions=extensions, filename_filter=filename_filter,
+                    progress_callback=progress_update
                 )
                 
                 # Check for cancellation

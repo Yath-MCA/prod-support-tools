@@ -1,0 +1,38 @@
+{
+  "default_category": "Analysis",
+  "default_tool": "analyses",
+  "categories": [
+    {
+      "name": "Analysis",
+      "tools": [
+        { "id": "analyses", "label": "Analyses" },
+        { "id": "patterns", "label": "Patterns" },
+        { "id": "search", "label": "Search" },
+        { "id": "cjk_integrity", "label": "CJK Integrity" }
+      ]
+    },
+    {
+      "name": "Process",
+      "tools": [
+        { "id": "data_transfer", "label": "Data Transfer" },
+        { "id": "pgm_html_clone_processor", "label": "PGM HTML Clone Processor" },
+        { "id": "impact_to_ceg_pgm", "label": "IMPACT to CEG/PGM" },
+        { "id": "word_extractor", "label": "Word Extractor" }
+      ]
+    },
+    {
+      "name": "Comparison",
+      "tools": [
+        { "id": "compare_html", "label": "Compare HTML" },
+        { "id": "compare_replace", "label": "Compare & Replace" }
+      ]
+    },
+    {
+      "name": "Configuration",
+      "tools": [
+        { "id": "new_journal_config", "label": "New Journal Config" },
+        { "id": "element_extractor", "label": "Element Extractor" }
+      ]
+    }
+  ]
+}

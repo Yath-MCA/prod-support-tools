@@ -3,6 +3,7 @@ import re
 import html
 import json
 import hashlib
+import fnmatch
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -228,7 +229,7 @@ class ElementExtractor:
 
     def scan_directory(self, dir_path: Path, query_type: str, query_val: str, 
                        attr_name: str = "", attr_val: str = "", recursive: bool = False,
-                       extensions: list = None, progress_callback=None):
+                       extensions: list = None, filename_filter: str = None, progress_callback=None):
         """
         Scans a directory for matching files and extracts elements.
         Uses cache for files that have not been modified since last scan.
@@ -243,8 +244,15 @@ class ElementExtractor:
 
         pattern = "**/*" if recursive else "*"
         all_files = []
+        normalized_filter = filename_filter.strip().lower() if filename_filter else ""
         for file in dir_path.glob(pattern):
-            if file.is_file() and file.suffix.lower() in extensions:
+            if not file.is_file():
+                continue
+            if normalized_filter and normalized_filter != "none" and not fnmatch.fnmatchcase(
+                file.name.lower(), normalized_filter
+            ):
+                continue
+            if file.suffix.lower() in extensions:
                 all_files.append(file)
 
         all_files = sorted(all_files)

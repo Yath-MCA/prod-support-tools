@@ -21,6 +21,7 @@ from element_extractor_tab import ElementExtractorTab
 
 
 class CommonToolsApp:
+    APP_METADATA_NAME = "build_metadata.json"
     NAVIGATION_CONFIG_NAME = "tools_navigation.json"
     TOOL_CLASS_BY_ID = {
         "analyses": AnalysesTab,
@@ -77,13 +78,17 @@ class CommonToolsApp:
 
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title("Framework Tools")
+        self.app_metadata = self._load_app_metadata()
+        self.root.title(self.app_metadata.get("display_name", "Framework Tools"))
         self.root.geometry("1120x820")
         self.is_dark_mode = False
         self.images = {}
         self.navigation_config = self._load_navigation_config()
         self.category_order = [item["name"] for item in self.navigation_config["categories"]]
         self.category_by_name = {item["name"]: item for item in self.navigation_config["categories"]}
+        self.navigation_config_path = self._resolve_navigation_config_path()
+        self.navigation_config_mtime = self._config_mtime(self.navigation_config_path)
+        self._nav_watch_active = True
         self._set_window_icon()
         self._setup_menu()
         self._build()
@@ -97,6 +102,31 @@ class CommonToolsApp:
         paths.append(Path(__file__).resolve().with_name(cls.NAVIGATION_CONFIG_NAME))
         paths.append(Path.cwd() / cls.NAVIGATION_CONFIG_NAME)
         return paths
+
+    @classmethod
+    def _app_metadata_paths(cls) -> list[Path]:
+        paths = []
+        if getattr(sys, "frozen", False):
+            paths.append(Path(sys.executable).resolve().with_name(cls.APP_METADATA_NAME))
+        paths.append(Path(__file__).resolve().with_name(cls.APP_METADATA_NAME))
+        paths.append(Path.cwd() / cls.APP_METADATA_NAME)
+        return paths
+
+    @classmethod
+    def _resolve_navigation_config_path(cls) -> Path | None:
+        for path in cls._config_paths():
+            if path.is_file():
+                return path
+        return None
+
+    @staticmethod
+    def _config_mtime(path: Path | None) -> float | None:
+        if not path:
+            return None
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return None
 
     @classmethod
     def _normalize_navigation_config(cls, data: dict) -> dict:
@@ -154,6 +184,25 @@ class CommonToolsApp:
                 print(f"Navigation config error at {path}: {exc}")
         return cls._normalize_navigation_config(cls.DEFAULT_NAVIGATION)
 
+    @classmethod
+    def _load_app_metadata(cls) -> dict:
+        defaults = {"display_name": "IMPACT_ConfigSuite", "version": "5.1.0"}
+        for path in cls._app_metadata_paths():
+            if not path.is_file():
+                continue
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+                target = raw.get("common", {}) if isinstance(raw, dict) else {}
+                display_name = str(target.get("display_name", defaults["display_name"])).strip()
+                version = str(target.get("version", defaults["version"])).strip()
+                return {
+                    "display_name": display_name or defaults["display_name"],
+                    "version": version or defaults["version"],
+                }
+            except Exception as exc:
+                print(f"App metadata error at {path}: {exc}")
+        return defaults
+
     def _set_window_icon(self) -> None:
         assets_dir = Path(__file__).resolve().parent / "assets"
         for icon_name in ("favicon.ico", "ng_favicon.ico"):
@@ -189,7 +238,9 @@ class CommonToolsApp:
         # Help Menu
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "IMPACT Common Tools GUI\nVersion 5.1.0\n© 2026 IMPACT Team"))
+        about_text = f"{self.app_metadata['display_name']}\nVersion {self.app_metadata['version']}\n© 2026 IMPACT Team"
+        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", about_text))
+        help_menu.add_command(label="Reload Navigation", command=self.reload_navigation)
 
     def _setup_header(self) -> None:
         self.header_frame = tk.Frame(self.root, bg="#ffffff", pady=10)
@@ -322,6 +373,13 @@ class CommonToolsApp:
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
+        self._build_navigation()
+        self._schedule_navigation_watch()
+
+    def _build_navigation(self, preserve=None) -> None:
+        if hasattr(self, "navigation_frame"):
+            self.navigation_frame.destroy()
+
         self.navigation_frame = tk.Frame(self.scrollable_frame, bg="#f3f4f6")
         self.navigation_frame.pack(fill="both", expand=True, padx=5, pady=(5, 12))
 
@@ -346,8 +404,18 @@ class CommonToolsApp:
                 tool_notebook.add(view, text=tool["label"])
                 self.tool_views[(category["name"], tool["id"])] = view
 
-        self.search_tab = self.tool_views[("Analysis", "search")]
-        self._select_tool(self.navigation_config["default_category"], self.navigation_config["default_tool"])
+        previous_search_tab = getattr(self, "search_tab", None)
+        self.search_tab = self.tool_views.get(("Analysis", "search"), previous_search_tab)
+        target_category = self.navigation_config["default_category"]
+        target_tool = self.navigation_config["default_tool"]
+        if preserve:
+            preserve_category, preserve_tool = preserve
+            if self._tool_exists(preserve_category, preserve_tool):
+                target_category, target_tool = preserve_category, preserve_tool
+        self._select_tool(target_category, target_tool)
+
+    def _tool_exists(self, category: str, tool_id: str) -> bool:
+        return category in self.category_by_name and any(tool["id"] == tool_id for tool in self.category_by_name[category]["tools"])
 
     def _configure_tab_styles(self) -> None:
         style = ttk.Style()
@@ -401,8 +469,59 @@ class CommonToolsApp:
         tool_notebook.select(view)
         self.canvas.yview_moveto(0)
 
+    def _current_selection(self) -> tuple[str, str] | None:
+        if not hasattr(self, "category_notebook") or not self.tool_views:
+            return None
+        category_index = self.category_notebook.index(self.category_notebook.select())
+        category = self.category_order[category_index]
+        tool_notebook = self.tool_notebooks.get(category)
+        if tool_notebook is None:
+            return None
+        selected_tool_tab = tool_notebook.select()
+        if not selected_tool_tab:
+            return None
+        selected_label = tool_notebook.tab(selected_tool_tab, "text")
+        for tool in self.category_by_name.get(category, {}).get("tools", []):
+            if tool["label"] == selected_label:
+                return category, tool["id"]
+        return None
+
+    def _schedule_navigation_watch(self) -> None:
+        if not self._nav_watch_active:
+            return
+        try:
+            self.root.after(1000, self._watch_navigation_config)
+        except tk.TclError:
+            pass
+
+    def _watch_navigation_config(self) -> None:
+        if not self._nav_watch_active:
+            return
+        current_path = self._resolve_navigation_config_path()
+        current_mtime = self._config_mtime(current_path)
+        if current_path != self.navigation_config_path or current_mtime != self.navigation_config_mtime:
+            self.navigation_config_path = current_path
+            self.navigation_config_mtime = current_mtime
+            self.reload_navigation()
+        self._schedule_navigation_watch()
+
+    def reload_navigation(self) -> None:
+        preserve = self._current_selection()
+        old_search_tab = getattr(self, "search_tab", None)
+        if old_search_tab is not None:
+            old_search_tab.shutdown(wait=True)
+        self.navigation_config = self._load_navigation_config()
+        self.category_order = [item["name"] for item in self.navigation_config["categories"]]
+        self.category_by_name = {item["name"]: item for item in self.navigation_config["categories"]}
+        self.navigation_config_path = self._resolve_navigation_config_path()
+        self.navigation_config_mtime = self._config_mtime(self.navigation_config_path)
+        self._setup_menu()
+        self._build_navigation(preserve=preserve)
+
     def _on_close(self) -> None:
-        self.search_tab.shutdown(wait=True)
+        self._nav_watch_active = False
+        if self.search_tab is not None:
+            self.search_tab.shutdown(wait=True)
         self.root.destroy()
 
     def run(self) -> None:
