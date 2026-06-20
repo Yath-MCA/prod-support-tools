@@ -65,6 +65,8 @@ $args = @(
     "--add-data", "cjk_checker\\config.json;cjk_checker",
     "--add-data", "cjk_checker\\templates\\report_template.html;cjk_checker\\templates",
     "--add-data", "impact_to_ceg.json;.",
+    "--add-data", "build_metadata.json;.",
+    "--add-data", "tools_navigation.json;.",
     "--add-data", "search_service\\app\\templates;search_service\\app\\templates",
     "--add-data", "search_service\\app\\static;search_service\\app\\static",
     $entry

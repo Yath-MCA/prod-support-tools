@@ -268,6 +268,44 @@ class ElementExtractorTab(ttk.Frame):
         )
         self.filename_filter_combo.grid(row=1, column=1, columnspan=2, sticky="w", pady=(10, 0))
 
+        tk.Label(
+            options_frame,
+            text="DTD Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=2, column=0, sticky="w", pady=(10, 0))
+
+        self.dtd_filter_var = tk.StringVar(value="None")
+        self.dtd_filter_combo = ttk.Combobox(
+            options_frame,
+            textvariable=self.dtd_filter_var,
+            values=["None", "JATS", "BITS"],
+            state="readonly",
+            width=18,
+            font=("Segoe UI", 9),
+        )
+        self.dtd_filter_combo.grid(row=2, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        tk.Label(
+            options_frame,
+            text="Client Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=3, column=0, sticky="w", pady=(10, 0))
+
+        self.client_filter_var = tk.StringVar(value="None")
+        self.client_filter_combo = ttk.Combobox(
+            options_frame,
+            textvariable=self.client_filter_var,
+            values=["None", "OUP", "TNF", "PLOS", "BRILL", "ACS", "LWW", "MEDKNOW"],
+            state="readonly",
+            width=18,
+            font=("Segoe UI", 9),
+        )
+        self.client_filter_combo.grid(row=3, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
         # 6. Output report path
         tk.Label(
             settings_frame,
@@ -432,12 +470,16 @@ class ElementExtractorTab(ttk.Frame):
             self.recursive_chk.config(state="disabled")
             self.ext_entry.config(state="disabled", bg="#1e293b", fg="#475569")
             self.filename_filter_combo.config(state="disabled")
+            self.dtd_filter_combo.config(state="disabled")
+            self.client_filter_combo.config(state="disabled")
             self.path_label.config(text="Source XML/HTML File:")
             self.options_lbl.config(fg="#475569")
         else:
             self.recursive_chk.config(state="normal")
             self.ext_entry.config(state="normal", bg="#334155", fg="white")
             self.filename_filter_combo.config(state="readonly")
+            self.dtd_filter_combo.config(state="readonly")
+            self.client_filter_combo.config(state="readonly")
             self.path_label.config(text="Source Folder Path:")
             self.options_lbl.config(fg="#94a3b8")
 
@@ -621,15 +663,20 @@ class ElementExtractorTab(ttk.Frame):
                 recursive = self.recursive_var.get()
                 ext_str = self.extensions_var.get()
                 filename_filter = self.filename_filter_var.get().strip()
+                dtd_filter = self.dtd_filter_var.get().strip()
+                client_filter = self.client_filter_var.get().strip()
                 # Parse extensions (e.g. ".xml, .html")
                 extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
                 
                 filter_label = filename_filter if filename_filter != "None" else "No filename filter"
+                dtd_label = dtd_filter if dtd_filter != "None" else "No DTD filter"
+                client_label = client_filter if client_filter != "None" else "No client filter"
                 self._log(
                     f"Scanning directory with filters: {', '.join(extensions)} "
-                    f"(Recursive: {'Yes' if recursive else 'No'}, Filename: {filter_label})"
+                    f"(Recursive: {'Yes' if recursive else 'No'}, Filename: {filter_label}, "
+                    f"DTD: {dtd_label}, Client: {client_label})"
                 )
                 
                 def progress_update(current, total, file_name):
@@ -640,6 +687,7 @@ class ElementExtractorTab(ttk.Frame):
                 scan_results, total_matches, total_files = self.extractor.scan_directory(
                     source_path, query_type, query_val, attr_name, attr_val,
                     recursive=recursive, extensions=extensions, filename_filter=filename_filter,
+                    dtd_filter=dtd_filter, client_filter=client_filter,
                     progress_callback=progress_update
                 )
                 

@@ -76,6 +76,71 @@ class ElementExtractor:
         except Exception:
             self._cache = {}
 
+    @staticmethod
+    def _normalize_named_filter(value: str) -> str:
+        if not value:
+            return ""
+        normalized = value.strip()
+        if not normalized or normalized.lower() == "none":
+            return ""
+        return normalized
+
+    @staticmethod
+    def _matches_filename_filter(file_name: str, normalized_filter: str) -> bool:
+        if not normalized_filter:
+            return True
+
+        lowered_name = file_name.lower()
+        lowered_filter = normalized_filter.lower()
+
+        # Keep the common folder-scan options strict so *_original.html does not
+        # also include *_AU_original.html, and likewise for *_updated.html.
+        if lowered_filter == "*_original.html":
+            stem = Path(file_name).stem
+            return bool(re.fullmatch(r"[^_]+_original", stem, flags=re.IGNORECASE))
+        if lowered_filter == "*_updated.html":
+            stem = Path(file_name).stem
+            return bool(re.fullmatch(r"[^_]+_updated", stem, flags=re.IGNORECASE))
+
+        return fnmatch.fnmatchcase(lowered_name, lowered_filter)
+
+    @staticmethod
+    def _load_impact_config_filters(config_path: Path) -> tuple[str, str]:
+        try:
+            root = etree.parse(str(config_path)).getroot()
+        except Exception:
+            return "", ""
+
+        dtd_name = ""
+        client_name = ""
+
+        dtd_node = root.find(".//dtd")
+        if dtd_node is not None:
+            dtd_name = (dtd_node.get("name") or "").strip()
+
+        client_node = root.find(".//client")
+        if client_node is not None:
+            client_name = (client_node.get("name") or client_node.text or "").strip()
+
+        return dtd_name, client_name
+
+    def _matches_config_filters(self, file_path: Path, dtd_filter: str, client_filter: str) -> bool:
+        dtd_filter = self._normalize_named_filter(dtd_filter)
+        client_filter = self._normalize_named_filter(client_filter)
+        if not dtd_filter and not client_filter:
+            return True
+
+        config_path = file_path.parent / "impact_config.xml"
+        if not config_path.is_file():
+            return False
+
+        dtd_name, client_name = self._load_impact_config_filters(config_path)
+        if dtd_filter and dtd_name.upper() != dtd_filter.upper():
+            return False
+        if client_filter and client_name.upper() != client_filter.upper():
+            return False
+        return True
+
     def parse_and_extract(self, file_path: Path, query_type: str, query_val: str, attr_name: str = "", attr_val: str = ""):
         """
         Parses a single file and extracts elements matching the query.
@@ -227,9 +292,11 @@ class ElementExtractor:
 
         return results
 
-    def scan_directory(self, dir_path: Path, query_type: str, query_val: str, 
+    def scan_directory(self, dir_path: Path, query_type: str, query_val: str,
                        attr_name: str = "", attr_val: str = "", recursive: bool = False,
-                       extensions: list = None, filename_filter: str = None, progress_callback=None):
+                       extensions: list = None, filename_filter: str = None,
+                       dtd_filter: str = None, client_filter: str = None,
+                       progress_callback=None):
         """
         Scans a directory for matching files and extracts elements.
         Uses cache for files that have not been modified since last scan.
@@ -244,19 +311,21 @@ class ElementExtractor:
 
         pattern = "**/*" if recursive else "*"
         all_files = []
-        normalized_filter = filename_filter.strip().lower() if filename_filter else ""
-        if normalized_filter and normalized_filter != "none" and not any(
+        normalized_filter = filename_filter.strip() if filename_filter else ""
+        if normalized_filter and normalized_filter.lower() != "none" and not any(
             char in normalized_filter for char in "*?[]"
         ):
             normalized_filter = f"*{normalized_filter}"
         for file in dir_path.glob(pattern):
             if not file.is_file():
                 continue
-            if normalized_filter and normalized_filter != "none" and not fnmatch.fnmatchcase(
-                file.name.lower(), normalized_filter
+            if normalized_filter and normalized_filter.lower() != "none" and not self._matches_filename_filter(
+                file.name, normalized_filter
             ):
                 continue
             if file.suffix.lower() in extensions:
+                if not self._matches_config_filters(file, dtd_filter, client_filter):
+                    continue
                 all_files.append(file)
 
         all_files = sorted(all_files)
@@ -316,6 +385,8 @@ class ElementExtractor:
         
         for file_path_str, data in scan_results.items():
             file_name = os.path.basename(file_path_str)
+            file_uri = Path(file_path_str).as_uri()
+            js_file_path = json.dumps(file_path_str)
             file_index += 1
             
             if not data.get("ok", True):
@@ -324,10 +395,16 @@ class ElementExtractor:
                 file_sections += f"""
                 <div class="file-card error-card" data-filename="{html.escape(file_name)}">
                     <div class="file-header" onclick="toggleCard('file-{file_index}')">
-                        <div class="file-title">
-                            <span class="toggle-icon">▶</span>
-                            <span class="file-badge badge-error">Error</span>
-                            <strong>{html.escape(file_name)}</strong>
+                        <div class="file-header-main">
+                            <div class="file-title">
+                                <span class="toggle-icon">▶</span>
+                                <span class="file-badge badge-error">Error</span>
+                                <strong>{html.escape(file_name)}</strong>
+                            </div>
+                            <div class="file-actions">
+                                <a class="file-action-btn" href="{html.escape(file_uri)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>
+                                <button class="file-action-btn" onclick='copyFilePath({js_file_path}, this, event)'>Copy Path</button>
+                            </div>
                         </div>
                         <div class="file-path">{html.escape(file_path_str)}</div>
                     </div>
@@ -420,10 +497,16 @@ class ElementExtractor:
             file_sections += f"""
             <div class="file-card" data-filename="{html.escape(file_name)}">
                 <div class="file-header" onclick="toggleCard('file-{file_index}')">
-                    <div class="file-title">
-                        <span class="toggle-icon">▼</span>
-                        <span class="file-badge badge-success">{len(matches)} Match(es)</span>
-                        <strong>{html.escape(file_name)}</strong>
+                    <div class="file-header-main">
+                        <div class="file-title">
+                            <span class="toggle-icon">▼</span>
+                            <span class="file-badge badge-success">{len(matches)} Match(es)</span>
+                            <strong>{html.escape(file_name)}</strong>
+                        </div>
+                        <div class="file-actions">
+                            <a class="file-action-btn" href="{html.escape(file_uri)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>
+                            <button class="file-action-btn" onclick='copyFilePath({js_file_path}, this, event)'>Copy Path</button>
+                        </div>
                     </div>
                     <div class="file-path">{html.escape(file_path_str)}</div>
                 </div>
@@ -654,6 +737,14 @@ class ElementExtractor:
         .file-header:hover {{
             background: rgba(255, 255, 255, 0.04);
         }}
+
+        .file-header-main {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
         
         .file-title {{
             display: flex;
@@ -661,6 +752,36 @@ class ElementExtractor:
             gap: 12px;
             font-size: 1.1rem;
             margin-bottom: 4px;
+        }}
+
+        .file-actions {{
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }}
+
+        .file-action-btn {{
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }}
+
+        .file-action-btn:hover {{
+            background: rgba(148, 163, 184, 0.18);
+            border-color: rgba(148, 163, 184, 0.35);
+        }}
+
+        .file-action-btn.copied {{
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
         }}
         
         .toggle-icon {{
@@ -1024,6 +1145,27 @@ class ElementExtractor:
             }}).catch(err => {{
                 console.error('Failed to copy text: ', err);
                 showToast('Failed to copy markup.');
+            }});
+        }}
+
+        function copyFilePath(filePath, btn, event) {{
+            if (event) {{
+                event.stopPropagation();
+            }}
+
+            navigator.clipboard.writeText(filePath).then(() => {{
+                const originalLabel = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                showToast('File path copied to clipboard!');
+
+                setTimeout(() => {{
+                    btn.textContent = originalLabel;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy path: ', err);
+                showToast('Failed to copy file path.');
             }});
         }}
         

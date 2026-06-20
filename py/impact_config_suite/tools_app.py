@@ -95,20 +95,27 @@ class CommonToolsApp:
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     @classmethod
+    def _resource_base_dir(cls) -> Path:
+        bundle_dir = getattr(sys, "_MEIPASS", None)
+        if bundle_dir:
+            return Path(bundle_dir)
+        return Path(__file__).resolve().parent
+
+    @classmethod
     def _config_paths(cls) -> list[Path]:
         paths = []
+        paths.append(cls._resource_base_dir() / cls.NAVIGATION_CONFIG_NAME)
         if getattr(sys, "frozen", False):
             paths.append(Path(sys.executable).resolve().with_name(cls.NAVIGATION_CONFIG_NAME))
-        paths.append(Path(__file__).resolve().with_name(cls.NAVIGATION_CONFIG_NAME))
         paths.append(Path.cwd() / cls.NAVIGATION_CONFIG_NAME)
         return paths
 
     @classmethod
     def _app_metadata_paths(cls) -> list[Path]:
         paths = []
+        paths.append(cls._resource_base_dir() / cls.APP_METADATA_NAME)
         if getattr(sys, "frozen", False):
             paths.append(Path(sys.executable).resolve().with_name(cls.APP_METADATA_NAME))
-        paths.append(Path(__file__).resolve().with_name(cls.APP_METADATA_NAME))
         paths.append(Path.cwd() / cls.APP_METADATA_NAME)
         return paths
 
@@ -204,7 +211,7 @@ class CommonToolsApp:
         return defaults
 
     def _set_window_icon(self) -> None:
-        assets_dir = Path(__file__).resolve().parent / "assets"
+        assets_dir = self._resource_base_dir() / "assets"
         for icon_name in ("favicon.ico", "ng_favicon.ico"):
             icon_path = assets_dir / icon_name
             if icon_path.exists():
@@ -247,7 +254,7 @@ class CommonToolsApp:
         self.header_frame.pack(fill="x", side="top")
         self.header_frame.columnconfigure(1, weight=1)
 
-        assets_dir = Path(__file__).resolve().parent / "assets"
+        assets_dir = self._resource_base_dir() / "assets"
         try:
             # Resize IMPACT Image
             imp_img = Image.open(str(assets_dir / "IMPACT_5_4.png"))

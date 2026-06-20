@@ -3,11 +3,13 @@ from __future__ import annotations
 import datetime
 import os
 import socket
+import sys
 import tempfile
 import threading
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import requests
 import uvicorn
@@ -243,12 +245,34 @@ class SearchWorkflowTests(unittest.TestCase):
         self.assertTrue(metadata["display_name"])
         self.assertTrue(metadata["version"])
 
+    def test_frozen_bundle_resource_paths_are_checked_first(self) -> None:
+        bundle_dir = Path(self.temp_dir.name) / "bundle"
+        bundle_dir.mkdir()
+        (bundle_dir / "build_metadata.json").write_text(
+            '{"common": {"display_name": "Bundled Suite", "version": "9.9.9"}}',
+            encoding="utf-8",
+        )
+        (bundle_dir / "tools_navigation.json").write_text(
+            '{"default_category": "Analysis", "default_tool": "analyses", "categories": [{"name": "Analysis", "tools": [{"id": "analyses", "label": "Analyses"}]}]}',
+            encoding="utf-8",
+        )
+
+        with patch.object(sys, "_MEIPASS", str(bundle_dir), create=True):
+            metadata = CommonToolsApp._load_app_metadata()
+            navigation = CommonToolsApp._load_navigation_config()
+
+        self.assertEqual(metadata["display_name"], "Bundled Suite")
+        self.assertEqual(metadata["version"], "9.9.9")
+        self.assertEqual(navigation["default_tool"], "analyses")
+        self.assertEqual(navigation["categories"][0]["name"], "Analysis")
+
     def test_element_extractor_folder_filter(self) -> None:
         source = Path(self.temp_dir.name) / "scan"
         source.mkdir()
         (source / "doc1_original.html").write_text("<html><body><span>A</span></body></html>", encoding="utf-8")
         (source / "doc1_updated.html").write_text("<html><body><span>B</span></body></html>", encoding="utf-8")
         (source / "doc2_original.html").write_text("<html><body><span>C</span></body></html>", encoding="utf-8")
+        (source / "doc3_AU_original.html").write_text("<html><body><span>D</span></body></html>", encoding="utf-8")
 
         extractor = ElementExtractor()
         original_results, _, original_total = extractor.scan_directory(
@@ -257,7 +281,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "span",
             recursive=False,
             extensions=[".html"],
-            filename_filter="_original.html",
+            filename_filter="*_original.html",
         )
         updated_results, _, updated_total = extractor.scan_directory(
             source,
@@ -265,7 +289,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "span",
             recursive=False,
             extensions=[".html"],
-            filename_filter="_updated.html",
+            filename_filter="*_updated.html",
         )
         all_results, _, all_total = extractor.scan_directory(
             source,
@@ -278,10 +302,52 @@ class SearchWorkflowTests(unittest.TestCase):
 
         self.assertEqual(original_total, 2)
         self.assertEqual(updated_total, 1)
-        self.assertEqual(all_total, 3)
+        self.assertEqual(all_total, 4)
         self.assertEqual(len(original_results), 2)
         self.assertEqual(len(updated_results), 1)
-        self.assertEqual(len(all_results), 3)
+        self.assertEqual(len(all_results), 4)
+        self.assertFalse(any("AU_original" in path for path in original_results))
+
+    def test_element_extractor_folder_filter_with_impact_config(self) -> None:
+        source = Path(self.temp_dir.name) / "scan_with_config"
+        source.mkdir()
+
+        jats_oup = source / "jats_oup"
+        jats_oup.mkdir()
+        (jats_oup / "doc1_original.html").write_text("<html><body><span>A</span></body></html>", encoding="utf-8")
+        (jats_oup / "impact_config.xml").write_text(
+            "<root><dtd name=\"JATS\"/><client>oup</client></root>",
+            encoding="utf-8",
+        )
+
+        bits_plos = source / "bits_plos"
+        bits_plos.mkdir()
+        (bits_plos / "doc2_original.html").write_text("<html><body><span>B</span></body></html>", encoding="utf-8")
+        (bits_plos / "impact_config.xml").write_text(
+            "<root><dtd name=\"BITS\"/><client name=\"PLOS\"/></root>",
+            encoding="utf-8",
+        )
+
+        no_config = source / "no_config"
+        no_config.mkdir()
+        (no_config / "doc3_original.html").write_text("<html><body><span>C</span></body></html>", encoding="utf-8")
+
+        extractor = ElementExtractor()
+        results, _, total = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=True,
+            extensions=[".html"],
+            filename_filter="*_original.html",
+            dtd_filter="JATS",
+            client_filter="OUP",
+        )
+
+        self.assertEqual(total, 1)
+        self.assertEqual(len(results), 1)
+        only_path = next(iter(results))
+        self.assertIn("jats_oup", only_path)
 
     def test_element_extractor_css_selector_validation(self) -> None:
         source = Path(self.temp_dir.name) / "selector.html"
