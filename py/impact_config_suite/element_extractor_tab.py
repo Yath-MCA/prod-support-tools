@@ -11,14 +11,16 @@ import webbrowser
 from bs4 import BeautifulSoup
 
 from core.element_extractor import ElementExtractor
+from core.run_history import RunHistoryStore
 
 class ElementExtractorTab(ttk.Frame):
     """
     Tkinter Tab for HTML/XML Element Extraction and reporting.
     """
     DEFAULT_REPORT_FOLDER_NAME = "impact-support-log"
-    HISTORY_FILE_NAME = "element_extractor_history.json"
     HISTORY_LIMIT = 25
+    history_tool_id = "element_extractor"
+    history_tool_label = "Element Extractor"
 
     def __init__(self, parent: ttk.Notebook):
         super().__init__(parent)
@@ -38,36 +40,21 @@ class ElementExtractorTab(ttk.Frame):
 
     @classmethod
     def _history_file_path(cls) -> Path:
-        return cls._default_output_dir() / cls.HISTORY_FILE_NAME
+        return RunHistoryStore.history_file_path()
 
     @classmethod
     def _load_history_entries(cls) -> list[dict]:
-        history_path = cls._history_file_path()
-        if not history_path.exists():
-            return []
-        try:
-            raw = json.loads(history_path.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-        if not isinstance(raw, list):
-            return []
         valid_entries = []
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            if not str(item.get("source_path", "")).strip():
-                continue
-            valid_entries.append(item)
+        for item in RunHistoryStore.recent_for_tool(cls.history_tool_id):
+            if str(item.get("source_path", "")).strip():
+                valid_entries.append(item)
         return valid_entries[:cls.HISTORY_LIMIT]
 
     @classmethod
     def _save_history_entries(cls, entries: list[dict]) -> None:
-        history_path = cls._history_file_path()
-        history_path.parent.mkdir(parents=True, exist_ok=True)
-        history_path.write_text(
-            json.dumps(entries[:cls.HISTORY_LIMIT], ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        all_entries = [entry for entry in RunHistoryStore.load_entries() if entry.get("tool_id") != cls.history_tool_id]
+        all_entries.extend(entries[:cls.HISTORY_LIMIT])
+        RunHistoryStore.save_entries(all_entries)
 
     def _build_ui(self):
         # Main container with dark background (blends with existing suite styling)
@@ -770,6 +757,10 @@ class ElementExtractorTab(ttk.Frame):
             self.open_last_btn.config(state="normal")
         self.status_var.set("History entry applied.")
 
+    def apply_history_entry(self, entry: dict) -> bool:
+        self._apply_history_entry(entry)
+        return True
+
     def _apply_selected_history(self) -> None:
         entry = self._selected_history_entry()
         if not entry:
@@ -797,8 +788,16 @@ class ElementExtractorTab(ttk.Frame):
         self._apply_history_entry(self.history_entries[0])
         self._start_extraction()
 
+    def rerun_history_entry(self, entry: dict) -> bool:
+        self._apply_history_entry(entry)
+        self._start_extraction()
+        return True
+
     def _current_run_settings(self, source_path: str, query_val: str, output_dir: str, report_path: str) -> dict:
         return {
+            "tool_id": self.history_tool_id,
+            "tool_label": self.history_tool_label,
+            "action": "extract",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "mode": self.mode_var.get().strip(),
             "source_path": source_path,
@@ -814,21 +813,24 @@ class ElementExtractorTab(ttk.Frame):
             "output_dir": output_dir,
             "open_report": bool(self.open_report_var.get()),
             "report_path": report_path,
+            "summary": f"{self.mode_var.get().strip()} | {self.selector_type_var.get().strip()}: {query_val}",
+            "params": {
+                "mode": self.mode_var.get().strip(),
+                "query_type": self.selector_type_var.get().strip(),
+                "query_value": query_val,
+                "attr_name": self.attr_name_var.get().strip(),
+                "attr_value": self.attr_val_var.get().strip(),
+                "recursive": bool(self.recursive_var.get()),
+                "extensions": self.extensions_var.get().strip(),
+                "filename_filter": self.filename_filter_var.get().strip() or "None",
+                "dtd_filter": self.dtd_filter_var.get().strip() or "None",
+                "client_filter": self.client_filter_var.get().strip() or "None",
+            },
         }
 
     def _record_history_entry(self, entry: dict) -> None:
-        self.history_entries = [
-            existing for existing in self.history_entries
-            if not (
-                str(existing.get("source_path", "")) == str(entry.get("source_path", "")) and
-                str(existing.get("query_type", "")) == str(entry.get("query_type", "")) and
-                str(existing.get("query_value", "")) == str(entry.get("query_value", "")) and
-                str(existing.get("output_dir", "")) == str(entry.get("output_dir", ""))
-            )
-        ]
-        self.history_entries.insert(0, entry)
-        self.history_entries = self.history_entries[:self.HISTORY_LIMIT]
-        self._save_history_entries(self.history_entries)
+        RunHistoryStore.add_entry(entry)
+        self.history_entries = self._load_history_entries()
         self.filtered_history_entries = list(self.history_entries)
         self._refresh_history_list()
 

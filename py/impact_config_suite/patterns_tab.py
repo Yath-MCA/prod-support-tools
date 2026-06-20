@@ -6,6 +6,7 @@ import webbrowser
 from datetime import datetime
 import glob
 
+from core.run_history import RunHistoryStore
 # Import logic from recovered patterns module
 from patterns import report_config as cfg
 from patterns.report_log import log
@@ -15,8 +16,12 @@ from patterns.report_writer import write_json, write_html, write_excel
 
 
 class PatternsTab(ttk.Frame):
+    history_tool_id = "patterns"
+    history_tool_label = "Patterns"
+
     def __init__(self, parent: ttk.Notebook):
         super().__init__(parent)
+        self.last_report_path = ""
         self._build_ui()
 
     def _build_ui(self):
@@ -228,6 +233,8 @@ class PatternsTab(ttk.Frame):
 
             self._log(f"Done! Report saved to: {os.path.basename(out_html)}")
             self.status_var.set("Report Generated.")
+            self.last_report_path = os.path.abspath(out_html)
+            self._record_history(source_dir, pattern, out_dir, self.last_report_path)
 
             if messagebox.askyesno(
                 "Success", f"Report generated successfully.\nView report now?"
@@ -243,3 +250,39 @@ class PatternsTab(ttk.Frame):
                 state="normal", text="📊 GENERATE GLOBAL PATTERNS REPORT"
             )
             self.cancel_btn.config(state="disabled")
+
+    def _record_history(self, source_dir: str, pattern: str, output_dir: str, report_path: str) -> None:
+        RunHistoryStore.add_entry(
+            {
+                "tool_id": self.history_tool_id,
+                "tool_label": self.history_tool_label,
+                "action": "generate_report",
+                "summary": f"Pattern: {pattern}",
+                "source_path": source_dir,
+                "output_dir": output_dir,
+                "report_path": report_path,
+                "params": {
+                    "source_dir": source_dir,
+                    "pattern": pattern,
+                    "output_dir": output_dir,
+                },
+            }
+        )
+
+    def apply_history_entry(self, entry: dict) -> bool:
+        params = entry.get("params", {})
+        source_dir = str(params.get("source_dir", "")).strip() or str(entry.get("source_path", "")).strip()
+        pattern = str(params.get("pattern", "")).strip()
+        if source_dir:
+            self.path_var.set(source_dir)
+        if pattern:
+            self.pattern_var.set(pattern)
+        report_path = str(entry.get("report_path", "")).strip()
+        if report_path:
+            self.last_report_path = report_path
+        return True
+
+    def rerun_history_entry(self, entry: dict) -> bool:
+        self.apply_history_entry(entry)
+        self._start_report_thread()
+        return True

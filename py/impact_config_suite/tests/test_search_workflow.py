@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from search_service.app.app import app
 from search_service.app.services.file_search import copy_files_for_batch, fetch_doc_ids, search_in_batch
 from core.element_extractor import ElementExtractor
+from core.run_history import RunHistoryStore
 from element_extractor_tab import ElementExtractorTab
 from search_tab import SearchTab
 from tools_app import CommonToolsApp
@@ -279,6 +280,8 @@ class SearchWorkflowTests(unittest.TestCase):
     def test_element_extractor_history_is_saved_and_loaded(self) -> None:
         fake_home = Path(self.temp_dir.name) / "userhome"
         sample_entry = {
+            "tool_id": "element_extractor",
+            "tool_label": "Element Extractor",
             "timestamp": "2026-06-20 21:30:00",
             "mode": "Folder Scan",
             "source_path": r"C:\sample\input",
@@ -297,6 +300,39 @@ class SearchWorkflowTests(unittest.TestCase):
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["source_path"], sample_entry["source_path"])
         self.assertEqual(loaded[0]["query_value"], sample_entry["query_value"])
+
+    def test_global_run_history_store_adds_and_searches_entries(self) -> None:
+        fake_home = Path(self.temp_dir.name) / "userhome"
+        with patch.object(Path, "home", return_value=fake_home):
+            RunHistoryStore.add_entry(
+                {
+                    "tool_id": "patterns",
+                    "tool_label": "Patterns",
+                    "action": "generate_report",
+                    "summary": "Pattern: **/config.xml",
+                    "source_path": r"C:\config",
+                    "output_dir": r"C:\reports",
+                    "report_path": r"C:\reports\Patterns_Report.html",
+                    "params": {"pattern": "**/config.xml"},
+                }
+            )
+            RunHistoryStore.add_entry(
+                {
+                    "tool_id": "search",
+                    "tool_label": "Search",
+                    "action": "service_ready",
+                    "summary": "service_ready | port 7000",
+                    "report_path": "http://127.0.0.1:7000/ui",
+                    "params": {"port": "7000"},
+                }
+            )
+            entries = RunHistoryStore.load_entries()
+            matched = RunHistoryStore.search_entries("7000")
+
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]["tool_id"], "search")
+        self.assertEqual(len(matched), 1)
+        self.assertEqual(matched[0]["tool_id"], "search")
 
     def test_element_extractor_folder_filter(self) -> None:
         source = Path(self.temp_dir.name) / "scan"

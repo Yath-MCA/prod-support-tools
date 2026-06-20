@@ -16,9 +16,13 @@ from analyses.book_analyzer import (
     ReportGenerator,
 )
 from analyses.report_template import HTML_TEMPLATE
+from core.run_history import RunHistoryStore
 
 
 class AnalysesTab(ttk.Frame):
+    history_tool_id = "analyses"
+    history_tool_label = "Analyses"
+
     def __init__(self, parent: ttk.Notebook):
         super().__init__(parent)
 
@@ -28,6 +32,7 @@ class AnalysesTab(ttk.Frame):
         self.cache = Cache(self.config.CACHE_FILE)
         self.analyzer = ContentAnalyzer(self.cache, self.logger)
         self.config_parser = ConfigParser(self.logger)
+        self.last_report_path = ""
 
         self._build_ui()
 
@@ -343,6 +348,8 @@ class AnalysesTab(ttk.Frame):
             # Open report
             self.status_var.set(f"Analysis Complete. Report saved to {out_name}")
             self.cache_info.config(text=f"Cached Analysis Items: {len(self.cache)}")
+            self.last_report_path = str(report_path.absolute())
+            self._record_history(root_path, parameter, recursive, self.last_report_path)
             webbrowser.open(f"file:///{report_path.absolute()}")
 
         except Exception as e:
@@ -454,6 +461,8 @@ class AnalysesTab(ttk.Frame):
             # Open report
             self.status_var.set(f"✅ Analysis Complete. Report saved to {out_name}")
             self.cache_info.config(text=f"Cached Analysis Items: {len(self.cache)}")
+            self.last_report_path = str(report_path.absolute())
+            self._record_history(root_path, parameter, recursive, self.last_report_path)
             webbrowser.open(f"file:///{report_path.absolute()}")
 
         except Exception as e:
@@ -462,3 +471,40 @@ class AnalysesTab(ttk.Frame):
             messagebox.showerror(
                 "Error", f"An error occurred during analysis:\n{str(e)}"
             )
+
+    def _record_history(self, root_path: str, parameter: str, recursive: bool, report_path: str) -> None:
+        RunHistoryStore.add_entry(
+            {
+                "tool_id": self.history_tool_id,
+                "tool_label": self.history_tool_label,
+                "action": "generate_report",
+                "summary": f"Parameter: {parameter or 'Full Scan'}",
+                "source_path": root_path,
+                "output_dir": str(Path(report_path).parent),
+                "report_path": report_path,
+                "params": {
+                    "root_path": root_path,
+                    "parameter": parameter,
+                    "recursive": recursive,
+                },
+            }
+        )
+
+    def apply_history_entry(self, entry: dict) -> bool:
+        params = entry.get("params", {})
+        root_path = str(params.get("root_path", "")).strip() or str(entry.get("source_path", "")).strip()
+        parameter = str(params.get("parameter", "")).strip()
+        recursive = bool(params.get("recursive", False))
+        if root_path:
+            self.path_var.set(root_path)
+        self.param_var.set(parameter)
+        self.recursive_var.set(recursive)
+        report_path = str(entry.get("report_path", "")).strip()
+        if report_path:
+            self.last_report_path = report_path
+        return True
+
+    def rerun_history_entry(self, entry: dict) -> bool:
+        self.apply_history_entry(entry)
+        self._run_analysis()
+        return True

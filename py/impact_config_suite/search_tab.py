@@ -9,10 +9,14 @@ from tkinter import messagebox, ttk
 import requests
 import uvicorn
 
+from core.run_history import RunHistoryStore
 from search_service.app.app import app as search_app
 
 
 class SearchTab(ttk.Frame):
+    history_tool_id = "search"
+    history_tool_label = "Search"
+
     def __init__(self, parent):
         super().__init__(parent)
         self.server = None
@@ -20,6 +24,7 @@ class SearchTab(ttk.Frame):
         self._stopping = False
         self._ui_polling = True
         self._ui_queue = queue.SimpleQueue()
+        self.last_service_url = ""
         self._build_ui()
         self.after(50, self._drain_ui_queue)
 
@@ -239,11 +244,13 @@ class SearchTab(ttk.Frame):
     def _handle_server_ready(self):
         if self._stopping:
             return
+        self.last_service_url = f"http://127.0.0.1:{self.port_var.get().strip()}/ui"
         self._set_status("Service Running", "#10b981")
         self.start_btn.config(text="SERVICE RUNNING", state="disabled")
         self.stop_btn.config(state="normal")
         self.open_btn.config(state="normal")
         self._log("Search service is ready.")
+        self._record_history("service_ready")
 
     def _handle_server_failure(self, detail):
         self._log(f"Service failed: {detail}")
@@ -286,7 +293,9 @@ class SearchTab(ttk.Frame):
         self.status_circle.itemconfig(self.circle, fill=color)
 
     def _open_browser(self):
-        webbrowser.open(f"http://127.0.0.1:{self.port_var.get().strip()}/ui")
+        self.last_service_url = f"http://127.0.0.1:{self.port_var.get().strip()}/ui"
+        self._record_history("open_ui")
+        webbrowser.open(self.last_service_url)
 
     def _log(self, message):
         self.log_text.insert(tk.END, f"{message}\n")
@@ -321,3 +330,43 @@ class SearchTab(ttk.Frame):
             self.server.should_exit = True
         if wait and thread and thread.is_alive():
             thread.join(timeout=5)
+
+    def _history_entry(self, action: str) -> dict:
+        port = self.port_var.get().strip()
+        service_url = self.last_service_url or f"http://127.0.0.1:{port}/ui"
+        return {
+            "tool_id": self.history_tool_id,
+            "tool_label": self.history_tool_label,
+            "action": action,
+            "summary": f"{action} | port {port}",
+            "source_path": "",
+            "output_dir": "",
+            "report_path": service_url,
+            "params": {
+                "port": port,
+                "service_url": service_url,
+            },
+        }
+
+    def _record_history(self, action: str) -> None:
+        RunHistoryStore.add_entry(self._history_entry(action))
+
+    def apply_history_entry(self, entry: dict) -> bool:
+        params = entry.get("params", {})
+        port = str(params.get("port", "")).strip() or str(entry.get("port", "")).strip()
+        if port:
+            self.port_var.set(port)
+        service_url = str(params.get("service_url", "")).strip() or str(entry.get("report_path", "")).strip()
+        if service_url:
+            self.last_service_url = service_url
+        return True
+
+    def rerun_history_entry(self, entry: dict) -> bool:
+        self.apply_history_entry(entry)
+        action = str(entry.get("action", "")).strip()
+        if action == "open_ui":
+            if not (self.server_thread and self.server_thread.is_alive()):
+                self._start_service()
+            return True
+        self._start_service()
+        return True

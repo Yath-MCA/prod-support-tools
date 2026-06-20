@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import tkinter as tk
+import webbrowser
 from pathlib import Path
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
@@ -18,6 +19,7 @@ from word_extractor_tab import WordExtractorTab
 from new_config_tab import NewConfigTab
 from compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from element_extractor_tab import ElementExtractorTab
+from core.run_history import RunHistoryStore
 
 
 class CommonToolsApp:
@@ -230,6 +232,12 @@ class CommonToolsApp:
         self.menu_bar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Exit", command=self._on_close)
 
+        history_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="History", menu=history_menu)
+        history_menu.add_command(label="View Run History", command=self._open_history_browser)
+        history_menu.add_command(label="Open History Folder", command=self._open_history_folder)
+        history_menu.add_command(label="Open History File", command=self._open_history_file)
+
         # Tools menu mirrors the categorized selectors.
         tools_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Tools", menu=tools_menu)
@@ -382,6 +390,185 @@ class CommonToolsApp:
 
         self._build_navigation()
         self._schedule_navigation_watch()
+
+    def _tool_location_by_id(self, tool_id: str) -> tuple[str, str] | None:
+        for category in self.navigation_config["categories"]:
+            for tool in category["tools"]:
+                if tool["id"] == tool_id:
+                    return category["name"], tool_id
+        return None
+
+    def _open_history_folder(self) -> None:
+        history_dir = RunHistoryStore.base_dir()
+        history_dir.mkdir(parents=True, exist_ok=True)
+        webbrowser.open(history_dir.as_uri())
+
+    def _open_history_file(self) -> None:
+        history_path = RunHistoryStore.history_file_path()
+        history_path.parent.mkdir(parents=True, exist_ok=True)
+        if not history_path.exists():
+            RunHistoryStore.save_entries(RunHistoryStore.load_entries())
+        webbrowser.open(history_path.as_uri())
+
+    def _open_history_browser(self) -> None:
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Global Run History")
+        dialog.geometry("980x560")
+        dialog.configure(bg="#1e293b")
+        dialog.transient(self.root)
+
+        tk.Label(
+            dialog,
+            text="GLOBAL RUN HISTORY",
+            font=("Segoe UI", 16, "bold"),
+            fg="#f8fafc",
+            bg="#1e293b",
+        ).pack(anchor="w", padx=20, pady=(18, 10))
+
+        search_frame = tk.Frame(dialog, bg="#1e293b")
+        search_frame.pack(fill="x", padx=20, pady=(0, 10))
+        tk.Label(search_frame, text="Search:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 10, "bold")).pack(side="left")
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(search_frame, textvariable=search_var, bg="#334155", fg="white", border=0, font=("Segoe UI", 10))
+        search_entry.pack(side="left", fill="x", expand=True, padx=(10, 0), ipady=6)
+
+        list_frame = tk.Frame(dialog, bg="#1e293b")
+        list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        listbox = tk.Listbox(
+            list_frame,
+            bg="#0f172a",
+            fg="#e2e8f0",
+            selectbackground="#2563eb",
+            selectforeground="white",
+            border=0,
+            font=("Consolas", 10),
+        )
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=scrollbar.set)
+        listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        details_var = tk.StringVar(value="Select a history entry to inspect details.")
+        tk.Label(dialog, textvariable=details_var, bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9), justify="left", anchor="w").pack(fill="x", padx=20, pady=(0, 10))
+
+        state = {"entries": RunHistoryStore.load_entries()}
+
+        def format_entry(entry: dict) -> str:
+            ts = str(entry.get("timestamp", "")).strip() or "Unknown time"
+            tool_label = str(entry.get("tool_label", "")).strip() or str(entry.get("tool_id", "")).strip() or "Tool"
+            action = str(entry.get("action", "")).strip() or "run"
+            summary = str(entry.get("summary", "")).strip()
+            return f"{ts} | {tool_label} | {action} | {summary}"
+
+        def refresh_entries(*_args) -> None:
+            state["entries"] = RunHistoryStore.search_entries(search_var.get())
+            listbox.delete(0, tk.END)
+            for entry in state["entries"]:
+                listbox.insert(tk.END, format_entry(entry))
+            details_var.set("Select a history entry to inspect details.")
+
+        def selected_entry() -> dict | None:
+            if not listbox.curselection():
+                return None
+            index = listbox.curselection()[0]
+            if index >= len(state["entries"]):
+                return None
+            return state["entries"][index]
+
+        def update_details(_event=None) -> None:
+            entry = selected_entry()
+            if not entry:
+                details_var.set("Select a history entry to inspect details.")
+                return
+            source_path = str(entry.get("source_path", "")).strip() or "NA"
+            output_dir = str(entry.get("output_dir", "")).strip() or "NA"
+            report_path = str(entry.get("report_path", "")).strip() or "NA"
+            details_var.set(f"Source: {source_path}\nOutput: {output_dir}\nArtifact: {report_path}")
+
+        def select_tool_for_entry(entry: dict):
+            location = self._tool_location_by_id(str(entry.get("tool_id", "")).strip())
+            if not location:
+                return None
+            category, tool_id = location
+            self._select_tool(category, tool_id)
+            return self.tool_views.get((category, tool_id))
+
+        def apply_selected() -> None:
+            entry = selected_entry()
+            if not entry:
+                messagebox.showinfo("Run History", "Please select a history entry.")
+                return
+            view = select_tool_for_entry(entry)
+            if view is None or not hasattr(view, "apply_history_entry"):
+                messagebox.showinfo("Run History", "The selected tool does not support applying history yet.")
+                return
+            view.apply_history_entry(entry)
+
+        def rerun_selected() -> None:
+            entry = selected_entry()
+            if not entry:
+                messagebox.showinfo("Run History", "Please select a history entry.")
+                return
+            view = select_tool_for_entry(entry)
+            if view is None or not hasattr(view, "rerun_history_entry"):
+                messagebox.showinfo("Run History", "The selected tool does not support rerun yet.")
+                return
+            view.rerun_history_entry(entry)
+
+        def open_artifact() -> None:
+            entry = selected_entry()
+            if not entry:
+                messagebox.showinfo("Run History", "Please select a history entry.")
+                return
+            target = str(entry.get("report_path", "")).strip()
+            if not target:
+                messagebox.showinfo("Run History", "No report or artifact path is saved for this entry.")
+                return
+            if target.startswith("http://") or target.startswith("https://"):
+                webbrowser.open(target)
+                return
+            artifact_path = Path(target)
+            if artifact_path.exists():
+                webbrowser.open(artifact_path.as_uri())
+                return
+            messagebox.showerror("Run History", "Saved artifact path is no longer available.")
+
+        def open_output_folder() -> None:
+            entry = selected_entry()
+            if not entry:
+                messagebox.showinfo("Run History", "Please select a history entry.")
+                return
+            output_dir = str(entry.get("output_dir", "")).strip()
+            if output_dir and Path(output_dir).exists():
+                webbrowser.open(Path(output_dir).as_uri())
+                return
+            report_path = str(entry.get("report_path", "")).strip()
+            if report_path and Path(report_path).exists():
+                webbrowser.open(Path(report_path).parent.as_uri())
+                return
+            messagebox.showerror("Run History", "Output folder is not available for this entry.")
+
+        def copy_json() -> None:
+            entry = selected_entry()
+            if not entry:
+                messagebox.showinfo("Run History", "Please select a history entry.")
+                return
+            dialog.clipboard_clear()
+            dialog.clipboard_append(json.dumps(entry, ensure_ascii=False, indent=2))
+
+        search_var.trace_add("write", refresh_entries)
+        listbox.bind("<<ListboxSelect>>", update_details)
+
+        button_frame = tk.Frame(dialog, bg="#1e293b")
+        button_frame.pack(fill="x", padx=20, pady=(0, 18))
+        tk.Button(button_frame, text="Apply To Tool", command=apply_selected, bg="#2563eb", fg="white", font=("Segoe UI", 9, "bold"), border=0, padx=14, pady=8).pack(side="left", padx=(0, 8))
+        tk.Button(button_frame, text="Rerun", command=rerun_selected, bg="#0f766e", fg="white", font=("Segoe UI", 9, "bold"), border=0, padx=14, pady=8).pack(side="left", padx=(0, 8))
+        tk.Button(button_frame, text="Open Artifact", command=open_artifact, bg="#7c3aed", fg="white", font=("Segoe UI", 9, "bold"), border=0, padx=14, pady=8).pack(side="left", padx=(0, 8))
+        tk.Button(button_frame, text="Open Output Folder", command=open_output_folder, bg="#475569", fg="white", font=("Segoe UI", 9, "bold"), border=0, padx=14, pady=8).pack(side="left", padx=(0, 8))
+        tk.Button(button_frame, text="Copy JSON", command=copy_json, bg="#1d4ed8", fg="white", font=("Segoe UI", 9, "bold"), border=0, padx=14, pady=8).pack(side="right")
+
+        refresh_entries()
+        search_entry.focus_set()
 
     def _build_navigation(self, preserve=None) -> None:
         if hasattr(self, "navigation_frame"):
