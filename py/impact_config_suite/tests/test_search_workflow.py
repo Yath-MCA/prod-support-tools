@@ -276,6 +276,28 @@ class SearchWorkflowTests(unittest.TestCase):
 
         self.assertEqual(default_dir, expected)
 
+    def test_element_extractor_history_is_saved_and_loaded(self) -> None:
+        fake_home = Path(self.temp_dir.name) / "userhome"
+        sample_entry = {
+            "timestamp": "2026-06-20 21:30:00",
+            "mode": "Folder Scan",
+            "source_path": r"C:\sample\input",
+            "query_type": "CSS Selector",
+            "query_value": ".ref span",
+            "output_dir": r"C:\sample\output",
+            "report_path": r"C:\sample\output\report.html",
+        }
+
+        with patch.object(Path, "home", return_value=fake_home):
+            ElementExtractorTab._save_history_entries([sample_entry])
+            loaded = ElementExtractorTab._load_history_entries()
+            history_path = ElementExtractorTab._history_file_path()
+
+        self.assertTrue(history_path.exists())
+        self.assertEqual(len(loaded), 1)
+        self.assertEqual(loaded[0]["source_path"], sample_entry["source_path"])
+        self.assertEqual(loaded[0]["query_value"], sample_entry["query_value"])
+
     def test_element_extractor_folder_filter(self) -> None:
         source = Path(self.temp_dir.name) / "scan"
         source.mkdir()

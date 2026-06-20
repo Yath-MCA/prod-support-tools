@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import json
 import os
 import re
 import threading
@@ -16,6 +17,8 @@ class ElementExtractorTab(ttk.Frame):
     Tkinter Tab for HTML/XML Element Extraction and reporting.
     """
     DEFAULT_REPORT_FOLDER_NAME = "impact-support-log"
+    HISTORY_FILE_NAME = "element_extractor_history.json"
+    HISTORY_LIMIT = 25
 
     def __init__(self, parent: ttk.Notebook):
         super().__init__(parent)
@@ -23,11 +26,48 @@ class ElementExtractorTab(ttk.Frame):
         self.scan_thread = None
         self.cancelled = False
         self.last_report_path = None
+        self.history_entries = self._load_history_entries()
+        self.filtered_history_entries = list(self.history_entries)
         self._build_ui()
+        self._restore_last_history_state()
+        self._refresh_history_list()
 
     @classmethod
     def _default_output_dir(cls) -> Path:
         return Path.home() / "Documents" / cls.DEFAULT_REPORT_FOLDER_NAME
+
+    @classmethod
+    def _history_file_path(cls) -> Path:
+        return cls._default_output_dir() / cls.HISTORY_FILE_NAME
+
+    @classmethod
+    def _load_history_entries(cls) -> list[dict]:
+        history_path = cls._history_file_path()
+        if not history_path.exists():
+            return []
+        try:
+            raw = json.loads(history_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        if not isinstance(raw, list):
+            return []
+        valid_entries = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            if not str(item.get("source_path", "")).strip():
+                continue
+            valid_entries.append(item)
+        return valid_entries[:cls.HISTORY_LIMIT]
+
+    @classmethod
+    def _save_history_entries(cls, entries: list[dict]) -> None:
+        history_path = cls._history_file_path()
+        history_path.parent.mkdir(parents=True, exist_ok=True)
+        history_path.write_text(
+            json.dumps(entries[:cls.HISTORY_LIMIT], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     def _build_ui(self):
         # Main container with dark background (blends with existing suite styling)
@@ -361,6 +401,111 @@ class ElementExtractorTab(ttk.Frame):
         )
         self.open_report_chk.grid(row=6, column=1, columnspan=2, sticky="w", pady=5)
 
+        history_frame = tk.LabelFrame(
+            main_container,
+            text="Run History",
+            bg="#1e293b",
+            fg="#cbd5e1",
+            font=("Segoe UI", 10, "bold"),
+            padx=20,
+            pady=15,
+            bd=1,
+            relief="flat"
+        )
+        history_frame.pack(fill="x", pady=(0, 15))
+        history_frame.columnconfigure(1, weight=1)
+        history_frame.columnconfigure(3, weight=1)
+
+        tk.Label(
+            history_frame,
+            text="Search History:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=5)
+
+        self.history_search_var = tk.StringVar()
+        self.history_search_entry = tk.Entry(
+            history_frame,
+            textvariable=self.history_search_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white"
+        )
+        self.history_search_entry.grid(row=0, column=1, sticky="ew", ipady=6, padx=(0, 10), pady=5)
+        self.history_search_entry.bind("<KeyRelease>", self._on_history_search_change)
+
+        tk.Label(
+            history_frame,
+            text="Saved Runs:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=1, column=0, sticky="w", pady=5)
+
+        self.history_choice_var = tk.StringVar()
+        self.history_combo = ttk.Combobox(
+            history_frame,
+            textvariable=self.history_choice_var,
+            state="readonly",
+            font=("Segoe UI", 9),
+        )
+        self.history_combo.grid(row=1, column=1, columnspan=3, sticky="ew", ipady=4, pady=5)
+
+        self.apply_history_btn = tk.Button(
+            history_frame,
+            text="Apply Selected",
+            command=self._apply_selected_history,
+            bg="#2563eb",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.apply_history_btn.grid(row=2, column=0, pady=(10, 0), sticky="w")
+
+        self.rerun_last_btn = tk.Button(
+            history_frame,
+            text="Rerun Last",
+            command=self._rerun_last_history,
+            bg="#0f766e",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.rerun_last_btn.grid(row=2, column=1, pady=(10, 0), sticky="w")
+
+        self.open_history_report_btn = tk.Button(
+            history_frame,
+            text="Open Saved Report",
+            command=self._open_selected_history_report,
+            bg="#7c3aed",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.open_history_report_btn.grid(row=2, column=2, pady=(10, 0), sticky="w")
+
+        self.clear_history_search_btn = tk.Button(
+            history_frame,
+            text="Clear Search",
+            command=self._clear_history_search,
+            bg="#475569",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.clear_history_search_btn.grid(row=2, column=3, pady=(10, 0), sticky="e")
+
         # --- Progress Bar & Status Line (before action buttons) ---
         self.progress_frame = tk.Frame(main_container, bg="#1e293b")
         self.progress_frame.pack(fill="x", pady=(10, 0))
@@ -554,6 +699,139 @@ class ElementExtractorTab(ttk.Frame):
         cleaned = re.sub(r"_+", "_", cleaned).strip("_")
         return cleaned or fallback
 
+    @staticmethod
+    def _history_summary(entry: dict) -> str:
+        ts = str(entry.get("timestamp", "")).strip() or "Unknown time"
+        mode = str(entry.get("mode", "")).strip() or "Mode?"
+        query_type = str(entry.get("query_type", "")).strip() or "Query?"
+        query_val = str(entry.get("query_value", "")).strip() or "?"
+        source_name = Path(str(entry.get("source_path", "")).strip() or ".").name
+        return f"{ts} | {mode} | {query_type}: {query_val} | {source_name}"
+
+    def _restore_last_history_state(self) -> None:
+        if not self.history_entries:
+            return
+        latest = self.history_entries[0]
+        report_path = str(latest.get("report_path", "")).strip()
+        if report_path and os.path.exists(report_path):
+            self.last_report_path = report_path
+            self.open_last_btn.config(state="normal")
+
+    def _refresh_history_list(self) -> None:
+        values = [self._history_summary(entry) for entry in self.filtered_history_entries]
+        self.history_combo["values"] = values
+        if values:
+            self.history_combo.current(0)
+        else:
+            self.history_choice_var.set("")
+
+    def _on_history_search_change(self, event=None) -> None:
+        needle = self.history_search_var.get().strip().lower()
+        if not needle:
+            self.filtered_history_entries = list(self.history_entries)
+        else:
+            self.filtered_history_entries = [
+                entry for entry in self.history_entries
+                if needle in json.dumps(entry, ensure_ascii=False).lower()
+            ]
+        self._refresh_history_list()
+
+    def _clear_history_search(self) -> None:
+        self.history_search_var.set("")
+        self.filtered_history_entries = list(self.history_entries)
+        self._refresh_history_list()
+
+    def _selected_history_entry(self) -> dict | None:
+        index = self.history_combo.current()
+        if index < 0 or index >= len(self.filtered_history_entries):
+            return None
+        return self.filtered_history_entries[index]
+
+    def _apply_history_entry(self, entry: dict) -> None:
+        mode = str(entry.get("mode", "Single File")).strip() or "Single File"
+        self.mode_var.set(mode)
+        self._on_mode_change()
+        self.path_var.set(str(entry.get("source_path", "")).strip())
+        self.selector_type_var.set(str(entry.get("query_type", "Tag Name")).strip() or "Tag Name")
+        self._on_selector_type_change()
+        self.query_var.set(str(entry.get("query_value", "")).strip())
+        self.attr_name_var.set(str(entry.get("attr_name", "")).strip())
+        self.attr_val_var.set(str(entry.get("attr_value", "")).strip())
+        self.recursive_var.set(bool(entry.get("recursive", False)))
+        self.extensions_var.set(str(entry.get("extensions", ".xml, .html, .htm, .xhtml")).strip() or ".xml, .html, .htm, .xhtml")
+        self.filename_filter_var.set(str(entry.get("filename_filter", "None")).strip() or "None")
+        self.dtd_filter_var.set(str(entry.get("dtd_filter", "None")).strip() or "None")
+        self.client_filter_var.set(str(entry.get("client_filter", "None")).strip() or "None")
+        self.output_dir_var.set(str(entry.get("output_dir", str(self._default_output_dir()))).strip() or str(self._default_output_dir()))
+        self.open_report_var.set(bool(entry.get("open_report", True)))
+        report_path = str(entry.get("report_path", "")).strip()
+        if report_path:
+            self.last_report_path = report_path
+            self.open_last_btn.config(state="normal")
+        self.status_var.set("History entry applied.")
+
+    def _apply_selected_history(self) -> None:
+        entry = self._selected_history_entry()
+        if not entry:
+            messagebox.showinfo("Run History", "No saved history entry is selected.")
+            return
+        self._apply_history_entry(entry)
+
+    def _open_selected_history_report(self) -> None:
+        entry = self._selected_history_entry()
+        if not entry:
+            messagebox.showinfo("Run History", "No saved history entry is selected.")
+            return
+        report_path = str(entry.get("report_path", "")).strip()
+        if not report_path or not os.path.exists(report_path):
+            messagebox.showerror("Run History", "Saved report is missing for the selected history entry.")
+            return
+        self.last_report_path = report_path
+        self.open_last_btn.config(state="normal")
+        webbrowser.open(f"file:///{os.path.abspath(report_path)}")
+
+    def _rerun_last_history(self) -> None:
+        if not self.history_entries:
+            messagebox.showinfo("Run History", "No previous run is available yet.")
+            return
+        self._apply_history_entry(self.history_entries[0])
+        self._start_extraction()
+
+    def _current_run_settings(self, source_path: str, query_val: str, output_dir: str, report_path: str) -> dict:
+        return {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": self.mode_var.get().strip(),
+            "source_path": source_path,
+            "query_type": self.selector_type_var.get().strip(),
+            "query_value": query_val,
+            "attr_name": self.attr_name_var.get().strip(),
+            "attr_value": self.attr_val_var.get().strip(),
+            "recursive": bool(self.recursive_var.get()),
+            "extensions": self.extensions_var.get().strip(),
+            "filename_filter": self.filename_filter_var.get().strip() or "None",
+            "dtd_filter": self.dtd_filter_var.get().strip() or "None",
+            "client_filter": self.client_filter_var.get().strip() or "None",
+            "output_dir": output_dir,
+            "open_report": bool(self.open_report_var.get()),
+            "report_path": report_path,
+        }
+
+    def _record_history_entry(self, entry: dict) -> None:
+        self.history_entries = [
+            existing for existing in self.history_entries
+            if not (
+                str(existing.get("source_path", "")) == str(entry.get("source_path", "")) and
+                str(existing.get("query_type", "")) == str(entry.get("query_type", "")) and
+                str(existing.get("query_value", "")) == str(entry.get("query_value", "")) and
+                str(existing.get("output_dir", "")) == str(entry.get("output_dir", ""))
+            )
+        ]
+        self.history_entries.insert(0, entry)
+        self.history_entries = self.history_entries[:self.HISTORY_LIMIT]
+        self._save_history_entries(self.history_entries)
+        self.filtered_history_entries = list(self.history_entries)
+        self._refresh_history_list()
+
     def _start_extraction(self):
         # Validate inputs
         source_path = self.path_var.get().strip()
@@ -742,6 +1020,14 @@ class ElementExtractorTab(ttk.Frame):
             self.last_report_path = str(report_path.absolute())
             self.last_simple_report_path = None
             self.last_pattern_report_path = None
+            self._record_history_entry(
+                self._current_run_settings(
+                    str(source_path),
+                    query_val,
+                    str(output_dir),
+                    self.last_report_path,
+                )
+            )
             
             self._log(f"📄 Detailed report saved to: {report_path.name}")
             self._log(f"Folder: {output_dir}")
