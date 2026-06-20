@@ -283,6 +283,37 @@ class SearchWorkflowTests(unittest.TestCase):
         self.assertEqual(len(updated_results), 1)
         self.assertEqual(len(all_results), 3)
 
+    def test_element_extractor_css_selector_validation(self) -> None:
+        source = Path(self.temp_dir.name) / "selector.html"
+        source.write_text(
+            """
+            <html>
+              <body>
+                <div class="ref">
+                  <div class="mixed-citation">
+                    <span>
+                      <span>Match</span>
+                      <span data-class="ckcommentsfull">Ignore</span>
+                      <span class="person-group">Ignore</span>
+                    </span>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """,
+            encoding="utf-8",
+        )
+
+        extractor = ElementExtractor()
+        matches = extractor.parse_and_extract(
+            source,
+            "CSS Selector",
+            '.ref > .mixed-citation > span:not(.person-group):not([data-class="ckcommentsfull"]) > span\n',
+        )
+
+        self.assertEqual(len(matches), 3)
+        self.assertEqual(matches[0]["text"], "Match")
+
     def test_search_tab_port_check(self) -> None:
         port = _free_port()
         self.assertTrue(SearchTab._port_available(port))

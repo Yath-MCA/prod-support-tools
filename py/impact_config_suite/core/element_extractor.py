@@ -245,6 +245,10 @@ class ElementExtractor:
         pattern = "**/*" if recursive else "*"
         all_files = []
         normalized_filter = filename_filter.strip().lower() if filename_filter else ""
+        if normalized_filter and normalized_filter != "none" and not any(
+            char in normalized_filter for char in "*?[]"
+        ):
+            normalized_filter = f"*{normalized_filter}"
         for file in dir_path.glob(pattern):
             if not file.is_file():
                 continue

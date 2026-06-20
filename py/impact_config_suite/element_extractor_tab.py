@@ -486,11 +486,38 @@ class ElementExtractorTab(ttk.Frame):
             self.clipboard_append(content)
             self.status_var.set("Logs copied to clipboard.")
 
+    def _normalize_query_input(self, query_type: str, query_val: str) -> str:
+        normalized = query_val.strip()
+        if not normalized:
+            raise ValueError("Please enter a tag, selector, or XPath query.")
+
+        if query_type == "CSS Selector":
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            try:
+                BeautifulSoup("", "lxml").select(normalized)
+            except Exception as exc:
+                raise ValueError(f"Invalid CSS selector: {exc}") from exc
+
+        return normalized
+
+    @staticmethod
+    def _slugify(text: str, fallback: str = "report") -> str:
+        cleaned = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in text.strip())
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        return cleaned or fallback
+
     def _start_extraction(self):
         # Validate inputs
         source_path = self.path_var.get().strip()
+        query_type = self.selector_type_var.get()
         query_val = self.query_var.get().strip()
         output_dir = self.output_dir_var.get().strip()
+
+        try:
+            query_val = self._normalize_query_input(query_type, query_val)
+        except ValueError as exc:
+            messagebox.showerror("Error", str(exc))
+            return
         
         if not source_path:
             messagebox.showerror("Error", "Please provide a valid source path (file or folder).")
@@ -645,49 +672,24 @@ class ElementExtractorTab(ttk.Frame):
                 str(source_path), query_type, query_val, attr_name, attr_val,
                 scan_results, total_matches, total_files, is_single
             )
-            
-            simple_report_html = self.extractor.generate_simple_report(
-                str(source_path), query_type, query_val,
-                scan_results, total_matches, total_files
-            )
-            
-            pattern_report_html = self.extractor.generate_pattern_report(
-                str(source_path), query_type, query_val,
-                scan_results, total_matches, total_files
-            )
-            
+
             # Save file paths
-            safe_target_name = "".join([c if c.isalnum() or c in ('-', '_') else '_' for c in source_path.stem])
+            safe_target_name = self._slugify(source_path.stem, "selected_file")
+            safe_selector = self._slugify(query_val[:60], "selector")
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            report_name = f"Element_Extraction_Report_{safe_target_name}_{ts}.html"
+            report_name = f"Element_Extraction_Report_{safe_target_name}_{safe_selector}_{ts}.html"
             report_path = output_dir / report_name
-            
-            simple_report_name = f"Simple_Element_Report_{safe_target_name}_{ts}.html"
-            simple_report_path = output_dir / simple_report_name
-            
-            pattern_report_name = f"Pattern_Analysis_Report_{safe_target_name}_{ts}.html"
-            pattern_report_path = output_dir / pattern_report_name
             
             # Save Detailed Report
             with open(report_path, "w", encoding="utf-8") as f:
                 f.write(report_html)
                 
-            # Save Simple Report
-            with open(simple_report_path, "w", encoding="utf-8") as f:
-                f.write(simple_report_html)
-            
-            # Save Pattern Report
-            with open(pattern_report_path, "w", encoding="utf-8") as f:
-                f.write(pattern_report_html)
-                
             self.last_report_path = str(report_path.absolute())
-            self.last_simple_report_path = str(simple_report_path.absolute())
-            self.last_pattern_report_path = str(pattern_report_path.absolute())
+            self.last_simple_report_path = None
+            self.last_pattern_report_path = None
             
             self._log(f"📄 Detailed report saved to: {report_path.name}")
-            self._log(f"📄 Simple table report saved to: {simple_report_name}")
-            self._log(f"📄 Pattern analysis report saved to: {pattern_report_name}")
             self._log(f"Folder: {output_dir}")
             
             self.status_var.set(f"Complete! Found {total_matches} match(es) in {total_files} file(s).")
@@ -696,8 +698,6 @@ class ElementExtractorTab(ttk.Frame):
             # Auto-open report if checked
             if self.open_report_var.get():
                 webbrowser.open(f"file:///{self.last_report_path}")
-                webbrowser.open(f"file:///{self.last_simple_report_path}")
-                webbrowser.open(f"file:///{self.last_pattern_report_path}")
                 
         except Exception as e:
             self._log(f"\n❌ Error during extraction:\n{str(e)}")
