@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(cd:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);console.log\\(execSync\\(''npm run build'',{encoding:''utf8''}\\)\\)\")",
+      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);try{console.log\\(execSync\\(''npm run build'',{encoding:''utf8''}\\)\\)}catch\\(e\\){console.error\\(e.stdout\\);console.error\\(e.stderr\\)}\")",
+      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);try{const o=execSync\\(''npm run build'',{encoding:''utf8''}\\);console.log\\(o.split\\(''\\\\n''\\).slice\\(-5\\).join\\(''\\\\n''\\)\\)}catch\\(e\\){console.error\\(e.stdout\\);console.error\\(e.stderr\\)}\")",
+      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);try{const o=execSync\\(''npm run build'',{encoding:''utf8''}\\);console.log\\(o.split\\(''\\\\n''\\).slice\\(-4\\).join\\(''\\\\n''\\)\\)}catch\\(e\\){console.error\\(e.stdout\\);console.error\\(e.stderr\\)}\")"
+    ]
+  }
+}

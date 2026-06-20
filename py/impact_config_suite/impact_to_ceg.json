@@ -1,0 +1,932 @@
+{
+    "display": {
+        "front": {
+            "match": {
+                "data-impact-class": "front",
+                "data-impact-name": "front"
+            },
+            "tag": "div",
+            "attrs": {
+                "class": "front",
+                "data-alias": "front"
+            }
+        },
+
+        "subject": {
+            "match": {
+                "data-impact-class": "subject",
+                "data-impact-name": "subject"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FM_Article_Type",
+                "data-alias": "FM_Article_Type",
+                "data-label": "†FM_Article_Type",
+                "data-name": "†FM_Article_Type"
+            }
+        },
+
+        "article-title": {
+            "match": {
+                "data-impact-class": "article-title",
+                "data-impact-name": "article-title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FM_Article_Title",
+                "data-alias": "FM_Article_Title",
+                "data-label": "†FM_Article_Title",
+                "data-name": "†FM_Article_Title"
+            }
+        },
+
+        "alt-title": {
+            "match": {
+                "data-impact-class": "alt-title",
+                "data-impact-name": "alt-title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FM_RunningHead_Recto",
+                "data-alias": "FM_RunningHead_Recto",
+                "data-label": "†FM_RunningHead_Recto",
+                "data-name": "†FM_RunningHead_Recto"
+            }
+        },
+
+
+
+        "contrib-group": {
+            "match": {
+                "data-impact-class": "contrib-group",
+                "data-impact-name": "contrib-group"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FMAuthors",
+                "data-alias": "FM_Authors",
+                "data-label": "†FM_Authors",
+                "data-name": "†FM_Authors"
+            }
+        },
+        "contrib": {
+            "match": {
+                "data-impact-class": "contrib"
+
+            },
+            "tag": "span",
+            "attrs": {
+
+            }
+        },
+        "aff": {
+            "match": {
+                "data-impact-class": "aff",
+                "data-impact-name": "aff"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FM_Affiliations",
+                "data-alias": "FM_Affiliations",
+                "data-label": "†FM_Affiliations",
+                "data-name": "†FM_Affiliations"
+            }
+        },
+
+        "abs-title": {
+            "match": {
+                "data-impact-class": "abstract"
+            },
+            "prepend": [{
+                "tag": "p",
+                "attrs": {
+                    "class": "FMAbstractHead",
+                    "data-name": "†FM_Abstract_Head",
+                    "data-label": "†FM_Abstract_Head"
+                },
+                "value": "Abstract: "
+            }]
+        },
+
+        "abstract": {
+            "parent_match": {
+                "data-impact-name": "abstract"
+            },
+            "match": {
+                "data-impact-class": "p"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FMAbstractParaFlushLeft",
+                "data-label": "†FM_Abstract_Para_FlushLeft",
+                "data-name": "†FM_Abstract_Para_FlushLeft"
+            }
+        },
+
+
+        "body": {
+            "match": {
+                "data-impact-class": "body",
+                "data-impact-name": "body"
+            },
+            "tag": "div",
+            "attrs": {
+                "class": "body",
+                "data-alias": "body"
+            }
+        },
+        "back": {
+            "match": {
+                "data-impact-class": "back",
+                "data-impact-name": "back"
+            },
+            "tag": "div",
+            "attrs": {
+                "class": "back",
+                "data-alias": "back"
+            }
+        },
+        "sec-levels": {
+            "match": {
+                "data-impact-name": "sec"
+            },
+            "tag": "div",
+            "attrs": {
+                "class": "Heading",
+                "data-alias": "Heading",
+                "data-name": "Heading"
+
+            }
+        },
+        "title-level-1": {
+            "match": {
+                "data-impact-class": "title",
+                "data-impact-levels": "1",
+                "data-impact-name": "title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "HeadA",
+                "data-label": "†HeadA",
+                "data-name": "†HeadA"
+            },
+            "prepend": [{
+                "tag": "span",
+                "attrs": {
+                    "class": "label",
+                    "data-name": "‡label"
+                },
+                "text_from": "data-impact-label"
+            }]
+        },
+        "title-level-2": {
+            "match": {
+                "data-impact-class": "title",
+                "data-impact-levels": "2",
+                "data-impact-name": "title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "HeadB",
+                "data-label": "†HeadB",
+                "data-name": "†HeadB"
+            },
+            "prepend": [{
+                "tag": "span",
+                "attrs": {
+                    "class": "label",
+                    "data-name": "‡label"
+                },
+                "text_from": "data-impact-label"
+            }]
+        },
+        "title-level-3": {
+            "match": {
+                "data-impact-class": "title",
+                "data-impact-levels": "3",
+                "data-impact-name": "title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "HeadC",
+                "data-label": "†HeadC",
+                "data-name": "†HeadC"
+            },
+            "prepend": [{
+                "tag": "span",
+                "attrs": {
+                    "class": "label",
+                    "data-name": "‡label"
+                },
+                "text_from": "data-impact-label"
+            }]
+        },
+
+
+        "para-flush-left": {
+            "match": {
+                "data-impact-class": "p",
+                "data-impact-content-type": "flush left"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "ParaFlushLeft",
+                "data-label": "†Para_FlushLeft",
+                "data-name": "†Para_FlushLeft"
+            }
+        },
+        "para-ind": {
+            "match": {
+                "data-impact-class": "p"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "ParaInd",
+                "data-label": "†Para_Ind",
+                "data-name": "†Para_Ind"
+            }
+        },
+
+        "fig": {
+            "match": {
+                "data-impact-class": "fig"
+            },
+            "tag": "figure",
+            "attrs": {}
+        },
+        "fig-caption": {
+            "parent_match": {
+                "data-impact-class": "fig"
+            },
+            "match": {
+                "data-impact-class": "caption"
+            },
+            "tag": "figcaption",
+            "attrs": {
+                "class": "FigureCaption",
+                "data-alias": "FigureCaption",
+                "data-label": "†Figure_Caption",
+                "data-name": "†Figure_Caption"
+            },
+            "prepend": [{
+                "tag": "span",
+                "attrs": {
+                    "class": "figurenumber",
+                    "data-name": "‡figure_number"
+                },
+                "text_from": "data-impact-label"
+            }]
+        },
+
+        "table-root": {
+            "match": {
+                "data-impact-class": "table-wrap"
+            },
+
+            "attrs": {
+                "class": "captiontable",
+                "data-alias": "TableGroup"
+
+            }
+        },
+        "table-caption": {
+            "parent_match": {
+                "data-impact-class": "table-wrap"
+            },
+            "match": {
+                "data-impact-class": "caption"
+            },
+
+            "attrs": {
+                "class": "TableCaption",
+                "data-alias": "TableCaption",
+                "data-label": "†Table_Caption",
+                "data-name": "†Table_Caption"
+            },
+            "prepend": [{
+                "tag": "span",
+                "attrs": {
+                    "class": "tablenumber",
+                    "data-name": "‡table_number"
+                },
+                "text_from": "data-impact-label"
+            }]
+        },
+        "corresp": {
+            "match": {
+                "data-impact-class": "corresp",
+                "data-impact-name": "corresp"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FM_Note_Correspondence",
+                "data-alias": "FM_Note_Correspondence",
+                "data-label": "†FM_Note_Correspondence",
+                "data-name": "†FM_Note_Correspondence"
+            }
+        },
+        "fn": {
+            "grandparent_match": {
+                "data-impact-name": "author-notes"
+            },
+            "parent_match": {
+                "data-impact-name": "fn"
+            },
+            "match": {
+                "data-impact-class": "p",
+                "data-impact-name": "p"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "FM_Note_Correspondence",
+                "data-alias": "FM_Note_Correspondence",
+                "data-label": "†FM_Note_Correspondence",
+                "data-name": "†FM_Note_Correspondence"
+            }
+        },
+        "table-border": {
+            "match": {
+                "data-impact-tag": "table"
+            },
+            "attrs": {
+                "style": "border: 1px solid rgb(160, 0, 0);"
+            }
+        },
+        "th-border": {
+            "match": {
+                "data-impact-tag": "th"
+            },
+            "attrs": {
+                "style": "border: 2px solid blue;"
+            },
+            "wrap": {
+                "tag": "p",
+                "attrs": {
+                    "class": "TableColumnHead",
+                    "data-name": "†Table_ColumnHead",
+                    "data-label": "†Table_ColumnHead"
+                }
+            }
+        },
+        "td-border": {
+            "match": {
+                "data-impact-tag": "td"
+            },
+            "attrs": {
+                "style": "border: 1px solid rgb(160, 0, 0);"
+            },
+            "wrap": {
+                "tag": "p",
+                "attrs": {
+                    "class": "TableBody",
+                    "data-name": "†Table_Body",
+                    "data-label": "†Table_Body"
+                }
+            }
+        },
+
+        "table-wrap-foot": {
+            "grandparent_match": {
+                "data-impact-name": "table-wrap-foot"
+            },
+            "parent_match": {
+                "data-impact-class": "fn"
+            },
+            "match": {
+                "data-impact-class": "p"
+            },
+            "tag": "p",
+            "attrs": {
+                "data-label": "†Table_Note",
+                "data-name": "†Table_Note"
+            }
+        },
+        "ack-head": {
+            "grandparent_match": {
+                "data-impact-name": "back"
+            },
+            "parent_match": {
+                "data-impact-class": "ack"
+            },
+            "match": {
+                "data-impact-pi": "PI"
+            },
+            "after": [{
+                "tag": "p",
+                "attrs": {
+                    "data-name": "†EM_Acknowledgments_Head",
+                    "data-label": "†EM_Acknowledgments_Head"
+                },
+                "text_from": "data-impact-pistart"
+            }]
+
+        },
+        "ack": {
+            "grandparent_match": {
+                "data-impact-name": "back"
+            },
+            "parent_match": {
+                "data-impact-class": "ack"
+            },
+            "match": {
+                "data-impact-class": "p"
+            },
+            "tag": "p",
+            "attrs": {
+                "data-label": "†EM_Acknowledgments_Text",
+                "data-name": "†EM_Acknowledgments_Text"
+            }
+        },
+
+        "back-title-level-1": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "match": {
+                "data-impact-class": "title",
+                "data-impact-levels": "1",
+                "data-impact-name": "title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "†EM_HeadA",
+                "data-label": "†EM_HeadA",
+                "data-name": "†EM_HeadA"
+            }
+        },
+        "back-title-level-2": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "match": {
+                "data-impact-class": "title",
+                "data-impact-levels": "2",
+                "data-impact-name": "title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "†EM_HeadB",
+                "data-label": "†EM_HeadB",
+                "data-name": "†EM_HeadB"
+            }
+        },
+        "back-text": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "match": {
+                "data-impact-class": "p"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "†EM_Text",
+                "data-name": "†EM_Text",
+                "data-label": "†EM_Text"
+            }
+        },
+        "ref-list": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "match": {
+                "data-impact-class": "ref-list"
+            },
+            "tag": "div",
+            "attrs": {
+                "class": "RefGroup",
+                "data-alias": "RefGroup"
+            }
+        },
+        "ref-list-title": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "parent_match": {
+                "data-impact-class": "ref-list"
+            },
+            "match": {
+                "data-impact-class": "title"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "†EM_References_Head",
+                "data-name": "†EM_References_Head",
+                "data-label": "†EM_References_Head"
+            }
+        },
+        "ref-list-item": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "parent_match": {
+                "data-impact-class": "ref-list"
+            },
+            "match": {
+                "data-impact-class": "ref"
+            },
+            "tag": "p",
+            "attrs": {
+                "class": "Reference",
+                "data-alias": "Reference",
+                "data-name": "†Reference",
+                "data-label": "†Reference"
+            }
+        },
+
+        "ref-label": {
+            "ancestor_match": {
+                "data-impact-name": "back"
+            },
+            "parent_match": {
+                "data-impact-class": "ref"
+            },
+            "match": {
+                "data-impact-class": "label"
+            },
+            "attrs": {
+                "class": "refnumber",
+                "data-name": "‡ref_number"
+            }
+        },
+        "ref-gn": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "given-names"
+            },
+            "attrs": {
+                "class": "refauGivenName",
+                "data-name": "‡ref_auGivenName"
+            }
+        },
+        "ref-sn": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "surname"
+            },
+            "attrs": {
+                "class": "refauSurname",
+                "data-name": "‡ref_auSurname"
+            }
+        },
+        "ref-at": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "article-title"
+            },
+            "attrs": {
+                "class": "reftitleArticle",
+                "data-name": "‡ref_titleArticle"
+            }
+        },
+        "ref-source": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "source"
+            },
+            "attrs": {
+                "class": "reftitleJournal",
+                "data-name": "‡ref_titleJournal"
+            }
+        },
+        "ref-year": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "year"
+            },
+            "attrs": {
+                "class": "refpubdateYear",
+                "data-name": "‡ref_pubdateYear"
+            }
+        },
+        "ref-volume": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "volume"
+            },
+            "attrs": {
+                "class": "refvolumeNumber",
+                "data-name": "‡ref_volumeNumber"
+            }
+        },
+        "ref-issue": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "issue"
+            },
+            "attrs": {
+                "class": "refissueNumber",
+                "data-name": "‡ref_issueNumber"
+            }
+        },
+        "ref-fpage": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "fpage"
+            },
+            "attrs": {
+                "class": "refpageFirst",
+                "data-name": "‡ref_pageFirst"
+            }
+        },
+        "ref-lpage": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "lpage"
+            },
+            "attrs": {
+                "class": "refpageLast",
+                "data-name": "‡ref_pageLast"
+            }
+        },
+        "ref-url": {
+            "ancestor_match": {
+                "data-impact-name": "ref"
+            },
+            "match": {
+                "data-impact-class": "ext-link"
+            },
+            "attrs": {
+                "class": "refURL",
+                "data-name": "‡ref_URL"
+            }
+        }
+
+    },
+
+
+    "inline": {
+        "sup": {
+            "match": {
+                "data-impact-class": "sup"
+            },
+            "tag": "span",
+            "attrs": {
+                "class": "sup",
+                "data-name": "sup"
+            }
+        },
+        "xref-fig": {
+            "match": {
+                "data-impact-class": "xref",
+                "data-impact-ref-type": "fig"
+            },
+            "tag": "a",
+            "attrs": {
+                "class": "citationfigure",
+                "data-alias": "FigureRef"
+            }
+        },
+        "xref-bibr": {
+            "match": {
+                "data-impact-class": "xref",
+                "data-impact-ref-type": "bibr"
+            },
+            "tag": "a",
+            "attrs": {
+                "class": "citationRef",
+                "data-alias": "BibRef"
+            }
+        },
+        "xref-table": {
+            "match": {
+                "data-impact-class": "xref",
+                "data-impact-ref-type": "table"
+            },
+            "tag": "a",
+            "attrs": {
+                "class": "citationtable",
+                "data-alias": "TableRef"
+            }
+        },
+        "name-given-names": {
+            "parent_match": {
+                "data-impact-class": "name"
+            },
+            "match": {
+                "data-impact-class": "given-names"
+            },
+            "tag": "span",
+            "attrs": {
+                "class": "fmauGivenName",
+                "data-name": "‡fm_auGivenName"
+            }
+        },
+        "name-surname": {
+            "parent_match": {
+                "data-impact-class": "name"
+            },
+            "match": {
+                "data-impact-class": "surname"
+            },
+            "tag": "span",
+            "attrs": {
+                "class": "fmauSurname",
+                "data-name": "‡fm_auSurname"
+            }
+        },
+        "xref-sup": {
+            "parent_match": {
+                "data-impact-ref-type": "aff"
+            },
+            "match": {
+                "data-impact-class": "sup"
+            },
+            "tag": "sup",
+            "attrs": {}
+        }
+    },
+    "hide": [{
+            "match": {
+                "data-impact-class": "journal-meta"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "journal-id"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-meta"
+            },
+            "child_match": {
+                "data-impact-class": "pub-date"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-meta"
+            },
+            "child_match": {
+                "data-impact-class": "volume"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-meta"
+            },
+            "child_match": {
+                "data-impact-class": "issue"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-meta"
+            },
+            "child_match": {
+                "data-impact-class": "fpage"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-meta"
+            },
+            "child_match": {
+                "data-impact-class": "lpage"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-meta"
+            },
+            "child_match": {
+                "data-impact-class": "elocation-id"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "article-id"
+            }
+        },
+        {
+            "match": {
+                "data-impact-date-type": "received"
+            }
+        },
+        {
+            "match": {
+                "data-impact-date-type": "revised"
+            }
+        },
+        {
+            "match": {
+                "data-impact-date-type": "accepted"
+            }
+        },
+        {
+            "match": {
+                "data-impact-date-type": "copyright-statement"
+            }
+        },
+        {
+            "match": {
+                "id": "AuthorAffTrackChanges"
+            }
+        },
+        {
+            "match": {
+                "id": "KWChanges"
+            }
+        },
+        {
+            "match": {
+                "id": "ABRChanges"
+            }
+        },
+        {
+            "match": {
+                "id": "TrackChangesListKW"
+            }
+        },
+        {
+            "match": {
+                "id": "TrackChangesListABR"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "permissions"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "book-part-id"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "contrib-group"
+            },
+            "child_tag": "br",
+            "child_match": {
+                "data-impact-type": "_moz"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "history"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "custom-meta-group"
+            }
+        },
+
+        {
+            "match": {
+                "data-impact-tag": "subj-group",
+                "data-impact-subj-group-type": "category-taxonomy-collection"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "counts"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "self-uri"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "role"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "award-group"
+            }
+        },
+        {
+            "match": {
+                "data-impact-class": "object-id"
+            }
+        },
+        {
+            "match": {
+                "data-impact-tag": "subj-group",
+                "data-impact-subj-group-type": "hwp-journal-coll"
+            }
+        }
+    ]
+}

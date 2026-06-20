@@ -1,0 +1,263 @@
+/* HTML Compare Report Styles */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+  padding: 24px;
+}
+
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.meta {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-bottom: 14px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.filters input,
+.filters select {
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  background: #fff;
+}
+
+.filters input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.filters label {
+  font-size: 0.82rem;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.count {
+  font-size: 0.82rem;
+  color: #6366f1;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.find-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.find-bar input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 0.84rem;
+}
+
+.find-bar button {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.btn-f {
+  background: #6366f1;
+  color: #fff;
+}
+
+.btn-fn {
+  background: #059669;
+  color: #fff;
+}
+
+.btn-cl {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.mb {
+  font-size: 0.8rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.83rem;
+}
+
+th {
+  background: #0f172a;
+  color: #fff;
+  padding: 9px 10px;
+  text-align: left;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 7px 10px;
+  vertical-align: top;
+  max-width: 320px;
+  word-break: break-word;
+}
+
+tr:hover td {
+  background: #eff6ff !important;
+}
+
+tr[data-status="Same"] td {
+  background: #f0fdf4;
+}
+
+tr[data-status="Changed"] td {
+  background: #fef2f2;
+}
+
+tr[data-status="Missing in update"] td {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+tr[data-status="New in update"] td {
+  background: #fffbeb;
+}
+
+tr[data-status="Changed (Div Replace)"] td {
+  background: #fdf4ff;
+}
+
+.ring {
+  outline: 2px solid #f59e0b;
+}
+
+/* Delmerge-specific styles */
+.delmerge-view {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 2px solid #cbd5e1;
+}
+
+.delmerge-view .meta {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.delmerge-view .hint {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.delmerge-view .toggle-bar {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.delmerge-view .toggle-bar label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.delmerge-view .html-snippet {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.delmerge-view table,
+.delmerge-view td,
+.delmerge-view th {
+  border: 1px solid #000;
+}
+
+.delmerge-view table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #fff;
+}
+
+.delmerge-view td,
+.delmerge-view th {
+  padding: 10px;
+  vertical-align: top;
+}
+
+.delmerge-view del {
+  color: red;
+}
+
+.delmerge-view ins,
+.delmerge-view insert {
+  color: #00f;
+  text-decoration: none;
+}
+
+.delmerge-view.hide-del del {
+  display: none;
+}
+
+.preview-row.focused {
+  background-color: #fffacd;
+}

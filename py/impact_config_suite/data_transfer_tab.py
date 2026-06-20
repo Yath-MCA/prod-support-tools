@@ -6,7 +6,6 @@ import sys
 import json
 import threading
 import shutil
-from pymongo import MongoClient
 from datetime import datetime
 
 
@@ -401,6 +400,19 @@ class DataTransferTab(ttk.Frame):
         signoff_fields = ["signoff", "signOff", "signedOff", "approved", "approval"]
         has_signoff = any(field in parsed for field in signoff_fields)
         status_to_set = "active" if has_signoff else parsed.get("status", "active")
+
+        try:
+            from pymongo import MongoClient
+        except ModuleNotFoundError:
+            self._log(
+                f"\n[{datetime.now().strftime('%H:%M:%S')}] [MONGO ERROR] pymongo is not available in this build."
+            )
+            self.mongo_status.config(text="pymongo missing", fg="#ef4444")
+            messagebox.showerror(
+                "MongoDB Unavailable",
+                "This build does not include pymongo. Rebuild the app with pymongo bundled to use MongoDB insert.",
+            )
+            return
 
         try:
             client = MongoClient("mongodb://localhost:27017/")

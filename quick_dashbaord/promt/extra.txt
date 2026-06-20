@@ -1,0 +1,21 @@
+# For auth layer:
+Add a login page with JWT token storage in localStorage.
+Protect all routes with a PrivateRoute wrapper.
+
+# For AG Grid instead of plain table:
+Use AG Grid Community for all data tables instead of 
+a custom table. Enable column resizing, row selection, 
+and dynamic column binding from API response shape.
+
+# For Express backend scaffold too:
+Also generate an Express.js backend with:
+- GET /api/rFileslist
+- GET /api/rdocviewhistory  
+- GET /api/rlinksharing
+Each connected to MongoDB using Mongoose with the 
+schemas defined earlier (identifier as primary key,
+timeiso_c as ISODate, timestamp as String).
+
+# For Docker setup:
+Include Dockerfile and docker-compose.yml to run 
+frontend + backend together locally.

@@ -1,0 +1,100 @@
+{
+  "winscp": {
+    "dllPath": "C:\\Program Files (x86)\\WinSCP\\WinSCPnet.dll",
+    "exePath": "C:\\Program Files (x86)\\WinSCP\\WinSCP.exe",
+    "logPath":  "D:\\_UAT_CODE_FTP\\winscp.log",
+    "acceptAnySshKey": true
+  },
+  "sftpEnvs": [
+    { "name": "UAT",  "hostName": "sftp.newgen.co",               "userName": "impact-uat",       "password": "Welcome@123$" },
+    { "name": "LIVE", "hostName": "",  "userName": "", "password": "" },
+    { "name": "QA",   "hostName": "",               "userName": "",       "password": "" }
+  ],
+  "remote": {
+    "inDir":     "/home/SFTP_DATA/impact-uat/UAT_CODE/in/",
+    "backupDir": "/home/SFTP_DATA/impact-uat/UAT_CODE/moved/"
+  },
+  "local": {
+    "inDir":      "D:\\_UAT_CODE_FTP\\in\\",
+    "processDir": "D:\\_UAT_CODE_FTP\\process\\",
+    "backupDir":  "D:\\_UAT_CODE_FTP\\moved\\"
+  },
+  "build": {
+    "repoPath": "D:\\IMPACT-SOURCE",
+    "branch": "main",
+    "buildWorkingDir": "D:\\IMPACT-SOURCE",
+    "gulpCommand": "gulp build",
+    "outputDir": "D:\\IMPACT-SOURCE\\dist"
+  },
+  "deployTargets": [
+    {
+      "name": "UAT", "keywordInFilename": "-UAT",
+      "webRoot": "D:\\UAT-apache-tomcat-9-0-113\\webapps\\ROOT\\",
+      "tomcat": {
+        "managerUrl":  "http://localhost:8080",
+        "user":        "admin",
+        "password":    "admin123",
+        "appPath":     "/",
+        "serviceName": "Tomcat9UAT",
+        "logDir":      "D:\\UAT-apache-tomcat-9-0-113\\logs"
+      }
+    },
+    {
+      "name": "QA", "keywordInFilename": "-QA",
+      "webRoot": "D:\\UATQA-apache-tomcat-9-0-80\\webapps\\ROOT\\",
+      "tomcat": {
+        "managerUrl":  "http://localhost:8081",
+        "user":        "admin",
+        "password":    "admin123",
+        "appPath":     "/",
+        "serviceName": "Tomcat9QA",
+        "logDir":      "D:\\UATQA-apache-tomcat-9-0-80\\logs"
+      }
+    },
+    {
+      "name": "LIVE", "keywordInFilename": "-LIVE",
+      "webRoot": "D:\\LIVE-tomcat\\webapps\\ROOT\\",
+      "tomcat": {
+        "managerUrl":  "http://localhost:8082",
+        "user":        "admin",
+        "password":    "admin123",
+        "appPath":     "/",
+        "serviceName": "Tomcat9LIVE",
+        "logDir":      "D:\\LIVE-tomcat\\logs"
+      }
+    },
+    {
+      "name": "DEV", "keywordInFilename": "-DEV",
+      "webRoot": "D:\\DEV-tomcat\\webapps\\ROOT\\",
+      "tomcat": {
+        "managerUrl":  "http://localhost:8083",
+        "user":        "admin",
+        "password":    "admin123",
+        "appPath":     "/",
+        "serviceName": "Tomcat9DEV",
+        "logDir":      "D:\\DEV-tomcat\\logs"
+      }
+    },
+    {
+      "name": "STAGING", "keywordInFilename": "-STAGING",
+      "webRoot": "D:\\STAGING-tomcat\\webapps\\ROOT\\",
+      "tomcat": {
+        "managerUrl":  "http://localhost:8084",
+        "user":        "admin",
+        "password":    "admin123",
+        "appPath":     "/",
+        "serviceName": "Tomcat9STAGING",
+        "logDir":      "D:\\STAGING-tomcat\\logs"
+      }
+    }
+  ],
+  "defaultTarget": "UAT",
+  "activeSftpEnv": "UAT",
+  "delays": {
+    "afterDownload": 4,
+    "afterUnzip":    5,
+    "afterDispose":  3,
+    "perFileCopy":   0.25,
+    "newFolderWait": 1.5
+  }
+}

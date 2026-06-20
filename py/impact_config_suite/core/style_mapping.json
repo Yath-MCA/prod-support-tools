@@ -1,0 +1,79 @@
+{
+    "Heading": {
+        "class": "sec",
+        "data-name": "sec"
+    },
+    "ParaFlushLeft8": {
+        "class": "p",
+        "data-name": "p",
+        "content-type": "flush left",
+        "tag": "span"
+    },
+    "ParaInd9": {
+        "class": "p",
+        "data-name": "p",
+        "tag": "span"
+    },
+    "sup": {
+        "class": "sup",
+        "data-name": "sup"
+    },
+    "b": {
+        "class": "strong",
+        "data-name": "strong"
+    },
+    "figure": {
+        "class": "fig",
+        "data-name": "fig",
+        "data-role": "fig",
+        "fig-type": "figure",
+        "tag": "div"
+    },
+    "figcaption": {
+
+        "tag": "div",
+        "class": "caption",
+        "data-name": "caption"
+
+    },
+    "[data-name='†EM_Acknowledgments_Head']": {
+        "tag": "div",
+        "class": "ack",
+        "data-name": "ack"
+    },
+    "[data-name='†EM_Acknowledgments_Text']": {
+        "tag": "div",
+        "class": "p",
+        "data-name": "p"
+    },
+    "[data-name='†EM_HeadA']": {
+        "tag": "div",
+        "class": "sec",
+        "data-name": "sec"
+    },
+    "[data-name='†EM_Text']": {
+        "tag": "div",
+        "class": "p",
+        "data-name": "p"
+    },
+    "[data-name='†EM_References_Head']": {
+        "tag": "div",
+        "class": "ref-list",
+        "data-name": "ref-list"
+    },
+    "[data-name='†Reference']": {
+        "tag": "div",
+        "class": "ref",
+        "data-name": "ref"
+    },
+    "[data-name='†EM_HeadA'] > b": {
+        "tag": "div",
+        "class": "title",
+        "data-name": "title"
+    },
+    "a[class='citationRef']": {
+        "tag": "span",
+        "class": "xref",
+        "data-name": "xref"
+    }
+}

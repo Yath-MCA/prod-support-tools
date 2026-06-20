@@ -1,0 +1,1220 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impact Unified Analysis Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --card-hover: rgba(30, 41, 59, 1);
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --secondary: #a855f7;
+            --accent: #f43f5e;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-dim: #94a3b8;
+            --border: rgba(148, 163, 184, 0.2);
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            background-image:
+                radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            line-height: 1.6;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        /* HEADER */
+        header {
+            max-width: 1400px;
+            margin: 0 auto 50px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .header-title h1 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f43f5e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header-title p {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .header-meta {
+            text-align: right;
+        }
+
+        .header-meta div {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+        }
+
+        .header-meta strong {
+            color: var(--primary-light);
+            font-weight: 600;
+        }
+
+        /* DASHBOARD STATS */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto 50px;
+            padding: 0 0;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        .stat-card:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+            transform: translateY(-4px);
+            box-shadow: 0 25px 30px rgba(99, 102, 241, 0.15);
+        }
+
+        .stat-card .label {
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* MAIN CONTAINER */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* DOCUMENT SECTIONS */
+        .doc-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .doc-section:hover {
+            border-color: var(--primary);
+        }
+
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.3s;
+        }
+
+        .doc-header:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
+        }
+
+        .doc-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .toggle-icon {
+            flex-shrink: 0;
+            font-size: 1.4rem;
+            color: var(--primary);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .doc-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .doc-meta {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .doc-meta strong {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .doc-section.collapsed .doc-content-wrapper {
+            display: none;
+        }
+
+        .doc-section.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .doc-content-wrapper {
+            padding: 24px;
+        }
+
+        /* TABS SYSTEM */
+        .tabs-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            padding-bottom: 12px;
+            scroll-behavior: smooth;
+        }
+
+        .tabs-header::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .tabs-header::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .tabs-header::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 8px;
+            position: relative;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.15);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* CHAPTER BREAKDOWN */
+        .chapter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .ch-summary-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .ch-summary-card:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.05));
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .ch-title {
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 14px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .ch-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .ch-stat-item {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .ch-stat-item b {
+            display: block;
+            color: var(--primary);
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        /* TABLES */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(99, 102, 241, 0.1);
+            text-align: left;
+            padding: 14px 16px;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            vertical-align: top;
+        }
+
+        tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* BADGES & LABELS */
+        .id-code {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--secondary);
+            font-weight: 600;
+            background: rgba(168, 85, 247, 0.15);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            display: inline-block;
+        }
+
+        .label-text {
+            color: var(--success);
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .citation-box {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: #d1d5db;
+            font-size: 0.8rem;
+            max-width: 100%;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            line-height: 1.4;
+        }
+
+        .citation-box::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .citation-box::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            padding: 30px 20px;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer a:hover {
+            color: var(--secondary);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 10px;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+                margin-bottom: 30px;
+            }
+
+            .header-meta {
+                text-align: left;
+                width: 100%;
+            }
+
+            .stat-card {
+                padding: 18px;
+            }
+
+            .stat-card .value {
+                font-size: 2rem;
+            }
+
+            .doc-header {
+                flex-wrap: wrap;
+                padding: 18px;
+            }
+
+            .doc-title {
+                font-size: 1.3rem;
+            }
+
+            .chapter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <div class="header-title">
+            <h1>📊 Unified Analysis Report</h1>
+            <p>Comprehensive DOM & Citation Analysis</p>
+        </div>
+        <div class="header-meta">
+            <div>📋 <strong>Nf0e2b0c9-8fb7-4390-8a3c-9d151a1aaa1c</strong></div>
+            <div>⏱️ 2026-06-20 15:19:14</div>
+        </div>
+    </header>
+
+    <!-- DASHBOARD STATS -->
+    <div class="dashboard">
+        <div class="stat-card">
+            <div class="label">📄 Documents</div>
+            <div class="value">1</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">📖 Chapters</div>
+            <div class="value">4</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">🖼️ Figures</div>
+            <div class="value">45</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">📊 Tables</div>
+            <div class="value">4</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">✏️ Labels</div>
+            <div class="value">354</div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-container">
+        
+        <div class='doc-section'>
+            <div class='doc-header' onclick="toggleSection(this)">
+                <div class='doc-title'><span class="toggle-icon">▼</span> Nf0e2b0c9-8fb7-4390-8a3c-9d151a1aaa1c</div>
+                <div class='doc-meta'>Client: <b>TNF</b> | File ID: 9780367438999_reverted_impact_QA_DEV</div>
+            </div>
+            <div class="doc-content-wrapper">
+                <div class="tabs-header"><button class="tab-btn active" onclick="openTab(event, 'Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c', 'ch_break')">Chapters (4)</button><button class="tab-btn" onclick="openTab(event, 'Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c', 'fig')">Figures (45)</button><button class="tab-btn" onclick="openTab(event, 'Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c', 'tab')">Tables (4)</button><button class="tab-btn" onclick="openTab(event, 'Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c', 'ref')">References (279)</button><button class="tab-btn" onclick="openTab(event, 'Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c', 'fn')">Notes/Footnotes (26)</button></div>
+                <div id="Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c_ch_break" class="tab-content active">
+            <div class='ch-summary-card'>
+                <div class='ch-title'>1 Introduction</div>
+                <div class='ch-stats'>
+                    <div class='ch-stat-item'>Figs: <b>0</b></div>
+                    <div class='ch-stat-item'>Tabs: <b>4</b></div>
+                    <div class='ch-stat-item'>Refs: <b>2</b></div>
+                    <div class='ch-stat-item'>Fns: <b>26</b></div>
+                </div>
+            </div>
+            
+            <div class='ch-summary-card'>
+                <div class='ch-title'>2 2001</div>
+                <div class='ch-stats'>
+                    <div class='ch-stat-item'>Figs: <b>16</b></div>
+                    <div class='ch-stat-item'>Tabs: <b>0</b></div>
+                    <div class='ch-stat-item'>Refs: <b>75</b></div>
+                    <div class='ch-stat-item'>Fns: <b>0</b></div>
+                </div>
+            </div>
+            
+            <div class='ch-summary-card'>
+                <div class='ch-title'>3 2005</div>
+                <div class='ch-stats'>
+                    <div class='ch-stat-item'>Figs: <b>9</b></div>
+                    <div class='ch-stat-item'>Tabs: <b>0</b></div>
+                    <div class='ch-stat-item'>Refs: <b>79</b></div>
+                    <div class='ch-stat-item'>Fns: <b>0</b></div>
+                </div>
+            </div>
+            
+            <div class='ch-summary-card'>
+                <div class='ch-title'>4 2010</div>
+                <div class='ch-stats'>
+                    <div class='ch-stat-item'>Figs: <b>20</b></div>
+                    <div class='ch-stat-item'>Tabs: <b>0</b></div>
+                    <div class='ch-stat-item'>Refs: <b>123</b></div>
+                    <div class='ch-stat-item'>Fns: <b>0</b></div>
+                </div>
+            </div>
+            </div><div id='Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c_fig' class='tab-content'><table><thead><tr><th>Label</th><th>Element ID</th><th>Cites</th><th>Sample Citation XML</th></tr></thead><tbody><tr><td><span class='label-text'>Figure 2.1</span></td><td><span class='id-code'>FIGn-fig-1</span></td><td><span class='count-badge'>6</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-1"&gt;Figure 2.1&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.2</span></td><td><span class='id-code'>FIGn-fig-2</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-2"&gt;Figure 2.2&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.3</span></td><td><span class='id-code'>FIGn-fig-3</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-3"&gt;Figure 2.&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.4</span></td><td><span class='id-code'>FIGn-fig-4</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-4"&gt;Figure 2.3&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.5</span></td><td><span class='id-code'>FIGn-fig-5</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-5"&gt;Figure 2.&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.6</span></td><td><span class='id-code'>FIGn-fig-6</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-6"&gt;Figure 2.6&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.7</span></td><td><span class='id-code'>FIGn-fig-7</span></td><td><span class='count-badge'>7</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-7"&gt;Figure 2.7&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.8</span></td><td><span class='id-code'>FIGn-fig-8</span></td><td><span class='count-badge'>3</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-8"&gt;Figure 2.8&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.9</span></td><td><span class='id-code'>FIGn-fig-9</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-9"&gt;Figure 2.9&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.10</span></td><td><span class='id-code'>FIGn-fig-10</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>Figure 2.11</span></td><td><span class='id-code'>FIGn-fig-11</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-11"&gt;Figure 2.11&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.12</span></td><td><span class='id-code'>FIGn-fig-12</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-12"&gt;Figure 2.12&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.13</span></td><td><span class='id-code'>FIGn-fig-13</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-13"&gt;Figure 2.13&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.14</span></td><td><span class='id-code'>FIGn-fig-14</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-14"&gt;Figure 2.14&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.15</span></td><td><span class='id-code'>FIGn-fig-15</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-15"&gt;Figure 2.15&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 2.16</span></td><td><span class='id-code'>FIGn-fig-16</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-16"&gt;Figure 2.16&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.1</span></td><td><span class='id-code'>FIGn-fig-17</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-17"&gt;Figure 3.1&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.2</span></td><td><span class='id-code'>FIGn-fig-18</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-18"&gt;Figure 3.2&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.3</span></td><td><span class='id-code'>FIGn-fig-19</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-19"&gt;Figure 3.3&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.4</span></td><td><span class='id-code'>FIGn-fig-20</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-20"&gt;Figure 3.4&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.5</span></td><td><span class='id-code'>FIGn-fig-21</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-21"&gt;Figure 3.5&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.6</span></td><td><span class='id-code'>FIGn-fig-22</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-22"&gt;Figure 3.6&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.7</span></td><td><span class='id-code'>FIGn-fig-23</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-23"&gt;Figure 3.7&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.8</span></td><td><span class='id-code'>FIGn-fig-24</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-24"&gt;Figure 3.8&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 3.9</span></td><td><span class='id-code'>FIGn-fig-25</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-25"&gt;Figure 3.9&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.1</span></td><td><span class='id-code'>FIGn-fig-26</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>Figure 4.2</span></td><td><span class='id-code'>FIGn-fig-27</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-27"&gt;Figure 4.2&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.3</span></td><td><span class='id-code'>FIGn-fig-28</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-28"&gt;Figure 4.3&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.4</span></td><td><span class='id-code'>FIGn-fig-29</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-29"&gt;Figure 4.4&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.5</span></td><td><span class='id-code'>FIGn-fig-30</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-30"&gt;Figure 4.5&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.6</span></td><td><span class='id-code'>FIGn-fig-31</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-31"&gt;Figure 4.6&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.7</span></td><td><span class='id-code'>FIGn-fig-32</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-32"&gt;Figure 4.7&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.8</span></td><td><span class='id-code'>FIGn-fig-33</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-33"&gt;Figure 4.8&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.9</span></td><td><span class='id-code'>FIGn-fig-34</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-34"&gt;Figure 4.9&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.10</span></td><td><span class='id-code'>FIGn-fig-35</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-35"&gt;Figure 4.11&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.11</span></td><td><span class='id-code'>FIGn-fig-36</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-36"&gt;Figure 4.10&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.12</span></td><td><span class='id-code'>FIGn-fig-37</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>Figure 4.13</span></td><td><span class='id-code'>FIGn-fig-38</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-38"&gt;Figure 4.16&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.14</span></td><td><span class='id-code'>FIGn-fig-39</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-39"&gt;Figure 4.17&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.15</span></td><td><span class='id-code'>FIGn-fig-40</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-40"&gt;Figure 4.18&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.16</span></td><td><span class='id-code'>FIGn-fig-41</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-41"&gt;Figure 4.12&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.17</span></td><td><span class='id-code'>FIGn-fig-42</span></td><td><span class='count-badge'>3</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-42"&gt;Figure 4.13&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.18</span></td><td><span class='id-code'>FIGn-fig-43</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-43"&gt;Figure 4.15&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.19</span></td><td><span class='id-code'>FIGn-fig-44</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-44"&gt;Figure 4.19&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Figure 4.20</span></td><td><span class='id-code'>FIGn-fig-45</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="fig" rid="FIGn-fig-45"&gt;Figure 4.20&lt;/xref&gt;</div></td></tr></tbody></table></div><div id='Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c_tab' class='tab-content'><table><thead><tr><th>Label</th><th>Element ID</th><th>Cites</th><th>Sample Citation XML</th></tr></thead><tbody><tr><td><span class='label-text'>Table 1.1</span></td><td><span class='id-code'>table-wrap-001</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="table" rid="table-wrap-001"&gt;Table 1&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Table 1.2</span></td><td><span class='id-code'>table-wrap-002</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="table" rid="table-wrap-002"&gt;Table 1.2&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Table 1.3</span></td><td><span class='id-code'>table-wrap-003</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="table" rid="table-wrap-003"&gt;Table 1.3&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Table 1.4</span></td><td><span class='id-code'>table-wrap-004</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="table" rid="table-wrap-004"&gt;Table 1.4&lt;/xref&gt;</div></td></tr></tbody></table></div><div id='Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c_ref' class='tab-content'><table><thead><tr><th>Label</th><th>Element ID</th><th>Cites</th><th>Sample Citation XML</th></tr></thead><tbody><tr><td><span class='label-text'>www.nobelprize.org/, last checked 6/29/22.</span></td><td><span class='id-code'>ref-001</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>https://chemistry.as.miami.edu/_assets/pdf/murthy-group/gnl_jensen-2.pdf, last checked 6/29/22.</span></td><td><span class='id-code'>ref-002</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(1) Journal of the Chemical Society 1957, 1958.</span></td><td><span class='id-code'>ref-003</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(2) Journal of the American Chemical Society 1973, 6136.</span></td><td><span class='id-code'>ref-004</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-004"&gt;&#13;
+&lt;sup&gt;2&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(3) Journal of the American Chemical Society 1980, 5974.</span></td><td><span class='id-code'>ref-005</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(4) Journal of the American Chemical Society 1990, 2801.</span></td><td><span class='id-code'>ref-006</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-006"&gt;&#13;
+&lt;sup&gt;4&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(5) Tetrahedron Letters 1990, 7345.</span></td><td><span class='id-code'>ref-007</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-007"&gt;&#13;
+&lt;sup&gt;5&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(6) Journal of the Chemical Society Dalton Transactions 1977, 941.</span></td><td><span class='id-code'>ref-008</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(7) Journal of the American Chemical Society 1988, 1968.</span></td><td><span class='id-code'>ref-009</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-009"&gt;&#13;
+&lt;sup&gt;7&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(8) Tetrahedron Letters 1976, 1973.</span></td><td><span class='id-code'>ref-010</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-010"&gt;&#13;
+&lt;sup&gt;8&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(9) Tetrahedron Letters 2000, 8083.</span></td><td><span class='id-code'>ref-011</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(10) Angewandte Chimie International Edition 2002, e202201790.</span></td><td><span class='id-code'>ref-012</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-012"&gt;&#13;
+&lt;sup&gt;10&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(11) Mini-Reviews in Organic Chemistry 2021, 606.</span></td><td><span class='id-code'>ref-013</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-013"&gt;&#13;
+&lt;sup&gt;11&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(12) Tetrahedron Assymmetry 2015, 405.</span></td><td><span class='id-code'>ref-014</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-014"&gt;&#13;
+&lt;sup&gt;12&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(13) Tetrahedron Letters 2000, 2181.</span></td><td><span class='id-code'>ref-015</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-015"&gt;&#13;
+&lt;sup&gt;13&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(14) Molecules 2010, 1041.</span></td><td><span class='id-code'>ref-016</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-016"&gt;&#13;
+&lt;sup&gt;14&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(15) Journal of the American Chemical Society 2006, 14042.</span></td><td><span class='id-code'>ref-017</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-017"&gt;&#13;
+&lt;sup&gt;15&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(16) Organic Letters 2015, 126.</span></td><td><span class='id-code'>ref-018</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-018"&gt;&#13;
+&lt;sup&gt;16&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(17) Tetrahedron Assymmetry 2016, 788.</span></td><td><span class='id-code'>ref-019</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-019"&gt;&#13;
+&lt;sup&gt;17&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(18) Natural Products Communications 2007, 737.</span></td><td><span class='id-code'>ref-020</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-020"&gt;&#13;
+&lt;sup&gt;18&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(19) European Journal of Organic Chemistry 2014, 8049.</span></td><td><span class='id-code'>ref-021</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-021"&gt;&#13;
+&lt;sup&gt;19&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(20) Journal of Organic Chemistry 2010, 2389.</span></td><td><span class='id-code'>ref-022</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-022"&gt;&#13;
+&lt;sup&gt;20&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(21) Tetrahedron 2010, 8458.</span></td><td><span class='id-code'>ref-023</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-023"&gt;&#13;
+&lt;sup&gt;21&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(22) Tetrahedron Letters 2011, 4885.</span></td><td><span class='id-code'>ref-024</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-024"&gt;&#13;
+&lt;sup&gt;22&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(23) Tetrahedron Assymmetry 2015, 405.</span></td><td><span class='id-code'>ref-025</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-025"&gt;&#13;
+&lt;sup&gt;23&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(24) Journal of Tropical Mydicine Hygine 2013, 778.</span></td><td><span class='id-code'>ref-026</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-026"&gt;&#13;
+&lt;sup&gt;24&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(25) Organic Processes Research and Development 2016, 52.</span></td><td><span class='id-code'>ref-027</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-027"&gt;&#13;
+&lt;sup&gt;25&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(26) Andrews’ Diseases of the Skin: Clinical Dermatology; W. B. Saudners Co., 2006.</span></td><td><span class='id-code'>ref-028</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-028"&gt;&#13;
+&lt;sup&gt;26&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(27) www.who.int/news-room/fact-sheets/detail/leishmaniasis, last checked 8/10/24.</span></td><td><span class='id-code'>ref-029</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-029"&gt;&#13;
+&lt;sup&gt;27&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(28) Molecules 2023, 2722.</span></td><td><span class='id-code'>ref-030</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-030"&gt;&#13;
+&lt;sup&gt;28&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(29) Phytochemistry 1985, 2141.</span></td><td><span class='id-code'>ref-031</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-031"&gt;&#13;
+&lt;sup&gt;29&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(30) Anti-Cancer Drug Design 2000, 1543.</span></td><td><span class='id-code'>ref-032</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-032"&gt;&#13;
+&lt;sup&gt;30&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(31) Organic Letters 2009, 57.</span></td><td><span class='id-code'>ref-033</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-033"&gt;&#13;
+&lt;sup&gt;31&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(32) Organic Letters 2020, 1976.</span></td><td><span class='id-code'>ref-034</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-034"&gt;&#13;
+&lt;sup&gt;32&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(33) Molecules 2020, 2215.</span></td><td><span class='id-code'>ref-035</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-035"&gt;&#13;
+&lt;sup&gt;33&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(34) Chirality 2010, 726.</span></td><td><span class='id-code'>ref-036</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-036"&gt;&#13;
+&lt;sup&gt;34&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(35) RSC Advances 2018, 6634.</span></td><td><span class='id-code'>ref-037</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-037"&gt;&#13;
+&lt;sup&gt;35&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(36) Chemical Communications 1968, 1945.</span></td><td><span class='id-code'>ref-038</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-038"&gt;&#13;
+&lt;sup&gt;36&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(37) Journal of the Chemical society A 1966, 1711.</span></td><td><span class='id-code'>ref-039</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-039"&gt;&#13;
+&lt;sup&gt;37&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(38) Tetrahedron Letters 1961, 161.</span></td><td><span class='id-code'>ref-040</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-040"&gt;&#13;
+&lt;sup&gt;38&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(39) Journal of the American Chemical Society 1967, 4784.</span></td><td><span class='id-code'>ref-041</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-041"&gt;&#13;
+&lt;sup&gt;39&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(40) Angewandte Chimie 1968, 1034.</span></td><td><span class='id-code'>ref-042</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-042"&gt;&#13;
+&lt;sup&gt;40&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(41) Angewandte Chimie International Edition 1968, 942.</span></td><td><span class='id-code'>ref-043</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(42) Tetrahedron Letters 1968, 4023.</span></td><td><span class='id-code'>ref-044</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-044"&gt;&#13;
+&lt;sup&gt;42&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(43) Chemical Communications 197, 481.</span></td><td><span class='id-code'>ref-045</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-045"&gt;&#13;
+&lt;sup&gt;43&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(44) Journal of the American Chemical Society 1971, 1301.</span></td><td><span class='id-code'>ref-046</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-046"&gt;&#13;
+&lt;sup&gt;44&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(45) Accounts of Chemical Research 1983, 106.</span></td><td><span class='id-code'>ref-047</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-047"&gt;&#13;
+&lt;sup&gt;45&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(46) In Asymmetric Synthesis Volume 5, Chapter 2; Academic Press: NY, 1985.</span></td><td><span class='id-code'>ref-048</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-048"&gt;&#13;
+&lt;sup&gt;46&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(47) Journal of the American Chemical Society 1980, 7932.</span></td><td><span class='id-code'>ref-049</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-049"&gt;&#13;
+&lt;sup&gt;47&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(48) Inorganic Chemistry 1988, 566.</span></td><td><span class='id-code'>ref-050</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-050"&gt;&#13;
+&lt;sup&gt;48&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(49) Journal of the American Chemical Society 1988, 629.</span></td><td><span class='id-code'>ref-051</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-051"&gt;&#13;
+&lt;sup&gt;49&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(50) Journal of Organic Chemistry 1986, 629.</span></td><td><span class='id-code'>ref-052</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-052"&gt;&#13;
+&lt;sup&gt;50&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(51) Organic Synthesis 1998, 6.</span></td><td><span class='id-code'>ref-053</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-053"&gt;&#13;
+&lt;sup&gt;51&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(52) Journal of the American Chemical Society 1986, 7117.</span></td><td><span class='id-code'>ref-054</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-054"&gt;&#13;
+&lt;sup&gt;52&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(53) Journal of Organic Chemistry 1992, 4053.</span></td><td><span class='id-code'>ref-055</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(54) Organic Synthesis 1993, 74.</span></td><td><span class='id-code'>ref-056</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-056"&gt;&#13;
+&lt;sup&gt;54&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(55) Acta Crystallographica Section B 1982, 807.</span></td><td><span class='id-code'>ref-057</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-057"&gt;&#13;
+&lt;sup&gt;55&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(56) Journal of the American Chemical Society 1980, 629.</span></td><td><span class='id-code'>ref-058</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-058"&gt;&#13;
+&lt;sup&gt;56&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(57) Tokyo Kagaka Dozin: Tokyo, 1992, p. 75.</span></td><td><span class='id-code'>ref-059</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-059"&gt;&#13;
+&lt;sup&gt;57&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(58) Whiley Chichester, 1992.</span></td><td><span class='id-code'>ref-060</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-060"&gt;&#13;
+&lt;sup&gt;58&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(59) Chemical Reviews 2017.</span></td><td><span class='id-code'>ref-061</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-061"&gt;&#13;
+&lt;sup&gt;59&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(60) Applied Catalysis A: General 2007, 1.</span></td><td><span class='id-code'>ref-062</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-062"&gt;&#13;
+&lt;sup&gt;60&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(61) Organic Letters 2003, 4559.</span></td><td><span class='id-code'>ref-063</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-063"&gt;&#13;
+&lt;sup&gt;61&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(62) Journal of Organometallic Chemistry 2007, 487.</span></td><td><span class='id-code'>ref-064</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-064"&gt;&#13;
+&lt;sup&gt;62&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(63) Tetrahedron Letters 2006, 4263.</span></td><td><span class='id-code'>ref-065</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-065"&gt;&#13;
+&lt;sup&gt;63&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(64) Chemistry: A European Journal 2009, 1370.</span></td><td><span class='id-code'>ref-066</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-066"&gt;&#13;
+&lt;sup&gt;64&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(65) Organometallics 2023, 157.</span></td><td><span class='id-code'>ref-067</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-067"&gt;&#13;
+&lt;sup&gt;65&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(66) Journal of Catalysis 2022, 84.</span></td><td><span class='id-code'>ref-068</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-068"&gt;&#13;
+&lt;sup&gt;66&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(67) Chirality 2023, 121.</span></td><td><span class='id-code'>ref-069</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-069"&gt;&#13;
+&lt;sup&gt;67&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(68) Green Synthesis and Catalysis 2020, 26.</span></td><td><span class='id-code'>ref-070</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(69) Journal of the American Chemical Society 2021, 6724.</span></td><td><span class='id-code'>ref-071</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-071"&gt;&#13;
+&lt;sup&gt;69&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(70) Nature Communications 2020, 5835.</span></td><td><span class='id-code'>ref-072</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-072"&gt;&#13;
+&lt;sup&gt;70&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(71) Chemical Science 2021.</span></td><td><span class='id-code'>ref-073</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-073"&gt;&#13;
+&lt;sup&gt;71&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(72) Bioorganic Medicinal Chemistry Letters 2012, 6933.</span></td><td><span class='id-code'>ref-074</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-074"&gt;&#13;
+&lt;sup&gt;72&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(73) Bioorganic Medicinal Chemistry Letters 2007, 6991.</span></td><td><span class='id-code'>ref-075</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-075"&gt;&#13;
+&lt;sup&gt;73&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(74) European Journal of Organic Chemistry 2007, 3911.</span></td><td><span class='id-code'>ref-076</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-076"&gt;&#13;
+&lt;sup&gt;74&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(75) Organic Letters 2018, 2143.</span></td><td><span class='id-code'>ref-077</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-077"&gt;&#13;
+&lt;sup&gt;75&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(1) Makromolecular Chemistry 1966, 87.</span></td><td><span class='id-code'>ref-078</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-078"&gt;&#13;
+&lt;sup&gt;1&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(2) Accounts of Chemical Research 1972, 127.</span></td><td><span class='id-code'>ref-079</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-079"&gt;&#13;
+&lt;sup&gt;2&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(3) Makromolecular Chemistry 1971, 161.</span></td><td><span class='id-code'>ref-080</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-080"&gt;&#13;
+&lt;sup&gt;3&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(4) Olefin Metathesis: The Early Days. www.nobelprize.org/uploads/2018/06/chauvin-lecture.pdf, last </span></td><td><span class='id-code'>ref-081</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-081"&gt;&#13;
+&lt;sup&gt;4&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(5) Comptes rendus de l'Académie des Sciences Paris 1973, 169.</span></td><td><span class='id-code'>ref-082</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-082"&gt;&#13;
+&lt;sup&gt;5&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(6) Makromolecular Chemistry 1976, 2637.</span></td><td><span class='id-code'>ref-083</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-083"&gt;&#13;
+&lt;sup&gt;6&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(7) Journal of the Chemical Society Chemical Communications 1992, 462.</span></td><td><span class='id-code'>ref-084</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-084"&gt;&#13;
+&lt;sup&gt;7&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(8) Comptes Rendus Hebdomadaires des Seances de Serie C 1973, 169.</span></td><td><span class='id-code'>ref-085</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-085"&gt;&#13;
+&lt;sup&gt;8&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(9) Journal of the American Chemical Society 1979, 4558.</span></td><td><span class='id-code'>ref-086</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-086"&gt;&#13;
+&lt;sup&gt;9&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(10) Journal of Molecular Catalysis 1980, 73.</span></td><td><span class='id-code'>ref-087</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-087"&gt;&#13;
+&lt;sup&gt;10&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(11) Journal of the American Chemical Society 1980, 4515.</span></td><td><span class='id-code'>ref-088</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-088"&gt;&#13;
+&lt;sup&gt;11&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(12) Organometallics 1984, 1563.</span></td><td><span class='id-code'>ref-089</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-089"&gt;&#13;
+&lt;sup&gt;12&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(13) Organometallics 1984, 1554.</span></td><td><span class='id-code'>ref-090</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-090"&gt;&#13;
+&lt;sup&gt;13&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(14) Progress in Inorganic Chemistry 1991, 1.</span></td><td><span class='id-code'>ref-091</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-091"&gt;&#13;
+&lt;sup&gt;14&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(15) Journal of the American Chemical Society 1990, 3875.</span></td><td><span class='id-code'>ref-092</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-092"&gt;&#13;
+&lt;sup&gt;15&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(16) Journal of the American Chemical Society 1976, 3478.</span></td><td><span class='id-code'>ref-093</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-093"&gt;&#13;
+&lt;sup&gt;16&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(17) Journal of the American Chemical Society 1975, 3265.</span></td><td><span class='id-code'>ref-094</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-094"&gt;&#13;
+&lt;sup&gt;17&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(18) Journal of the American Chemical Society 1976, 2519.</span></td><td><span class='id-code'>ref-095</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-095"&gt;&#13;
+&lt;sup&gt;18&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(19) Journal of the American Chemical Society 1992, 3974.</span></td><td><span class='id-code'>ref-096</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-096"&gt;&#13;
+&lt;sup&gt;19&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(20) Journal of the American Chemical Society 1993, 9858.</span></td><td><span class='id-code'>ref-097</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-097"&gt;&#13;
+&lt;sup&gt;20&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(21) Journal of the American Chemical Society 1997, 3887.</span></td><td><span class='id-code'>ref-098</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-098"&gt;&#13;
+&lt;sup&gt;21&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(22) Journal of the American Chemical Society 2001, 749.</span></td><td><span class='id-code'>ref-099</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(23) Journal of the American Chemical Society 2001, 6543.</span></td><td><span class='id-code'>ref-100</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-100"&gt;&#13;
+&lt;sup&gt;23&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(24) Polymers 2016, 140.</span></td><td><span class='id-code'>ref-101</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-101"&gt;&#13;
+&lt;sup&gt;24&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(25) Angewadte Chemie International Edition 2007, 6786.</span></td><td><span class='id-code'>ref-102</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-102"&gt;&#13;
+&lt;sup&gt;25&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(26) Green Chemistry 2012, 2012.</span></td><td><span class='id-code'>ref-103</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-103"&gt;&#13;
+&lt;sup&gt;26&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(27) ACS Sustainable Chemistry & Engineering 2021, 16450.</span></td><td><span class='id-code'>ref-104</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-104"&gt;&#13;
+&lt;sup&gt;27&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(28) Nature 2011, 461.</span></td><td><span class='id-code'>ref-105</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-105"&gt;&#13;
+&lt;sup&gt;28&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(29) Catalysts 2017, 87.</span></td><td><span class='id-code'>ref-106</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-106"&gt;&#13;
+&lt;sup&gt;29&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(30) Journal of Organic Chemistry 2010, 7905.</span></td><td><span class='id-code'>ref-107</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-107"&gt;&#13;
+&lt;sup&gt;30&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(31) Metathesis Catalysts.  https://media.abcr.com/pdf/strem-metathesis-catalysts.pdf, last checked </span></td><td><span class='id-code'>ref-108</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-108"&gt;&#13;
+&lt;sup&gt;31&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(32) Metathesis. www.sigmaaldrich.com/US/en/technical-documents/technical-article/chemistry-and-synt</span></td><td><span class='id-code'>ref-109</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-109"&gt;&#13;
+&lt;sup&gt;32&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(33) Journal of Molecular Catalysis A: Chemical 2013, 45.</span></td><td><span class='id-code'>ref-110</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-110"&gt;&#13;
+&lt;sup&gt;33&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(34) ACS Omega 2016, 714.</span></td><td><span class='id-code'>ref-111</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-111"&gt;&#13;
+&lt;sup&gt;34&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(35) European Respiratory Journal 2006, 563.</span></td><td><span class='id-code'>ref-112</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-112"&gt;&#13;
+&lt;sup&gt;35&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(36) Sexual Medicine Reviews 2019, 115.</span></td><td><span class='id-code'>ref-113</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-113"&gt;&#13;
+&lt;sup&gt;36&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(37) Journal of Medicinal Chemistry 2006, 1597.</span></td><td><span class='id-code'>ref-114</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-114"&gt;&#13;
+&lt;sup&gt;37&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(38) Thrombosis Research 1974, 741.</span></td><td><span class='id-code'>ref-115</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-115"&gt;&#13;
+&lt;sup&gt;38&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(39) Current Therapeutic Research, Clinical and Experimental 1964, 14.</span></td><td><span class='id-code'>ref-116</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-116"&gt;&#13;
+&lt;sup&gt;39&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(40) Drugs 2008, 1803.</span></td><td><span class='id-code'>ref-117</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-117"&gt;&#13;
+&lt;sup&gt;40&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(41) Lancet Haemetology 2017, e225.</span></td><td><span class='id-code'>ref-118</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-118"&gt;&#13;
+&lt;sup&gt;41&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(42) Aldrichimica Acta 2017, 17.</span></td><td><span class='id-code'>ref-119</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-119"&gt;&#13;
+&lt;sup&gt;42&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(43) Synthesis 2013, 845.</span></td><td><span class='id-code'>ref-120</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-120"&gt;&#13;
+&lt;sup&gt;43&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(44) Organic Processes Research and Development 2017, 1938.</span></td><td><span class='id-code'>ref-121</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-121"&gt;&#13;
+&lt;sup&gt;44&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(45) Angewadte Chemie International Edition 2006, 2923.</span></td><td><span class='id-code'>ref-122</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-122"&gt;&#13;
+&lt;sup&gt;45&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(46) JACS Au 2022, 2561.</span></td><td><span class='id-code'>ref-123</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-123"&gt;&#13;
+&lt;sup&gt;46&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(47) Applied Catalysis A 2009, 32.</span></td><td><span class='id-code'>ref-124</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-124"&gt;&#13;
+&lt;sup&gt;47&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(48) Bielstein Journal of Organic Chemistry 2011, 1.</span></td><td><span class='id-code'>ref-125</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(49) ChemSusChem 2017, 470.</span></td><td><span class='id-code'>ref-126</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(50) Chemistry A European Journal 2016, 12226.</span></td><td><span class='id-code'>ref-127</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(51) European Journal of Lipid Science and Technology 2011, 39.</span></td><td><span class='id-code'>ref-128</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(52) Green Chemistry 2007, 1356.</span></td><td><span class='id-code'>ref-129</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(53) Green Chemistry 2011, 2911.</span></td><td><span class='id-code'>ref-130</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(54) Green Chemistry 2014, 1579.</span></td><td><span class='id-code'>ref-131</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(55) Monatshefte für Chemie 2012, 669.</span></td><td><span class='id-code'>ref-132</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(56) RSC Advances 2016, 100925.</span></td><td><span class='id-code'>ref-133</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(57) RSC Advances 2014, 55622.</span></td><td><span class='id-code'>ref-134</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-134"&gt;&#13;
+&lt;sup&gt;57&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(58) Catalysts 2020, 904.</span></td><td><span class='id-code'>ref-135</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-135"&gt;&#13;
+&lt;sup&gt;58&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(59) International Advanced Research Journal in Science, Engineering, and Technology 2015, 110.</span></td><td><span class='id-code'>ref-136</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-136"&gt;&#13;
+&lt;sup&gt;59&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(60) RSC Advances 2021, 5659.</span></td><td><span class='id-code'>ref-137</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-137"&gt;&#13;
+&lt;sup&gt;60&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(61) Synthetic Communications 2013, 3224.</span></td><td><span class='id-code'>ref-138</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-138"&gt;&#13;
+&lt;sup&gt;61&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(62) Polymers 2007, 4328.</span></td><td><span class='id-code'>ref-139</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-139"&gt;&#13;
+&lt;sup&gt;62&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(63) Journal of Polymer Science A: Polymer Chemistry 2007, 2328.</span></td><td><span class='id-code'>ref-140</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-140"&gt;&#13;
+&lt;sup&gt;63&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(64) Synthetic Metals 2010, 2284.</span></td><td><span class='id-code'>ref-141</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-141"&gt;&#13;
+&lt;sup&gt;64&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(65) Organometallics 2008, 1479.</span></td><td><span class='id-code'>ref-142</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-142"&gt;&#13;
+&lt;sup&gt;65&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(66) Macromolecules 2002, 7532.</span></td><td><span class='id-code'>ref-143</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-143"&gt;&#13;
+&lt;sup&gt;66&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(67) Journal of the American Chemical Society 2003, 8515.</span></td><td><span class='id-code'>ref-144</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-144"&gt;&#13;
+&lt;sup&gt;67&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(68) Journal of Organic Chemistry 2008, 3088.</span></td><td><span class='id-code'>ref-145</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-145"&gt;&#13;
+&lt;sup&gt;68&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(69) Tetrahedron 1991, 8729.</span></td><td><span class='id-code'>ref-146</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-146"&gt;&#13;
+&lt;sup&gt;69&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(70) Tetrahedron Letters 1995, 6189.</span></td><td><span class='id-code'>ref-147</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-147"&gt;&#13;
+&lt;sup&gt;70&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(71) Organic Letters 2015, 3510.</span></td><td><span class='id-code'>ref-148</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-148"&gt;&#13;
+&lt;sup&gt;71&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(72) Journal of Organic Chemistry 1995, 6062.</span></td><td><span class='id-code'>ref-149</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-149"&gt;&#13;
+&lt;sup&gt;72&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(73) Natural Products Reports 2004, 77.</span></td><td><span class='id-code'>ref-150</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(74) Journal of Natural Products 2007, 451.</span></td><td><span class='id-code'>ref-151</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(75) Journal of Antibiotics 2008, 271.</span></td><td><span class='id-code'>ref-152</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(76) Israeli Journal of Chemistry 2011, 329.</span></td><td><span class='id-code'>ref-153</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-153"&gt;&#13;
+&lt;sup&gt;76&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(77) Angewadte Chemie International Edition 2016, 14518.</span></td><td><span class='id-code'>ref-154</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-154"&gt;&#13;
+&lt;sup&gt;77&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(78) Bioorganic Medicinal Chemistry Letters 1998, 357.</span></td><td><span class='id-code'>ref-155</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-155"&gt;&#13;
+&lt;sup&gt;78&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(79) Synthesis 2012, 3523.</span></td><td><span class='id-code'>ref-156</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-156"&gt;&#13;
+&lt;sup&gt;79&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Akira Suzuki. Biography. www.nobelprize.org/prizes/chemistry/2010/suzuki/biographical/, Last accesse</span></td><td><span class='id-code'>ref-157</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-157"&gt;&#13;
+&lt;sup&gt;1&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Akira Suzuki. Nobel Prize Lecture. www.nobelprize.org/uploads/2018/06/suzuki_lecture.pdf, Last acces</span></td><td><span class='id-code'>ref-158</span></td><td><span class='count-badge'>10</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-158"&gt;&#13;
+&lt;sup&gt;2&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Ei-ichi Negishi. Biographical. www.nobelprize.org/prizes/chemistry/2010/negishi/biographical/, Last </span></td><td><span class='id-code'>ref-159</span></td><td><span class='count-badge'>4</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-159"&gt;&#13;
+&lt;sup&gt;3&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Ei-Ichi Negishi. Nobel Prize Lecture. www.nobelprize.org/uploads/2018/06/negishi_lecture.pdf, Last a</span></td><td><span class='id-code'>ref-160</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-160"&gt;&#13;
+&lt;sup&gt;4&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Laszlo Kürti and Barbara Czakó, Strategic Applications of Named Reactions in Organic Synthesis, Else</span></td><td><span class='id-code'>ref-161</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-161"&gt;&#13;
+&lt;sup&gt;5&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Luke R. Odell and Mats Larhed, Richard F. Heck. Biographical. www.nobelprize.org/prizes/chemistry/20</span></td><td><span class='id-code'>ref-162</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-162"&gt;&#13;
+&lt;sup&gt;6&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>Scientifc Background on the Nobel Prize in Chemistry 2010. palladium-catalyzed cross couplings in or</span></td><td><span class='id-code'>ref-163</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-163"&gt;&#13;
+&lt;sup&gt;7&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(1) Journal of the American Chemical Society 1961, 4023.</span></td><td><span class='id-code'>ref-164</span></td><td><span class='count-badge'>3</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-164"&gt;&#13;
+&lt;sup&gt;8&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(2) Journal of the American Chemical Society 1968, 5538.</span></td><td><span class='id-code'>ref-165</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-165"&gt;&#13;
+&lt;sup&gt;9&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(3) Journal of the American Chemical Society 1968, 5518.</span></td><td><span class='id-code'>ref-166</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-166"&gt;&#13;
+&lt;sup&gt;10&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(4) Journal of the American Chemical Society 1968, 5526.</span></td><td><span class='id-code'>ref-167</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-167"&gt;&#13;
+&lt;sup&gt;11&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(5) Journal of the American Chemical Society 1969, 6707.</span></td><td><span class='id-code'>ref-168</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-168"&gt;&#13;
+&lt;sup&gt;12&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(6) Journal of Organic Chemistry 1972, 2320.</span></td><td><span class='id-code'>ref-169</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-169"&gt;&#13;
+&lt;sup&gt;13&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(7) Journal of Organic Chemistry 1983, 4236.</span></td><td><span class='id-code'>ref-170</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-170"&gt;&#13;
+&lt;sup&gt;14&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(8) Chemistry Select Reviews 2019, 2057.</span></td><td><span class='id-code'>ref-171</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-171"&gt;&#13;
+&lt;sup&gt;15&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(9) Journal of the American Chemical Society 1941, 2316.</span></td><td><span class='id-code'>ref-172</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-172"&gt;&#13;
+&lt;sup&gt;16&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(10) Journal of Organic Chemistry 1952, 1630.</span></td><td><span class='id-code'>ref-173</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-173"&gt;&#13;
+&lt;sup&gt;17&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(11) Journal of the American Chemical Society 1971, 1487.</span></td><td><span class='id-code'>ref-174</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-174"&gt;&#13;
+&lt;sup&gt;18&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(12) Chemical Communications 1972, 144.</span></td><td><span class='id-code'>ref-175</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-175"&gt;&#13;
+&lt;sup&gt;19&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(13) Journal of the American Chemical Society 1972, 4374.</span></td><td><span class='id-code'>ref-176</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(14) Journal of Organometallic Chemistry 1975, C39.</span></td><td><span class='id-code'>ref-177</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-177"&gt;&#13;
+&lt;sup&gt;21&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(15) Chemical Communications 1976, 596.</span></td><td><span class='id-code'>ref-178</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-178"&gt;&#13;
+&lt;sup&gt;22&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(16) Journal of the American Chemical Society 1976, 6729.</span></td><td><span class='id-code'>ref-179</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-179"&gt;&#13;
+&lt;sup&gt;23&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(17) Journal of Organic Chemistry 1977, 1821.</span></td><td><span class='id-code'>ref-180</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-180"&gt;&#13;
+&lt;sup&gt;24&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(18) Chemical Communications 1977, 683.</span></td><td><span class='id-code'>ref-181</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-181"&gt;&#13;
+&lt;sup&gt;25&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(19) Chemical Communications 1973, 606.</span></td><td><span class='id-code'>ref-182</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-182"&gt;&#13;
+&lt;sup&gt;26&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(20) Chemical Communications 1973, 874.</span></td><td><span class='id-code'>ref-183</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-183"&gt;&#13;
+&lt;sup&gt;27&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(21) Tetrahedron Letters 1977, 411.</span></td><td><span class='id-code'>ref-184</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-184"&gt;&#13;
+&lt;sup&gt;28&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(22) Journal of Organometallic Chemistry 2002, 23.</span></td><td><span class='id-code'>ref-185</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-185"&gt;&#13;
+&lt;sup&gt;29&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(23) Journal of the Chemical Society Chemical Communications 1972, 144.</span></td><td><span class='id-code'>ref-186</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-186"&gt;&#13;
+&lt;sup&gt;30&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(24) Journal of the Chemical Society Chemical Communications 1976, 596.</span></td><td><span class='id-code'>ref-187</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-187"&gt;&#13;
+&lt;sup&gt;31&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(25) Accounts of Chemical Research 1982, 340.</span></td><td><span class='id-code'>ref-188</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-188"&gt;&#13;
+&lt;sup&gt;32&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(26) In Aspects of Mechanism and Organometallic Chemistry; Brewster, J. H. Ed., Plenum Press: New Yo</span></td><td><span class='id-code'>ref-189</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-189"&gt;&#13;
+&lt;sup&gt;33&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(27) Chemical Letters 1997, 301.</span></td><td><span class='id-code'>ref-190</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-190"&gt;&#13;
+&lt;sup&gt;34&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(28) Tetrahedron Letters 1979, 3437.</span></td><td><span class='id-code'>ref-191</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(29) Journal of the Chemical Society Chemical Communications 1979, 866.</span></td><td><span class='id-code'>ref-192</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-192"&gt;&#13;
+&lt;sup&gt;36&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(30) Synthetic Communications 1981, 513.</span></td><td><span class='id-code'>ref-193</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-193"&gt;&#13;
+&lt;sup&gt;37&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(31) Synlett 1992, 207.</span></td><td><span class='id-code'>ref-194</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-194"&gt;&#13;
+&lt;sup&gt;38&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(32) Acta Chimica Scandinavica 1973, 521.</span></td><td><span class='id-code'>ref-195</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-195"&gt;&#13;
+&lt;sup&gt;39&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(33) Molecules 2020, 5506.</span></td><td><span class='id-code'>ref-196</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-196"&gt;&#13;
+&lt;sup&gt;40&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(34) Journal of Organic Chemistry 2003, 5660.</span></td><td><span class='id-code'>ref-197</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-197"&gt;&#13;
+&lt;sup&gt;41&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(35) Angewandte Chemie International Edition 2003, 4856.</span></td><td><span class='id-code'>ref-198</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-198"&gt;&#13;
+&lt;sup&gt;42&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(36) Angewandte Chemie International Edition 2003, 1407.</span></td><td><span class='id-code'>ref-199</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-199"&gt;&#13;
+&lt;sup&gt;43&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(37) Journal of Organic Chemistry 2005, 161.</span></td><td><span class='id-code'>ref-200</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-200"&gt;&#13;
+&lt;sup&gt;44&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(38) Journal of Organic Chemistry 2008, 3854.</span></td><td><span class='id-code'>ref-201</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-201"&gt;&#13;
+&lt;sup&gt;45&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(39) Tetrahedron Letters 2006, 1909.</span></td><td><span class='id-code'>ref-202</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-202"&gt;&#13;
+&lt;sup&gt;46&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(40) Synlett 2006, 2953.</span></td><td><span class='id-code'>ref-203</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-203"&gt;&#13;
+&lt;sup&gt;47&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(41) Nature Reviews Chemistry 2020, 584.</span></td><td><span class='id-code'>ref-204</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-204"&gt;&#13;
+&lt;sup&gt;48&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(42) Current Organic Chemistry 2004, 781.</span></td><td><span class='id-code'>ref-205</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-205"&gt;&#13;
+&lt;sup&gt;49&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(43) Advanced Synthesis & Catalysis 2007, 1533.</span></td><td><span class='id-code'>ref-206</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-206"&gt;&#13;
+&lt;sup&gt;50&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(44) Chemical Reviews 2015, 9587.</span></td><td><span class='id-code'>ref-207</span></td><td><span class='count-badge'>2</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-207"&gt;&#13;
+&lt;sup&gt;51&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(45) Journal of the American Chemical Society 2022, 15026.</span></td><td><span class='id-code'>ref-208</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(46) Journal of the American Chemical Society 2018, 11067.</span></td><td><span class='id-code'>ref-209</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(47) Journal of the American Chemical Society 2008, 2756.</span></td><td><span class='id-code'>ref-210</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-210"&gt;&#13;
+&lt;sup&gt;54&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(48) Applied Organometallic Chemistry 2018, e4271.</span></td><td><span class='id-code'>ref-211</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-211"&gt;&#13;
+&lt;sup&gt;55&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(49) Knowledge 2023, 1.</span></td><td><span class='id-code'>ref-212</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-212"&gt;&#13;
+&lt;sup&gt;56&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(50) Journal of the American Chemical Society 2022, 4819.</span></td><td><span class='id-code'>ref-213</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-213"&gt;&#13;
+&lt;sup&gt;57&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(51) Angewandte Chemie International Edition 2019, 4515.</span></td><td><span class='id-code'>ref-214</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-214"&gt;&#13;
+&lt;sup&gt;58&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(52) Angewandte Chemie International Edition 2020, 13253.</span></td><td><span class='id-code'>ref-215</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-215"&gt;&#13;
+&lt;sup&gt;59&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(53) Chemical Science 2021, 2931.</span></td><td><span class='id-code'>ref-216</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-216"&gt;&#13;
+&lt;sup&gt;60&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(54) Nature Communications 2020, 3878.</span></td><td><span class='id-code'>ref-217</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-217"&gt;&#13;
+&lt;sup&gt;61&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(55) Science 2022, 399.</span></td><td><span class='id-code'>ref-218</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-218"&gt;&#13;
+&lt;sup&gt;62&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(56) Angewandte Chemie International Edition 2018, 4192.</span></td><td><span class='id-code'>ref-219</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-219"&gt;&#13;
+&lt;sup&gt;63&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(57) Nature 2022, 92.</span></td><td><span class='id-code'>ref-220</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-220"&gt;&#13;
+&lt;sup&gt;64&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(58) Chemical Communications 2019, 1128.</span></td><td><span class='id-code'>ref-221</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-221"&gt;&#13;
+&lt;sup&gt;65&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(59) Nature Communications 2017, 15762.</span></td><td><span class='id-code'>ref-222</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-222"&gt;&#13;
+&lt;sup&gt;66&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(60) Science and Technology of Advanced Materials 2014, 044201.</span></td><td><span class='id-code'>ref-223</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-223"&gt;&#13;
+&lt;sup&gt;67&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(61) Organic Chemistry Frontiers 2015, 416.</span></td><td><span class='id-code'>ref-224</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-224"&gt;&#13;
+&lt;sup&gt;68&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(62) Angewandte Chemie International Edition 2005, 4442.</span></td><td><span class='id-code'>ref-225</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-225"&gt;&#13;
+&lt;sup&gt;69&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(63) European Journal of Organic Chemistry 2021, 2057.</span></td><td><span class='id-code'>ref-226</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-226"&gt;&#13;
+&lt;sup&gt;70&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(64) Natural Products Reports 2021, 1109.</span></td><td><span class='id-code'>ref-227</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-227"&gt;&#13;
+&lt;sup&gt;71&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(65) Molecular Diversity 2022, 647.</span></td><td><span class='id-code'>ref-228</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-228"&gt;&#13;
+&lt;sup&gt;72&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(66) Indo Global Journal of Pharmaceutical Sciences 2012, 351.</span></td><td><span class='id-code'>ref-229</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-229"&gt;&#13;
+&lt;sup&gt;73&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(67) Journal of the Brazilian Chemical Society 2014, 2186.</span></td><td><span class='id-code'>ref-230</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-230"&gt;&#13;
+&lt;sup&gt;74&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(68) Journal of Agricultural and Food Chemistry 2018, 8914.</span></td><td><span class='id-code'>ref-231</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-231"&gt;&#13;
+&lt;sup&gt;75&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(69) Journal of the American Chemical Society 2022, 20955.</span></td><td><span class='id-code'>ref-232</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(70) New England Journal of Medicine 2023, 710.</span></td><td><span class='id-code'>ref-233</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-233"&gt;&#13;
+&lt;sup&gt;77&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(71) Organic Processes Research and Development 2003, 436.</span></td><td><span class='id-code'>ref-234</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-234"&gt;&#13;
+&lt;sup&gt;78&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(72) Journal of Organic Chemistry 2013, 12338.</span></td><td><span class='id-code'>ref-235</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-235"&gt;&#13;
+&lt;sup&gt;79&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(73) Chinese Chemical Letters 2006, 461.</span></td><td><span class='id-code'>ref-236</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-236"&gt;&#13;
+&lt;sup&gt;80&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(74) Flurbiprofen (oral route). www.mayoclinic.org/drugs-supplements/flurbiprofen-oral-route/descrip</span></td><td><span class='id-code'>ref-237</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-237"&gt;&#13;
+&lt;sup&gt;81&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(75) Synthetic Letters 2012, 1564.</span></td><td><span class='id-code'>ref-238</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-238"&gt;&#13;
+&lt;sup&gt;82&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(76) Journal of Medicinal Chemistry 2008, 627.</span></td><td><span class='id-code'>ref-239</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-239"&gt;&#13;
+&lt;sup&gt;83&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(77) Organic Processes Research and Development 2012, 1897.</span></td><td><span class='id-code'>ref-240</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(78) Organic Processes Research and Development 2013, 907.</span></td><td><span class='id-code'>ref-241</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-241"&gt;&#13;
+&lt;sup&gt;85&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(79) AIDS 2021, 1907.</span></td><td><span class='id-code'>ref-242</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-242"&gt;&#13;
+&lt;sup&gt;86&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(80) Organic Processes Research and Development 2013, 651.</span></td><td><span class='id-code'>ref-243</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-243"&gt;&#13;
+&lt;sup&gt;87&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(81) Journal of Organic Chemistry 2012, 6340.</span></td><td><span class='id-code'>ref-244</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-244"&gt;&#13;
+&lt;sup&gt;88&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(82) Organic Processes Research and Development 2011, 673.</span></td><td><span class='id-code'>ref-245</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-245"&gt;&#13;
+&lt;sup&gt;89&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(83) Yuki Gosei Kagaku Kyokaishi 2003, 2.</span></td><td><span class='id-code'>ref-246</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(84) Pub source; assignee: country, 1990; Vol. version number, p pages.</span></td><td><span class='id-code'>ref-247</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-247"&gt;&#13;
+&lt;sup&gt;91&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(85) Brighton Crop Protection Conference WEeds, British Crop Protection Council 1993, 35.</span></td><td><span class='id-code'>ref-248</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-248"&gt;&#13;
+&lt;sup&gt;92&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(86) Japanese Kokai Tokkyo 2010, JP2017206453A.</span></td><td><span class='id-code'>ref-249</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(87) Shuhei Kubota. Manufacturing method of pyrazole derivative and intermediate products thereof. 2</span></td><td><span class='id-code'>ref-250</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(88) PCT International Applications 2009, WO2009135598A1.</span></td><td><span class='id-code'>ref-251</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-251"&gt;&#13;
+&lt;sup&gt;95&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(89) Pesticide Biochemistry Physiology 2012, 171.</span></td><td><span class='id-code'>ref-252</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-252"&gt;&#13;
+&lt;sup&gt;96&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(90) Julius-Kühn-Archiv 2010, 142.</span></td><td><span class='id-code'>ref-253</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-253"&gt;&#13;
+&lt;sup&gt;97&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(91) Bioactive Heterocyclic Compound Classes: Agrochemicals; Wiley VCH Verlag GMBH and Co., 2012.</span></td><td><span class='id-code'>ref-254</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-254"&gt;&#13;
+&lt;sup&gt;98&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(92) European Journal of Organic Chemistry 2017, 6566.</span></td><td><span class='id-code'>ref-255</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-255"&gt;&#13;
+&lt;sup&gt;99&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(93) Farming Zhuanli Shenquig 2015, CN104529786A.</span></td><td><span class='id-code'>ref-256</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-256"&gt;&#13;
+&lt;sup&gt;100&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(94) PCT International Applications 2009, WO2009156359A2.</span></td><td><span class='id-code'>ref-257</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-257"&gt;&#13;
+&lt;sup&gt;101&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(95) Nantong Jiahe Chemical Co Ltd. East China University of Science and Technology , CN107382734A. </span></td><td><span class='id-code'>ref-258</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-258"&gt;&#13;
+&lt;sup&gt;102&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(96) Bioorganic & Medical Chemistry 2016, 317.</span></td><td><span class='id-code'>ref-259</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-259"&gt;&#13;
+&lt;sup&gt;103&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(97) PCT International Applications 2010, WO2010094736A1.</span></td><td><span class='id-code'>ref-260</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-260"&gt;&#13;
+&lt;sup&gt;104&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(98) Organic Reactions 2002, 157.</span></td><td><span class='id-code'>ref-261</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-261"&gt;&#13;
+&lt;sup&gt;105&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(99) Journal of Organic Chemistry 2013, 10885.</span></td><td><span class='id-code'>ref-262</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-262"&gt;&#13;
+&lt;sup&gt;106&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(100) Organic Letters 2016, 1908.</span></td><td><span class='id-code'>ref-263</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-263"&gt;&#13;
+&lt;sup&gt;107&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(101) Journal of Organic Chemistry 2018, 4554.</span></td><td><span class='id-code'>ref-264</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-264"&gt;&#13;
+&lt;sup&gt;108&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(102) Organic Letters 2009, 2421.</span></td><td><span class='id-code'>ref-265</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-265"&gt;&#13;
+&lt;sup&gt;109&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(103) Journal of Cellular Biochemistry 2012, 440.</span></td><td><span class='id-code'>ref-266</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-266"&gt;&#13;
+&lt;sup&gt;110&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(104) Chemistry Letters 2014, 287.</span></td><td><span class='id-code'>ref-267</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-267"&gt;&#13;
+&lt;sup&gt;111&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(105) Bioorganic & Medical Chemistry 2017, 1622.</span></td><td><span class='id-code'>ref-268</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-268"&gt;&#13;
+&lt;sup&gt;112&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(106) Journal of Natural Products 2008, 1732.</span></td><td><span class='id-code'>ref-269</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(107) Interdisciplinary Sciences: Computational Life Sciences 2014, 187.</span></td><td><span class='id-code'>ref-270</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-270"&gt;&#13;
+&lt;sup&gt;114&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(108) RSC Advances 2015, 70985.</span></td><td><span class='id-code'>ref-271</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-271"&gt;&#13;
+&lt;sup&gt;115&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(109) Journal of Organometallic Chemistry 2020, 121093.</span></td><td><span class='id-code'>ref-272</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="bibr" rid="ref-272"&gt;&#13;
+&lt;sup&gt;116&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>(110) Journal of Organic Chemistry 2019, 2920.</span></td><td><span class='id-code'>ref-273</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(111) Chemistry: A European Journal 2018, 16770.</span></td><td><span class='id-code'>ref-274</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(112) Journal of the American Chemical Society 1990, 4061.</span></td><td><span class='id-code'>ref-275</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(113) Tetrahedron 1992, 3001.</span></td><td><span class='id-code'>ref-276</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(114) Nature Chemical Biology 2017, 916.</span></td><td><span class='id-code'>ref-277</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(115) Organic Letters 1999, 1823.</span></td><td><span class='id-code'>ref-278</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr><tr><td><span class='label-text'>(116) ChemBioChem 2000, 171.</span></td><td><span class='id-code'>ref-279</span></td><td><span class='count-badge'>0</span></td><td><div class='citation-box'>No citations found</div></td></tr></tbody></table></div><div id='Nf0e2b0c9_8fb7_4390_8a3c_9d151a1aaa1c_fn' class='tab-content'><table><thead><tr><th>Label</th><th>Element ID</th><th>Cites</th><th>Sample Citation XML</th></tr></thead><tbody><tr><td><span class='label-text'>1</span></td><td><span class='id-code'>en1</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en1"&gt;&#13;
+&lt;sup&gt;1&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>2</span></td><td><span class='id-code'>en2</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en2"&gt;&#13;
+&lt;sup&gt;2&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>3</span></td><td><span class='id-code'>en3</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en3"&gt;&#13;
+&lt;sup&gt;3&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>4</span></td><td><span class='id-code'>en4</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en4"&gt;&#13;
+&lt;sup&gt;4&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>5</span></td><td><span class='id-code'>en5</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en5"&gt;&#13;
+&lt;sup&gt;5&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>6</span></td><td><span class='id-code'>en6</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en6"&gt;&#13;
+&lt;sup&gt;6&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>7</span></td><td><span class='id-code'>en7</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en7"&gt;&#13;
+&lt;sup&gt;7&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>8</span></td><td><span class='id-code'>en8</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en8"&gt;&#13;
+&lt;sup&gt;8&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>9</span></td><td><span class='id-code'>en9</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en9"&gt;&#13;
+&lt;sup&gt;9&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>10</span></td><td><span class='id-code'>en10</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en10"&gt;&#13;
+&lt;sup&gt;10&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>11</span></td><td><span class='id-code'>en11</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en11"&gt;&#13;
+&lt;sup&gt;11&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>12</span></td><td><span class='id-code'>en12</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en12"&gt;&#13;
+&lt;sup&gt;12&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>13</span></td><td><span class='id-code'>en13</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en13"&gt;&#13;
+&lt;sup&gt;13&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>14</span></td><td><span class='id-code'>en14</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en14"&gt;&#13;
+&lt;sup&gt;14&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>15</span></td><td><span class='id-code'>en15</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en15"&gt;&#13;
+&lt;sup&gt;15&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>16</span></td><td><span class='id-code'>en16</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en16"&gt;&#13;
+&lt;sup&gt;16&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>17</span></td><td><span class='id-code'>en17</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en17"&gt;&#13;
+&lt;sup&gt;17&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>18</span></td><td><span class='id-code'>en18</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en18"&gt;&#13;
+&lt;sup&gt;18&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>19</span></td><td><span class='id-code'>en19</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en19"&gt;&#13;
+&lt;sup&gt;19&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>20</span></td><td><span class='id-code'>en20</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en20"&gt;&#13;
+&lt;sup&gt;20&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>21</span></td><td><span class='id-code'>en21</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en21"&gt;&#13;
+&lt;sup&gt;21&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>22</span></td><td><span class='id-code'>en22</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en22"&gt;&#13;
+&lt;sup&gt;22&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>23</span></td><td><span class='id-code'>en23</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en23"&gt;&#13;
+&lt;sup&gt;23&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>24</span></td><td><span class='id-code'>en24</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en24"&gt;&#13;
+&lt;sup&gt;24&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>25</span></td><td><span class='id-code'>en25</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en25"&gt;&#13;
+&lt;sup&gt;25&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr><tr><td><span class='label-text'>26</span></td><td><span class='id-code'>en26</span></td><td><span class='count-badge'>1</span></td><td><div class='citation-box'>&lt;xref ref-type="endnote" rid="en26"&gt;&#13;
+&lt;sup&gt;26&lt;/sup&gt;&#13;
+&lt;/xref&gt;</div></td></tr></tbody></table></div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p>Generated by Impact Unified Analyzer v3.0 | &copy; 2025</p>
+        <p style="margin-top: 10px; font-size: 0.75rem;">Advanced DOM & Regex Analysis Engine</p>
+    </div>
+
+    <script>
+        function openTab(evt, docId, tabName) {
+            // Get all tabs within the current doc section
+            const section = evt.currentTarget.closest('.doc-content-wrapper');
+            if (!section) return;
+
+            const tabContents = section.querySelectorAll('.tab-content');
+            const tabBtns = section.querySelectorAll('.tab-btn');
+
+            // Hide all tabs and deactivate buttons
+            tabContents.forEach(tab => tab.classList.remove('active'));
+            tabBtns.forEach(btn => btn.classList.remove('active'));
+
+            // Show selected tab and activate button
+            const targetTab = document.getElementById(docId + '_' + tabName);
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+            evt.currentTarget.classList.add('active');
+        }
+
+        function toggleSection(header) {
+            const section = header.closest('.doc-section');
+            section.classList.toggle('collapsed');
+        }
+
+        // Auto-activate first tab in each section
+        document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+            if (idx === 0 && !btn.classList.contains('active')) {
+                btn.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

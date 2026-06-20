@@ -63,6 +63,7 @@ class SearchApp {
         const daysInput = document.getElementById('daysInput').value;
         const dateInput = document.getElementById('dateInput').value;
         const rootFolder = document.getElementById('rootFolderInput').value.trim();
+        const outputFolder = document.getElementById('outputFolderInput').value.trim();
 
         const requestBody = {};
 
@@ -80,6 +81,9 @@ class SearchApp {
         if (rootFolder) {
             requestBody.root_folder = rootFolder;
         }
+        if (outputFolder) {
+            requestBody.output_folder = outputFolder;
+        }
 
         this.showLoading(true);
 
@@ -93,7 +97,8 @@ class SearchApp {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await this.readErrorDetail(response);
+                throw new Error(errorData || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
@@ -104,6 +109,15 @@ class SearchApp {
             this.showToast('Error fetching documents: ' + error.message, 'error');
         } finally {
             this.showLoading(false);
+        }
+    }
+
+    async readErrorDetail(response) {
+        try {
+            const payload = await response.json();
+            return payload.detail || payload.message || '';
+        } catch (error) {
+            return '';
         }
     }
 
@@ -139,8 +153,8 @@ class SearchApp {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                const errorData = await this.readErrorDetail(response);
+                throw new Error(errorData || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
@@ -194,8 +208,8 @@ class SearchApp {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                const errorData = await this.readErrorDetail(response);
+                throw new Error(errorData || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
@@ -241,6 +255,8 @@ class SearchApp {
             batchList.appendChild(batchItem);
         });
 
+        document.getElementById('batchFileInput').value = data.batches[0];
+
         resultsContainer.classList.remove('hidden');
     }
 
@@ -255,6 +271,10 @@ class SearchApp {
         skippedCount.textContent = data.skipped || 0;
         totalCount.textContent = data.total || 0;
         destPath.textContent = data.destination || 'N/A';
+
+        if (data.destination) {
+            document.getElementById('batchFolderInput').value = data.destination;
+        }
 
         resultsContainer.classList.remove('hidden');
     }

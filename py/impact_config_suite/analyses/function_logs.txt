@@ -1,0 +1,36 @@
+2026-06-20 15:19:14 - START: __init__
+2026-06-20 15:19:14 - END: __init__ (0.0152s)
+2026-06-20 15:19:14 - START: analyze
+2026-06-20 15:19:14 - START: __init__
+2026-06-20 15:19:14 - END: __init__ (0.0337s)
+2026-06-20 15:19:14 - START: extract
+2026-06-20 15:19:14 - END: extract (0.0060s)
+2026-06-20 15:19:14 - START: extract_all
+2026-06-20 15:19:14 - END: extract_all (0.0145s)
+2026-06-20 15:19:14 - START: extract
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0009s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0006s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0006s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0007s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0012s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0004s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0005s)
+2026-06-20 15:19:14 - START: get_title_text
+2026-06-20 15:19:14 - END: get_title_text (0.0007s)
+2026-06-20 15:19:14 - END: extract (0.0156s)
+2026-06-20 15:19:14 - END: analyze (0.0800s)
+2026-06-20 15:19:14 - START: build_doc_blocks
+2026-06-20 15:19:14 - END: build_doc_blocks (0.0010s)
+2026-06-20 15:19:14 - START: __init__
+2026-06-20 15:19:14 - END: __init__ (0.0015s)
+2026-06-20 15:19:14 - START: analyze
+2026-06-20 15:19:14 - END: analyze (0.0019s)
+2026-06-20 15:19:14 - START: build_doc_blocks
+2026-06-20 15:19:14 - END: build_doc_blocks (0.0014s)

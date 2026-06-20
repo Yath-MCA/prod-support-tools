@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>CKEditor Word Boundary Test</title>
+    <script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
+    <style>
+        .cke_editable {
+            font-family: "Segoe UI", Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            padding: 12px;
+            border: 2px solid #444;
+            border-radius: 6px;
+            background: #fdfdfd;
+            color: #222;
+        }
+
+        #selection-info {
+
+            top: 20px;
+            left: 20px;
+            background: #222;
+            color: #fff;
+            font-family: monospace;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 9999;
+            white-space: pre;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="selection-info">Start: 0 | End: 0 | WordComplete: ?</div>
+    <textarea name="editor1">
+    <p>This is sample text for testing selection indices.</p>
+    <p>Try selecting a <strong>word</strong> or part of a word to see offsets.</p>
+    <p>Inline <em>formatting</em> and <span data-hid="true">special spans</span> are included.</p>
+  </textarea>
+
+    <script>
+        var editor = CKEDITOR.replace('editor1');
+
+        // --- Common Methods ---
+        var commonMethods = {};
+
+        commonMethods.isExtendedWordChar = function(ch) {
+            if (/\s/.test(ch)) return false;
+            return /[A-Za-z0-9~!@#$%\^&\*\(\)_\+<>?"\:}{\[\]';\/\.,\u00B0\u02B9\u2032\u2033\u2013\u2014\u2012\u002D\u00AD\u2212\u02D0\u2070\u02DA\u0374\uFE63\uFF0D\u2010\u2011\u207B\u208B\u00D7\u00F7\u003D\u221A\u2260\u2264\u2265\u2202\u03C0\u222B\u2211\u00B1\u00B7\+\-\*\/\^\.]/.test(ch);
+        };
+        // var printWord = "Start: " + startOffset + " | End: " + endOffset + " | WordComplete: " + isCompleteWord;
+        // printWord += " | NextWordStart: " + nextOffset;
+
+        // ✅ Collapse caret
+        commonMethods.setCollapsedSelection = function(editor, selection, node, options = {}) {
+            var {
+                before = false, toStart = false, toEnd = false, offset = 0
+            } = options;
+            const updatedRange = editor.createRange();
+
+            if (before || toStart) {
+                updatedRange.setStartAt(node, CKEDITOR.POSITION_BEFORE_START);
+            } else if (toEnd) {
+                if (node.type === CKEDITOR.NODE_TEXT) {
+                    updatedRange.setStart(node, node.getText().length);
+                } else {
+                    updatedRange.setStart(node, node.getChildCount());
+                }
+            } else {
+                updatedRange.setStart(node, offset);
+            }
+            updatedRange.collapse(true);
+            selection.selectRanges([updatedRange]);
+            return true;
+        };
+
+        // ✅ Whitespace absorption
+        commonMethods.absorbWhitespace = function(editor) {
+            const selection = editor.getSelection();
+            if (!selection) return false;
+            const range = selection.getRanges()[0];
+            if (!range || range.collapsed) return false;
+
+            let changed = false;
+            let {
+                startContainer,
+                startOffset,
+                endContainer,
+                endOffset
+            } = range;
+
+            if (startContainer && startContainer.type === CKEDITOR.NODE_TEXT) {
+                const text = startContainer.getText();
+                let i = startOffset;
+                while (i < text.length && /\s/.test(text.charAt(i))) i++;
+                if (i !== startOffset) {
+                    range.setStart(startContainer, i);
+                    changed = true;
+                }
+            }
+
+            if (endContainer && endContainer.type === CKEDITOR.NODE_TEXT) {
+                const text = endContainer.getText();
+                let i = endOffset - 1;
+                while (i >= 0 && /\s/.test(text.charAt(i))) i--;
+                const newEnd = i + 1;
+                if (newEnd !== endOffset) {
+                    range.setEnd(endContainer, newEnd);
+                    changed = true;
+                }
+            }
+
+            if (changed) selection.selectRanges([range]);
+            return changed;
+        };
+
+        // ✅ Final normalize with all logic
+        commonMethods.normalizeSelectionToNearestWordBoundary = function(editor, options = {}) {
+            const selection = editor.getSelection();
+            const range = selection.getRanges()[0];
+            if (!range) return false;
+
+            let container = range.endContainer;
+            let startOffset = range.startOffset;
+            let endOffset = range.endOffset;
+
+            // --- Block boundary checks ---
+            // const {
+            //     ISEndOfBlock,
+            //     ISstartOfBlock
+            // } = IMPACT_SELECTION || {};
+            var ISstartOfBlock = range.checkStartOfBlock() || false;
+            var ISEndOfBlock = range.checkEndOfBlock() || false;
+
+            if (ISstartOfBlock || ISEndOfBlock) {
+                commonMethods.setCollapsedSelection(editor, selection, container, {
+                    toStart: ISstartOfBlock,
+                    toEnd: ISEndOfBlock,
+                    offset: 0
+                });
+                console.log("Block boundary collapse:", ISstartOfBlock ? "start" : "end");
+                return true;
+            }
+
+            // Resolve to text node
+            if (container.type === CKEDITOR.NODE_ELEMENT) {
+                const child = container.getChild(endOffset) || container.getFirst(CKEDITOR.NODE_TEXT);
+                if (child && child.type === CKEDITOR.NODE_TEXT) {
+                    container = child;
+                    startOffset = 0;
+                    endOffset = child.getText().length;
+                } else return false;
+            }
+            if (container.type !== CKEDITOR.NODE_TEXT) return false;
+
+            const text = container.getText();
+            let isCompleteWord = true;
+
+            // --- Right boundary check only ---
+            if (endOffset < text.length && commonMethods.isExtendedWordChar(text.charAt(endOffset))) {
+                isCompleteWord = false;
+            }
+            if (endOffset < text.length && /\s/.test(text.charAt(endOffset))) {
+                isCompleteWord = false;
+            }
+            if (range.checkEndOfBlock()) {
+                isCompleteWord = true;
+            }
+
+            // console.log("StartOffset:", startOffset, "EndOffset:", endOffset, "isCompleteWord:", isCompleteWord);
+            var printWord = "Start: " + startOffset + " | End: " + endOffset + " | WordComplete: " + isCompleteWord;
+
+            // --- First word logic ---
+            const parent = container.getParent();
+            let firstWord = null;
+            if (parent && typeof parent.getFirst === 'function') {
+                firstWord = parent.getFirst();
+                if (firstWord && firstWord.type === CKEDITOR.NODE_ELEMENT && firstWord.hasAttribute('data-pi')) {
+                    firstWord = firstWord.getNext();
+                }
+            }
+            const isFirstWord = firstWord && typeof firstWord.equals === 'function' && firstWord.equals(container);
+            if (isFirstWord) {
+                commonMethods.setCollapsedSelection(editor, selection, container, {
+                    toStart: true
+                });
+                console.log("Collapsed to first word start");
+                return true;
+            }
+
+            // --- Walker logic ---
+            const walker = new CKEDITOR.dom.walker(range);
+            walker.evaluator = function(node) {
+                return (
+                    node.type === CKEDITOR.NODE_TEXT ||
+                    (node.type === CKEDITOR.NODE_ELEMENT && node.hasAttribute('data-hid'))
+                );
+            };
+            walker.guard = function(node) {
+                return !(
+                    node.type === CKEDITOR.NODE_COMMENT ||
+                    (node.type === CKEDITOR.NODE_TEXT && !node.getText().trim())
+                );
+            };
+
+            // --- If not complete, collapse to end and log next word start ---
+            if (!isCompleteWord) {
+                let nextOffset = endOffset;
+                while (nextOffset < text.length && !commonMethods.isExtendedWordChar(text.charAt(nextOffset))) {
+                    nextOffset++;
+                }
+                // console.log("NextWordStartOffset:", nextOffset);
+                printWord += " | NextWordStart: " + nextOffset;
+                commonMethods.setCollapsedSelection(editor, selection, container, {
+                    toEnd: true
+                });
+            }
+
+            console.log(printWord);
+            document.getElementById('selection-info').textContent = printWord;
+            return true;
+        };
+
+
+        function updateSelectionInfo() {
+            setTimeout(() => {
+                commonMethods.absorbWhitespace(editor);
+                commonMethods.normalizeSelectionToNearestWordBoundary(editor);
+            }, 500);
+
+        }
+        // --- Hook into CKEditor ---
+        editor.on('selectionChange', function() {
+            updateSelectionInfo()
+        });
+
+        editor.on('contentDom', function() {
+            editor.document.on('keyup', updateSelectionInfo);
+            editor.document.on('mouseup', updateSelectionInfo);
+        });
+    </script>
+</body>
+
+</html>

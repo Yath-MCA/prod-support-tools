@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Compare Report</title>
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+  <div class="container">
+    <h1>📊 HTML Compare Report</h1>
+    <p class="meta">{{ summary }} | Generated: {{ generated }}</p>
+
+    <!-- Filters Section -->
+    <div class="filters">
+      <input id="tf" type="text" placeholder="Filter rows by any text..." oninput="af()">
+      <label>Status:</label>
+      <select id="sf" onchange="af()">
+        <option value="">— All —</option>
+      </select>
+      <label>Parent&nbsp;Status:</label>
+      <select id="pf" onchange="af()">
+        <option value="">— All —</option>
+      </select>
+      <span class="count" id="rc"></span>
+    </div>
+
+    <!-- Find Bar -->
+    <div class="find-bar">
+      <span style="font-size:.82rem;color:#475569">🔍 Find:</span>
+      <input id="fi" type="text" placeholder="Find in visible rows..." onkeydown="if(event.key==='Enter')df()">
+      <button class="btn-f" onclick="df()">Find</button>
+      <button class="btn-fn" onclick="fp()">⬆ Prev</button>
+      <button class="btn-fn" onclick="fn()">Next ⬇</button>
+      <button class="btn-cl" onclick="cf()">Clear</button>
+      <span class="mb" id="fc"></span>
+    </div>
+
+    <!-- Main Report Table -->
+    <div class="table-wrap">
+      <table id="main-report-table">
+        <thead>
+          <tr>
+            {% for heading in column_headings %}
+            <th>{{ heading }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {{ rows_body | safe }}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Optional Delmerge Preview Section -->
+    {% if delmerge_section %}
+    {{ delmerge_section | safe }}
+    {% endif %}
+  </div>
+
+  <script src="report.js"></script>
+</body>
+</html>

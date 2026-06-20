@@ -37,8 +37,14 @@ $args = @(
     "--onefile",
     $windowedFlag,
     "--name", $appName,
+    "--collect-submodules", "pymongo",
+    "--collect-submodules", "bson",
+    "--collect-submodules", "uvicorn",
     "--add-data", "cjk_checker\\config.json;cjk_checker",
     "--add-data", "cjk_checker\\templates\\report_template.html;cjk_checker\\templates",
+    "--add-data", "impact_to_ceg.json;.",
+    "--add-data", "search_service\\app\\templates;search_service\\app\\templates",
+    "--add-data", "search_service\\app\\static;search_service\\app\\static",
     $entry
 )
 
@@ -59,6 +65,12 @@ if ($LASTEXITCODE -ne 0) {
 
 $exePath = Join-Path $scriptRoot "dist\\$appName.exe"
 Write-Host "Build completed: $exePath"
+
+$navConfig = Join-Path $scriptRoot "tools_navigation.json"
+if (Test-Path $navConfig) {
+    Copy-Item -Force $navConfig (Join-Path $scriptRoot "dist\\tools_navigation.json")
+    Write-Host "Navigation config copied to dist\\tools_navigation.json"
+}
 
 if ($LegacyRefs) {
     $legacyBuildPath = ""

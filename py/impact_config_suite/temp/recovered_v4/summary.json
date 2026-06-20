@@ -1,0 +1,15 @@
+{
+  "exe": "C:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\dist\\IMPACT_ConfigSuite_v4.0.exe",
+  "output": "C:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\temp\\recovered_v4",
+  "total_entries": 4090,
+  "ok_entries": 4090,
+  "error_entries": 0,
+  "pyc_files": 11,
+  "raw_files": 4251,
+  "decompile": {
+    "status": "decompile attempted",
+    "success": 0,
+    "total": 11,
+    "dir": "C:\\_IMPACT\\tomcat\\webapps\\impactweb_live\\untils_automation\\py\\impact_config_suite\\temp\\recovered_v4\\decompiled"
+  }
+}
