@@ -15,6 +15,8 @@ class ElementExtractorTab(ttk.Frame):
     """
     Tkinter Tab for HTML/XML Element Extraction and reporting.
     """
+    DEFAULT_REPORT_FOLDER_NAME = "impact-support-log"
+
     def __init__(self, parent: ttk.Notebook):
         super().__init__(parent)
         self.extractor = ElementExtractor()
@@ -22,6 +24,10 @@ class ElementExtractorTab(ttk.Frame):
         self.cancelled = False
         self.last_report_path = None
         self._build_ui()
+
+    @classmethod
+    def _default_output_dir(cls) -> Path:
+        return Path.home() / "Documents" / cls.DEFAULT_REPORT_FOLDER_NAME
 
     def _build_ui(self):
         # Main container with dark background (blends with existing suite styling)
@@ -317,7 +323,7 @@ class ElementExtractorTab(ttk.Frame):
         output_frame.grid(row=5, column=1, columnspan=2, sticky="ew", pady=5)
         output_frame.columnconfigure(0, weight=1)
 
-        self.output_dir_var = tk.StringVar()
+        self.output_dir_var = tk.StringVar(value=str(self._default_output_dir()))
         self.output_dir_entry = tk.Entry(
             output_frame,
             textvariable=self.output_dir_var,

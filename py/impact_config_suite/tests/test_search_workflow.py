@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from search_service.app.app import app
 from search_service.app.services.file_search import copy_files_for_batch, fetch_doc_ids, search_in_batch
 from core.element_extractor import ElementExtractor
+from element_extractor_tab import ElementExtractorTab
 from search_tab import SearchTab
 from tools_app import CommonToolsApp
 
@@ -265,6 +266,15 @@ class SearchWorkflowTests(unittest.TestCase):
         self.assertEqual(metadata["version"], "9.9.9")
         self.assertEqual(navigation["default_tool"], "analyses")
         self.assertEqual(navigation["categories"][0]["name"], "Analysis")
+
+    def test_element_extractor_default_output_dir_uses_current_user_documents(self) -> None:
+        fake_home = Path(self.temp_dir.name) / "userhome"
+        expected = fake_home / "Documents" / "impact-support-log"
+
+        with patch.object(Path, "home", return_value=fake_home):
+            default_dir = ElementExtractorTab._default_output_dir()
+
+        self.assertEqual(default_dir, expected)
 
     def test_element_extractor_folder_filter(self) -> None:
         source = Path(self.temp_dir.name) / "scan"
