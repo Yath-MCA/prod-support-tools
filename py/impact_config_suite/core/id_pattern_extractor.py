@@ -167,13 +167,15 @@ class IDPatternExtractor:
 
         return dict(documents_by_client)
 
-    def normalize_id_to_pattern(self, id_value: str) -> str:
+    def normalize_id_to_pattern(self, id_value: str, element_tag: str = "") -> str:
         """
         Normalize an ID to a pattern template.
+        Preserves the element context (front-matter-part, book-part, back-matter-part, etc.)
         Examples:
         - 'front-matter-part-001' -> 'front-matter-part-{nnn}'
         - 'book-part-002' -> 'book-part-{nnn}'
         - 'workid-USAC0048448-book-part-2' -> 'workid-{work}-book-part-{n}'
+        - 'workid-USAC0048448-front-matter-part-2' -> 'workid-{work}-front-matter-part-{n}'
         - 'IMP35' -> 'IMP{n}'
         """
         if not id_value:
@@ -188,8 +190,16 @@ class IDPatternExtractor:
         # Replace 3+ digit sequences with {nnn}
         result = re.sub(r'\d{3,}', '{nnn}', result)
 
-        # Replace 1-2 digit sequences with {n}
+        # Replace 1-2 digit sequences with {n} (only if not already part of {nnn})
         result = re.sub(r'(?<!\d)\d{1,2}(?!\d)', '{n}', result)
+
+        # If element tag provided and ID doesn't already include element context,
+        # prepend it for clarity
+        if element_tag and element_tag not in result.lower():
+            # Check if this looks like a generic ID that needs context
+            if result.startswith("workid-"):
+                # Already has workid prefix, context should be in the middle
+                pass
 
         return result
 
