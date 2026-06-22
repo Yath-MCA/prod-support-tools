@@ -27,6 +27,8 @@ class ElementExtractor:
     def __init__(self):
         # In-memory cache: {cache_key: {"mtime": float, "results": list}}
         self._cache = {}
+        # Config cache for doc-title: {config_path: {"mtime": float, "doc_title": str}}
+        self._config_cache = {}
 
     def _cache_key(self, file_path: Path, query_type: str, query_val: str,
                    attr_name: str, attr_val: str) -> str:
@@ -104,15 +106,36 @@ class ElementExtractor:
 
         return fnmatch.fnmatchcase(lowered_name, lowered_filter)
 
-    @staticmethod
-    def _load_impact_config_filters(config_path: Path) -> tuple[str, str]:
+    def _load_impact_config_filters(self, config_path: Path) -> tuple[str, str, str, str, str, str, str]:
+        """Load DTD, client, doc-title, project-title, identifier, link-info, and type from impact_config.xml with caching."""
+        config_path = Path(config_path)
+
+        # Check cache first
+        cached = self._config_cache.get(str(config_path))
+        try:
+            current_mtime = config_path.stat().st_mtime
+        except OSError:
+            current_mtime = 0
+
+        if cached is not None and cached["mtime"] == current_mtime:
+            return (
+                cached["dtd_name"], cached["client_name"], cached["doc_title"],
+                cached["project_title"], cached["identifier"], cached["link_info"], cached["doc_type"]
+            )
+
+        # Parse the config file
         try:
             root = etree.parse(str(config_path)).getroot()
         except Exception:
-            return "", ""
+            return "", "", "", "", "", "", ""
 
         dtd_name = ""
         client_name = ""
+        doc_title = ""
+        project_title = ""
+        identifier = ""
+        link_info = ""
+        doc_type = ""
 
         dtd_node = root.find(".//dtd")
         if dtd_node is not None:
@@ -122,7 +145,40 @@ class ElementExtractor:
         if client_node is not None:
             client_name = (client_node.get("name") or client_node.text or "").strip()
 
-        return dtd_name, client_name
+        doc_title_node = root.find(".//doc-title")
+        if doc_title_node is not None:
+            doc_title = (doc_title_node.text or "").strip()
+
+        project_title_node = root.find(".//project-title")
+        if project_title_node is not None:
+            project_title = (project_title_node.text or "").strip()
+
+        # Read additional metadata fields
+        identifier_node = root.find(".//identifier[@type='isbn']")
+        if identifier_node is not None:
+            identifier = (identifier_node.text or "").strip()
+
+        link_info_node = root.find(".//link-info")
+        if link_info_node is not None:
+            link_info = (link_info_node.text or "").strip()
+
+        type_node = root.find(".//type")
+        if type_node is not None:
+            doc_type = (type_node.text or "").strip()
+
+        # Cache the result
+        self._config_cache[str(config_path)] = {
+            "mtime": current_mtime,
+            "dtd_name": dtd_name,
+            "client_name": client_name,
+            "doc_title": doc_title,
+            "project_title": project_title,
+            "identifier": identifier,
+            "link_info": link_info,
+            "doc_type": doc_type
+        }
+
+        return dtd_name, client_name, doc_title, project_title, identifier, link_info, doc_type
 
     def _matches_config_filters(self, file_path: Path, dtd_filter: str, client_filter: str) -> bool:
         dtd_filter = self._normalize_named_filter(dtd_filter)
@@ -134,12 +190,118 @@ class ElementExtractor:
         if not config_path.is_file():
             return False
 
-        dtd_name, client_name = self._load_impact_config_filters(config_path)
+        # Now returns 7 values: dtd_name, client_name, doc_title, project_title, identifier, link_info, doc_type
+        dtd_name, client_name, _, _, _, _, _ = self._load_impact_config_filters(config_path)
         if dtd_filter and dtd_name.upper() != dtd_filter.upper():
             return False
         if client_filter and client_name.upper() != client_filter.upper():
             return False
         return True
+
+    def get_doc_title(self, file_path: Path) -> str:
+        """
+        Get the doc-title from impact_config.xml in the file's parent directory.
+        Uses caching to avoid repeated parsing.
+
+        Args:
+            file_path: Path to the HTML/XML file
+
+        Returns:
+            The doc-title string, or empty string if not found
+        """
+        file_path = Path(file_path)
+        config_path = file_path.parent / "impact_config.xml"
+
+        if not config_path.is_file():
+            return ""
+
+        # _load_impact_config_filters handles caching internally (returns 7 values)
+        _, _, doc_title, _, _, _, _ = self._load_impact_config_filters(config_path)
+        return doc_title
+
+    def get_file_title(self, file_path: Path) -> tuple[str, str]:
+        """
+        Get appropriate title for a file based on its DTD.
+        BITS DTD: returns project-title
+        JATS DTD: returns doc-title
+
+        Returns (title_type, title_value) where title_type is "doc-title", "project-title", or "filename"
+        """
+        file_path = Path(file_path)
+        config_path = file_path.parent / "impact_config.xml"
+
+        if not config_path.is_file():
+            return "filename", file_path.name
+
+        # _load_impact_config_filters returns 7 values
+        dtd, client, doc_title, project_title, identifier, link_info, doc_type = \
+            self._load_impact_config_filters(config_path)
+
+        # Determine title based on DTD
+        if dtd.upper() == "BITS" and project_title:
+            return "project-title", project_title
+        elif dtd.upper() == "JATS" and doc_title:
+            return "doc-title", doc_title
+        elif doc_title:  # Default fallback
+            return "doc-title", doc_title
+        elif project_title:
+            return "project-title", project_title
+        else:
+            return "filename", file_path.name
+
+    def clear_config_cache(self) -> None:
+        """Clear the impact_config.xml cache."""
+        self._config_cache.clear()
+
+    def get_file_metadata(self, file_path: Path) -> dict[str, str]:
+        """
+        Get all metadata for a file from impact_config.xml.
+        Returns dict with keys: dtd, client, doc_title, project_title,
+        identifier, link_info, doc_type
+        """
+        file_path = Path(file_path)
+        config_path = file_path.parent / "impact_config.xml"
+
+        if not config_path.is_file():
+            return {
+                "dtd": "",
+                "client": "",
+                "doc_title": "",
+                "project_title": "",
+                "identifier": "",
+                "link_info": "",
+                "doc_type": ""
+            }
+
+        dtd, client, doc_title, project_title, identifier, link_info, doc_type = \
+            self._load_impact_config_filters(config_path)
+
+        return {
+            "dtd": dtd,
+            "client": client,
+            "doc_title": doc_title,
+            "project_title": project_title,
+            "identifier": identifier,
+            "link_info": link_info,
+            "doc_type": doc_type
+        }
+
+    @staticmethod
+    def format_metadata_line(metadata: dict[str, str]) -> str:
+        """
+        Format metadata as TYPE|CLIENT|LINK-INFO|IDENTIFIER
+        Only includes non-empty values.
+        """
+        parts = [
+            metadata.get("doc_type", ""),
+            metadata.get("client", ""),
+            metadata.get("link_info", ""),
+            metadata.get("identifier", "")
+        ]
+        # Only return if at least one part has value
+        if any(parts):
+            return "|".join(parts)
+        return ""
 
     def parse_and_extract(self, file_path: Path, query_type: str, query_val: str, attr_name: str = "", attr_val: str = ""):
         """
@@ -363,14 +525,16 @@ class ElementExtractor:
         return scan_results, total_matches, total_files
 
     def generate_html_report(self, target_path: str, query_type: str, query_val: str,
-                             attr_name: str, attr_val: str, scan_results: dict,
-                             total_matches: int, total_files: int, is_single_file: bool) -> str:
+                             attr_name: str, attr_val: str, all_selector_results: list,
+                             total_matches: int, total_files: int, is_single_file: bool,
+                             show_outer_xml: bool = True, show_inner_text: bool = True) -> str:
         """
         Generates a premium HTML report containing all the extracted elements.
+        Supports multi-selector results and conditional display of content sections.
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         target_name = os.path.basename(target_path)
-        
+
         # Build query description string
         query_desc = f"{query_type}: <code>{html.escape(query_val)}</code>"
         if query_type == "Tag Name" and attr_name.strip():
@@ -379,27 +543,171 @@ class ElementExtractor:
                 query_desc += f" = <code>{html.escape(attr_val)}</code>"
             query_desc += ")"
 
-        # Generate elements statistics & HTML code
-        file_sections = ""
-        file_index = 0
-        
-        for file_path_str, data in scan_results.items():
-            file_name = os.path.basename(file_path_str)
-            file_uri = Path(file_path_str).as_uri()
-            js_file_path = json.dumps(file_path_str)
-            file_index += 1
-            
-            if not data.get("ok", True):
-                # Error file block
-                err_msg = html.escape(data.get("error", "Unknown parse error"))
+        # Determine if we have multi-selector results
+        is_multi_selector = len(all_selector_results) > 1
+
+        # Generate selector sections for multi-selector mode
+        selector_sections = ""
+        file_global_index = 0
+
+        for selector_idx, selector_data in enumerate(all_selector_results):
+            query_val_single = selector_data.get("query_val", query_val)
+            scan_results = selector_data.get("scan_results", {})
+            selector_matches = selector_data.get("total_matches", 0)
+
+            if is_multi_selector:
+                # Add selector header for multi-selector mode
+                selector_sections += f"""
+                <div class="selector-section">
+                    <div class="selector-header" onclick="toggleSelector('selector-{selector_idx}')">
+                        <span class="toggle-icon">{'▼' if selector_idx == 0 else '▶'}</span>
+                        <span class="selector-badge">{selector_matches} Match(es)</span>
+                        <strong class="selector-name">{html.escape(query_val_single)}</strong>
+                    </div>
+                    <div id="selector-{selector_idx}" class="selector-content" style="display: {'block' if selector_idx == 0 else 'none'}">
+                """
+
+            # Generate file sections for this selector
+            file_sections = ""
+            for file_path_str, data in scan_results.items():
+                file_global_index += 1
+                file_name = os.path.basename(file_path_str)
+                file_uri = Path(file_path_str).as_uri()
+                js_file_path = json.dumps(file_path_str)
+
+                # Get file title info for display
+                title_type, title_value = self.get_file_title(Path(file_path_str))
+                display_title = html.escape(title_value) if title_value else html.escape(file_name)
+                title_badge = f'<span class="title-badge">{html.escape(title_type)}</span>' if title_type != "filename" else ""
+                filename_sub = f'<span class="file-name-sub">{html.escape(file_name)}</span>' if title_type != "filename" else ""
+
+                # Get metadata for display
+                metadata = self.get_file_metadata(Path(file_path_str))
+                metadata_line = self.format_metadata_line(metadata)
+                metadata_html = f'<div class="file-metadata">{html.escape(metadata_line)}</div>' if metadata_line else ""
+
+                if not data.get("ok", True):
+                    # Error file block
+                    err_msg = html.escape(data.get("error", "Unknown parse error"))
+                    file_sections += f"""
+                    <div class="file-card error-card" data-filename="{html.escape(file_name)}">
+                        <div class="file-header" onclick="toggleCard('file-{file_global_index}')">
+                            <div class="file-header-main">
+                                <div class="file-title">
+                                    <span class="toggle-icon">▶</span>
+                                    <span class="file-badge badge-error">Error</span>
+                                    {title_badge}
+                                    <strong>{display_title}</strong>
+                                    {filename_sub}
+                                </div>
+                                <div class="file-actions">
+                                    <a class="file-action-btn" href="{html.escape(file_uri)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>
+                                    <button class="file-action-btn" onclick='copyFilePath({js_file_path}, this, event)'>Copy Path</button>
+                                </div>
+                            </div>
+                            <div class="file-path">{html.escape(file_path_str)}</div>
+                            {metadata_html}
+                        </div>
+                        <div id="file-{file_global_index}" class="file-content" style="display: none;">
+                            <div class="error-box">
+                                <strong>Parsing Failed:</strong> {err_msg}
+                            </div>
+                        </div>
+                    </div>
+                    """
+                    continue
+
+                matches = data.get("matches", [])
+                if not matches:
+                    continue
+
+                match_rows = ""
+                for m_idx, match in enumerate(matches):
+                    line = match["line"]
+                    tag = match["tag"]
+                    attributes = match["attributes"]
+                    text_content = match["text"]
+                    outer_html = match["html"]
+
+                    # Attribute table (always shown)
+                    attr_html = ""
+                    if attributes:
+                        attr_rows = ""
+                        for k, v in attributes.items():
+                            attr_rows += f"""
+                            <tr>
+                                <td class="attr-name">{html.escape(k)}</td>
+                                <td class="attr-val">{html.escape(v)}</td>
+                            </tr>
+                            """
+                        attr_html = f"""
+                        <div class="attr-section">
+                            <span class="section-lbl">Attributes:</span>
+                            <table class="attr-table">
+                                <thead>
+                                    <tr>
+                                        <th>Attribute Name</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {attr_rows}
+                                </tbody>
+                            </table>
+                        </div>
+                        """
+
+                    # Text section (conditional based on show_inner_text flag)
+                    text_section = ""
+                    if show_inner_text and text_content:
+                        # Show full text (removed 300 char truncation)
+                        text_section = f"""
+                        <div class="text-section">
+                            <span class="section-lbl">Inner Text Content:</span>
+                            <div class="text-box">{html.escape(text_content)}</div>
+                        </div>
+                        """
+
+                    # Code section (conditional based on show_outer_xml flag)
+                    code_section = ""
+                    if show_outer_xml:
+                        escaped_code = html.escape(outer_html)
+                        code_section = f"""
+                        <div class="code-section">
+                            <span class="section-lbl">Outer HTML/XML Markup:</span>
+                            <div class="code-wrapper">
+                                <pre><code>{escaped_code}</code></pre>
+                            </div>
+                        </div>
+                        """
+
+                    match_rows += f"""
+                    <div class="match-item" data-tag="{html.escape(tag)}" data-text="{html.escape(text_content)}">
+                        <div class="match-header">
+                            <div class="match-meta">
+                                <span class="match-number">#{m_idx + 1}</span>
+                                <span class="match-badge">Line {line}</span>
+                                <span class="match-tag-badge">&lt;{html.escape(tag)}&gt;</span>
+                            </div>
+                            <button class="copy-btn" onclick="copySnippet(this)">Copy Markup</button>
+                        </div>
+
+                        {attr_html}
+                        {text_section}
+                        {code_section}
+                    </div>
+                    """
+
                 file_sections += f"""
-                <div class="file-card error-card" data-filename="{html.escape(file_name)}">
-                    <div class="file-header" onclick="toggleCard('file-{file_index}')">
+                <div class="file-card" data-filename="{html.escape(file_name)}">
+                    <div class="file-header" onclick="toggleCard('file-{file_global_index}')">
                         <div class="file-header-main">
                             <div class="file-title">
-                                <span class="toggle-icon">▶</span>
-                                <span class="file-badge badge-error">Error</span>
-                                <strong>{html.escape(file_name)}</strong>
+                                <span class="toggle-icon">▼</span>
+                                <span class="file-badge badge-success">{len(matches)} Match(es)</span>
+                                {title_badge}
+                                <strong>{display_title}</strong>
+                                {filename_sub}
                             </div>
                             <div class="file-actions">
                                 <a class="file-action-btn" href="{html.escape(file_uri)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>
@@ -407,116 +715,28 @@ class ElementExtractor:
                             </div>
                         </div>
                         <div class="file-path">{html.escape(file_path_str)}</div>
+                        {metadata_html}
                     </div>
-                    <div id="file-{file_index}" class="file-content" style="display: none;">
-                        <div class="error-box">
-                            <strong>Parsing Failed:</strong> {err_msg}
+                    <div id="file-{file_global_index}" class="file-content">
+                        <div class="matches-list">
+                            {match_rows}
                         </div>
                     </div>
                 </div>
                 """
-                continue
-                
-            matches = data.get("matches", [])
-            if not matches:
-                continue
-                
-            match_rows = ""
-            for m_idx, match in enumerate(matches):
-                line = match["line"]
-                tag = match["tag"]
-                attributes = match["attributes"]
-                text_content = match["text"]
-                outer_html = match["html"]
-                
-                # Attribute table
-                attr_html = ""
-                if attributes:
-                    attr_rows = ""
-                    for k, v in attributes.items():
-                        attr_rows += f"""
-                        <tr>
-                            <td class="attr-name">{html.escape(k)}</td>
-                            <td class="attr-val">{html.escape(v)}</td>
-                        </tr>
-                        """
-                    attr_html = f"""
-                    <div class="attr-section">
-                        <span class="section-lbl">Attributes:</span>
-                        <table class="attr-table">
-                            <thead>
-                                <tr>
-                                    <th>Attribute Name</th>
-                                    <th>Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {attr_rows}
-                            </tbody>
-                        </table>
-                    </div>
-                    """
-                
-                # Text section
-                text_section = ""
-                if text_content:
-                    truncated_text = text_content if len(text_content) <= 300 else text_content[:297] + "..."
-                    text_section = f"""
-                    <div class="text-section">
-                        <span class="section-lbl">Inner Text Content:</span>
-                        <div class="text-box">{html.escape(truncated_text)}</div>
-                    </div>
-                    """
-                
-                # Format code
-                escaped_code = html.escape(outer_html)
-                
-                match_rows += f"""
-                <div class="match-item" data-tag="{html.escape(tag)}" data-text="{html.escape(text_content)}">
-                    <div class="match-header">
-                        <div class="match-meta">
-                            <span class="match-number">#{m_idx + 1}</span>
-                            <span class="match-badge">Line {line}</span>
-                            <span class="match-tag-badge">&lt;{html.escape(tag)}&gt;</span>
-                        </div>
-                        <button class="copy-btn" onclick="copySnippet(this)">Copy Markup</button>
-                    </div>
-                    
-                    {attr_html}
-                    {text_section}
-                    
-                    <div class="code-section">
-                        <span class="section-lbl">Outer HTML/XML Markup:</span>
-                        <div class="code-wrapper">
-                            <pre><code>{escaped_code}</code></pre>
-                        </div>
-                    </div>
+
+            if not file_sections:
+                file_sections = f"""
+                <div class="no-results">
+                    No matching elements found for selector: {html.escape(query_val_single)}
                 </div>
                 """
-                
-            file_sections += f"""
-            <div class="file-card" data-filename="{html.escape(file_name)}">
-                <div class="file-header" onclick="toggleCard('file-{file_index}')">
-                    <div class="file-header-main">
-                        <div class="file-title">
-                            <span class="toggle-icon">▼</span>
-                            <span class="file-badge badge-success">{len(matches)} Match(es)</span>
-                            <strong>{html.escape(file_name)}</strong>
-                        </div>
-                        <div class="file-actions">
-                            <a class="file-action-btn" href="{html.escape(file_uri)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>
-                            <button class="file-action-btn" onclick='copyFilePath({js_file_path}, this, event)'>Copy Path</button>
-                        </div>
-                    </div>
-                    <div class="file-path">{html.escape(file_path_str)}</div>
-                </div>
-                <div id="file-{file_index}" class="file-content">
-                    <div class="matches-list">
-                        {match_rows}
-                    </div>
-                </div>
-            </div>
-            """
+
+            if is_multi_selector:
+                selector_sections += file_sections
+                selector_sections += "</div></div>"  # Close selector-content and selector-section
+            else:
+                selector_sections = file_sections
 
         if not file_sections:
             file_sections = f"""
@@ -547,6 +767,50 @@ class ElementExtractor:
             --warning: #f59e0b;
             --tag-color: #38bdf8;
         }}
+
+        /* Selector Section Styles (for multi-selector mode) */
+        .selector-section {{
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-card);
+        }}
+
+        .selector-header {{
+            padding: 16px 20px;
+            background: rgba(99, 102, 241, 0.1);
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        .selector-header:hover {{
+            background: rgba(99, 102, 241, 0.15);
+        }}
+
+        .selector-badge {{
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }}
+
+        .selector-name {{
+            font-size: 1.1rem;
+            color: var(--primary);
+        }}
+
+        .selector-content {{
+            padding: 20px;
+        }}.
         
         body {{
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -752,6 +1016,31 @@ class ElementExtractor:
             gap: 12px;
             font-size: 1.1rem;
             margin-bottom: 4px;
+            color: #f3f4f6; /* Light color for dark background */
+        }}
+
+        .file-title strong {{
+            color: #f3f4f6; /* Ensure title is light colored */
+        }}
+
+        .title-badge {{
+            font-size: 0.7rem;
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }}
+
+        .file-name-sub {{
+            font-size: 0.85rem;
+            color: #94a3b8; /* Slightly lighter muted color for visibility */
+            font-weight: 400;
+            display: block;
+            margin-top: 4px;
+            margin-left: 28px; /* Align with title content */
         }}
 
         .file-actions {{
@@ -822,7 +1111,16 @@ class ElementExtractor:
             padding-left: 28px;
             word-break: break-all;
         }}
-        
+
+        .file-metadata {{
+            font-size: 0.85rem;
+            color: #38bdf8;  /* Light blue */
+            font-family: 'Consolas', 'Courier New', monospace;
+            padding-left: 28px;
+            margin-top: 4px;
+            letter-spacing: 0.02em;
+        }}
+
         .file-content {{
             padding: 20px;
         }}
@@ -1065,15 +1363,19 @@ class ElementExtractor:
                 <span class="val">{total_files}</span>
             </div>
             <div class="stat-card">
+                <span class="lbl">Selectors Queried</span>
+                <span class="val">{len(all_selector_results)}</span>
+            </div>
+            <div class="stat-card">
                 <span class="lbl">Query Method</span>
                 <span class="val" style="font-size: 1.4rem; padding-top: 4px;">{query_type}</span>
             </div>
-            <div class="stat-card">
-                <span class="lbl">Query Selector</span>
+            <div class="stat-card" style="grid-column: span 2;">
+                <span class="lbl">Query Selector(s)</span>
                 <div class="query-details">{query_desc}</div>
             </div>
         </div>
-        
+
         <!-- Interactive Controls -->
         <div class="controls-panel">
             <div class="search-container">
@@ -1083,16 +1385,16 @@ class ElementExtractor:
                 </svg>
                 <input type="text" id="searchInput" class="search-input" placeholder="Search matches by tag, text, filename, or markup..." oninput="filterResults()">
             </div>
-            
+
             <div class="button-group">
                 <button class="action-btn" onclick="toggleAll(false)">Collapse All</button>
                 <button class="action-btn" onclick="toggleAll(true)">Expand All</button>
             </div>
         </div>
-        
-        <!-- File sections -->
+
+        <!-- Results sections (selector-grouped for multi-selector mode) -->
         <div id="resultsList">
-            {file_sections}
+            {selector_sections}
         </div>
     </div>
     
@@ -1127,6 +1429,33 @@ class ElementExtractor:
                     card.classList.add('collapsed');
                 }}
             }});
+            // Also toggle selector sections
+            const selectors = document.querySelectorAll('.selector-content');
+            const selectorHeaders = document.querySelectorAll('.selector-header');
+            selectors.forEach((content, idx) => {{
+                if (expand) {{
+                    content.style.display = 'block';
+                    const icon = selectorHeaders[idx].querySelector('.toggle-icon');
+                    if (icon) icon.textContent = '▼';
+                }} else {{
+                    content.style.display = 'none';
+                    const icon = selectorHeaders[idx].querySelector('.toggle-icon');
+                    if (icon) icon.textContent = '▶';
+                }}
+            }});
+        }}
+
+        function toggleSelector(id) {{
+            const content = document.getElementById(id);
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            if (content.style.display === 'none') {{
+                content.style.display = 'block';
+                if (icon) icon.textContent = '▼';
+            }} else {{
+                content.style.display = 'none';
+                if (icon) icon.textContent = '▶';
+            }}
         }}
         
         function copySnippet(btn) {{
@@ -1912,3 +2241,499 @@ class ElementExtractor:
 </html>
 """
         return pattern_html
+
+    def generate_consolidated_summary_report(self, all_selector_results: list, target_path: str,
+                                             timestamp_str: str, is_single_file: bool) -> str:
+        """
+        Generates a consolidated summary HTML report with per-selector stats cards and file tables.
+        Inspired by the Patterns tool's consolidated box style.
+        """
+        from datetime import datetime
+        import html
+
+        target_name = os.path.basename(target_path)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Calculate overall stats
+        total_selectors = len(all_selector_results)
+        total_matches = sum(s.get("total_matches", 0) for s in all_selector_results)
+        total_files_scanned = all_selector_results[0].get("total_files", 0) if all_selector_results else 0
+
+        # Generate per-selector stats cards
+        selector_stats_html = ""
+        for selector_data in all_selector_results:
+            query_val = selector_data.get("query_val", "Unknown")
+            scan_results = selector_data.get("scan_results", {})
+            total_matches_selector = selector_data.get("total_matches", 0)
+
+            # Count files with matches for this selector
+            files_with_matches = sum(
+                1 for data in scan_results.values()
+                if data.get("ok", True) and data.get("matches")
+            )
+
+            # Determine card color based on matches
+            if total_matches_selector == 0:
+                card_class = "stat-card-empty"
+            elif total_matches_selector < 10:
+                card_class = "stat-card-low"
+            else:
+                card_class = "stat-card-high"
+
+            selector_stats_html += f"""
+            <div class="consolidated-card {card_class}">
+                <div class="card-header">
+                    <span class="card-icon">🔍</span>
+                    <span class="card-title">{html.escape(query_val)}</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-stat">
+                        <span class="stat-value">{files_with_matches}</span>
+                        <span class="stat-label">/ {total_files_scanned} files</span>
+                    </div>
+                    <div class="card-stat">
+                        <span class="stat-value highlight">{total_matches_selector}</span>
+                        <span class="stat-label">instances</span>
+                    </div>
+                </div>
+            </div>
+            """
+
+        # Generate per-selector file tables
+        selector_tables_html = ""
+        for selector_idx, selector_data in enumerate(all_selector_results):
+            query_val = selector_data.get("query_val", "Unknown")
+            scan_results = selector_data.get("scan_results", {})
+
+            # Build file table rows
+            table_rows = ""
+            for file_path_str, data in scan_results.items():
+                if not data.get("ok", True):
+                    continue
+                matches = data.get("matches", [])
+                if not matches:
+                    continue
+
+                file_name = os.path.basename(file_path_str)
+                instance_count = len(matches)
+                lines = [str(m.get("line", "")) for m in matches]
+                lines_str = ", ".join(lines[:10])
+                if len(lines) > 10:
+                    lines_str += f", ... (+{len(lines) - 10} more)"
+
+                table_rows += f"""
+                <tr>
+                    <td class="col-path">{html.escape(file_path_str)}</td>
+                    <td class="col-filename">{html.escape(file_name)}</td>
+                    <td class="col-count">{instance_count}</td>
+                    <td class="col-lines">{html.escape(lines_str)}</td>
+                </tr>
+                """
+
+            if not table_rows:
+                table_rows = f"""
+                <tr>
+                    <td colspan="4" class="no-data">No matches found for this selector.</td>
+                </tr>
+                """
+
+            selector_tables_html += f"""
+            <div class="selector-table-section">
+                <h3 class="selector-title">📌 {html.escape(query_val)}</h3>
+                <div class="table-wrapper">
+                    <table class="file-table">
+                        <thead>
+                            <tr>
+                                <th class="col-path">File Path</th>
+                                <th class="col-filename">File Name</th>
+                                <th class="col-count">Instances</th>
+                                <th class="col-lines">Line(s)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {table_rows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            """
+
+        summary_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Element Extraction Summary - {html.escape(target_name)}</title>
+    <style>
+        :root {{
+            --bg-main: #0b0f19;
+            --bg-card: #111827;
+            --bg-code: #030712;
+            --bg-input: #1f2937;
+            --border-color: #374151;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --accent: #818cf8;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }}
+
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }}
+
+        header {{
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 24px;
+            margin-bottom: 32px;
+        }}
+
+        h1 {{
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 0;
+            background: linear-gradient(135deg, #a5b4fc, #6366f1, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }}
+
+        .subtitle {{
+            color: var(--text-muted);
+            margin: 8px 0 0 0;
+            font-size: 1rem;
+        }}
+
+        .timestamp {{
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            display: inline-block;
+            margin-top: 16px;
+        }}
+
+        /* Overall Stats */
+        .overall-stats {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }}
+
+        .overall-stat-card {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }}
+
+        .overall-stat-card .stat-label {{
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }}
+
+        .overall-stat-card .stat-value {{
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }}
+
+        /* Consolidated Stats Grid */
+        .consolidated-box {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 40px;
+        }}
+
+        .consolidated-title {{
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .consolidated-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }}
+
+        .consolidated-card {{
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }}
+
+        .consolidated-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }}
+
+        .consolidated-card.stat-card-high {{
+            border-left: 4px solid var(--success);
+        }}
+
+        .consolidated-card.stat-card-low {{
+            border-left: 4px solid var(--warning);
+        }}
+
+        .consolidated-card.stat-card-empty {{
+            border-left: 4px solid var(--text-muted);
+            opacity: 0.7;
+        }}
+
+        .card-header {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }}
+
+        .card-icon {{
+            font-size: 1.2rem;
+        }}
+
+        .card-title {{
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-main);
+            word-break: break-word;
+        }}
+
+        .card-body {{
+            display: flex;
+            gap: 24px;
+        }}
+
+        .card-stat {{
+            display: flex;
+            flex-direction: column;
+        }}
+
+        .card-stat .stat-value {{
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }}
+
+        .card-stat .stat-value.highlight {{
+            color: var(--accent);
+        }}
+
+        .card-stat .stat-label {{
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }}
+
+        /* Per-Selector Tables */
+        .tables-section {{
+            margin-top: 40px;
+        }}
+
+        .section-title {{
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: var(--text-main);
+        }}
+
+        .selector-table-section {{
+            margin-bottom: 32px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }}
+
+        .selector-title {{
+            background: rgba(99, 102, 241, 0.1);
+            margin: 0;
+            padding: 16px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        .table-wrapper {{
+            overflow-x: auto;
+        }}
+
+        .file-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }}
+
+        .file-table th {{
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        .file-table td {{
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }}
+
+        .file-table tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        .file-table tr:hover td {{
+            background: rgba(255, 255, 255, 0.02);
+        }}
+
+        .col-path {{
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        .col-filename {{
+            font-weight: 500;
+        }}
+
+        .col-count {{
+            text-align: center;
+            font-weight: 600;
+            color: var(--accent);
+        }}
+
+        .col-lines {{
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }}
+
+        .no-data {{
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            font-style: italic;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Element Extraction Summary Report</h1>
+            <p class="subtitle">Target: <strong>{html.escape(target_name)}</strong></p>
+            <div class="timestamp">Generated: {timestamp}</div>
+        </header>
+
+        <!-- Overall Stats -->
+        <div class="overall-stats">
+            <div class="overall-stat-card">
+                <div class="stat-label">Selectors Queried</div>
+                <div class="stat-value">{total_selectors}</div>
+            </div>
+            <div class="overall-stat-card">
+                <div class="stat-label">Files Scanned</div>
+                <div class="stat-value">{total_files_scanned}</div>
+            </div>
+            <div class="overall-stat-card">
+                <div class="stat-label">Total Matches</div>
+                <div class="stat-value">{total_matches}</div>
+            </div>
+        </div>
+
+        <!-- Consolidated Stats Grid -->
+        <div class="consolidated-box">
+            <h2 class="consolidated-title">📊 Per-Selector Statistics</h2>
+            <div class="consolidated-grid">
+                {selector_stats_html}
+            </div>
+        </div>
+
+        <!-- Per-Selector File Tables -->
+        <div class="tables-section">
+            <h2 class="section-title">📁 Per-Selector File Details</h2>
+            {selector_tables_html}
+        </div>
+    </div>
+</body>
+</html>
+"""
+        return summary_html
+
+    def export_csv(self, all_selector_results: list, output_path: Path) -> Path:
+        """
+        Exports all match instances to a CSV file.
+        Columns: selector, query_type, file_path, file_name, instance_no, line, tag, inner_text, outer_xml
+        """
+        import csv
+
+        with open(output_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            # Write header
+            writer.writerow([
+                'selector', 'query_type', 'file_path', 'file_name',
+                'instance_no', 'line', 'tag', 'inner_text', 'outer_xml'
+            ])
+
+            # Write data rows
+            for selector_data in all_selector_results:
+                query_val = selector_data.get('query_val', '')
+                query_type = selector_data.get('query_type', '')
+                scan_results = selector_data.get('scan_results', {})
+
+                for file_path_str, data in scan_results.items():
+                    if not data.get('ok', True):
+                        continue
+                    matches = data.get('matches', [])
+                    if not matches:
+                        continue
+
+                    file_name = os.path.basename(file_path_str)
+                    for idx, match in enumerate(matches, 1):
+                        writer.writerow([
+                            query_val,
+                            query_type,
+                            file_path_str,
+                            file_name,
+                            idx,
+                            match.get('line', ''),
+                            match.get('tag', ''),
+                            match.get('text', ''),
+                            match.get('html', '')
+                        ])
+
+        return output_path

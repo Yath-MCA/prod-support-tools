@@ -459,6 +459,775 @@ class SearchWorkflowTests(unittest.TestCase):
         finally:
             blocker.close()
 
+    # ------------------------------------------------------------------
+    # Element Extractor Enhancements Tests
+    # ------------------------------------------------------------------
+
+    def test_parse_query_list_splits_comma_separated_values(self) -> None:
+        """Test that _parse_query_list correctly splits comma-separated queries."""
+        # Single query
+        result = ElementExtractorTab._parse_query_list("span")
+        self.assertEqual(result, ["span"])
+
+        # Multiple queries with spaces
+        result = ElementExtractorTab._parse_query_list("span, a, div")
+        self.assertEqual(result, ["span", "a", "div"])
+
+        # Multiple queries with extra whitespace
+        result = ElementExtractorTab._parse_query_list("  span  ,  a[href]  ,  //xpath  ")
+        self.assertEqual(result, ["span", "a[href]", "//xpath"])
+
+        # Empty segments should be filtered out
+        result = ElementExtractorTab._parse_query_list("span,, ,div")
+        self.assertEqual(result, ["span", "div"])
+
+        # Empty string should return empty list
+        result = ElementExtractorTab._parse_query_list("")
+        self.assertEqual(result, [])
+
+        # Only commas should return empty list
+        result = ElementExtractorTab._parse_query_list(",,,")
+        self.assertEqual(result, [])
+
+    def test_xpath_label_normalization(self) -> None:
+        """Test that 'XPath Query' is normalized to 'XPath' before calling core."""
+        from element_extractor_tab import ElementExtractorTab
+        tab = ElementExtractorTab.__new__(ElementExtractorTab)
+
+        # XPath Query should be normalized to XPath
+        result = tab._normalize_query_input("XPath Query", "//div")
+        self.assertEqual(result, "//div")
+
+        # Tag Name should remain unchanged
+        result = tab._normalize_query_input("Tag Name", "span")
+        self.assertEqual(result, "span")
+
+        # CSS Selector should remain unchanged (after whitespace normalization)
+        result = tab._normalize_query_input("CSS Selector", "  .class  ")
+        self.assertEqual(result, ".class")
+
+    def test_generate_html_report_omits_sections_when_flags_false(self) -> None:
+        """Test that generate_html_report omits text/code sections when flags are False."""
+        extractor = ElementExtractor()
+
+        # Create a temp file for testing
+        temp_file = Path(self.temp_dir.name) / "test_report.html"
+        temp_file.write_text("<html><body><span>Test</span></body></html>", encoding="utf-8")
+
+        # Create mock scan results - use absolute paths
+        scan_results = {
+            str(temp_file): {
+                "ok": True,
+                "matches": [
+                    {
+                        "line": 10,
+                        "tag": "span",
+                        "attributes": {"class": "test"},
+                        "text": "Hello World",
+                        "html": "<span class=\"test\">Hello World</span>"
+                    }
+                ]
+            }
+        }
+
+        all_selector_results = [{
+            "query_val": "span",
+            "query_type": "Tag Name",
+            "scan_results": scan_results,
+            "total_matches": 1,
+            "total_files": 1
+        }]
+
+        # With both flags True - should have both sections
+        html_with_both = extractor.generate_html_report(
+            str(temp_file.parent), "Tag Name", "span", "", "",
+            all_selector_results, 1, 1, True,
+            show_outer_xml=True, show_inner_text=True
+        )
+        self.assertIn("Inner Text Content", html_with_both)
+        self.assertIn("Outer HTML/XML Markup", html_with_both)
+        self.assertIn("Hello World", html_with_both)
+
+        # With show_outer_xml=False - should not have outer XML section
+        html_no_outer = extractor.generate_html_report(
+            str(temp_file.parent), "Tag Name", "span", "", "",
+            all_selector_results, 1, 1, True,
+            show_outer_xml=False, show_inner_text=True
+        )
+        self.assertIn("Inner Text Content", html_no_outer)
+        self.assertNotIn("Outer HTML/XML Markup", html_no_outer)
+        self.assertIn("Hello World", html_no_outer)
+
+        # With show_inner_text=False - should not have text section
+        html_no_text = extractor.generate_html_report(
+            str(temp_file.parent), "Tag Name", "span", "", "",
+            all_selector_results, 1, 1, True,
+            show_outer_xml=True, show_inner_text=False
+        )
+        self.assertNotIn("Inner Text Content", html_no_text)
+        self.assertIn("Outer HTML/XML Markup", html_no_text)
+        # Note: The text content still appears in the outer HTML markup,
+        # which is expected since outer XML is still shown
+
+        # With both False - should have neither section (but still have metadata)
+        html_neither = extractor.generate_html_report(
+            str(temp_file.parent), "Tag Name", "span", "", "",
+            all_selector_results, 1, 1, True,
+            show_outer_xml=False, show_inner_text=False
+        )
+        self.assertNotIn("Inner Text Content", html_neither)
+        self.assertNotIn("Outer HTML/XML Markup", html_neither)
+
+    def test_generate_consolidated_summary_report_counts(self) -> None:
+        """Test that consolidated summary report shows correct per-selector counts."""
+        extractor = ElementExtractor()
+
+        # Create mock multi-selector results
+        all_selector_results = [
+            {
+                "query_val": "span",
+                "query_type": "Tag Name",
+                "scan_results": {
+                    "/test/file1.html": {
+                        "ok": True,
+                        "matches": [{"line": 1}, {"line": 5}]
+                    },
+                    "/test/file2.html": {
+                        "ok": True,
+                        "matches": [{"line": 3}]
+                    },
+                    "/test/file3.html": {
+                        "ok": True,
+                        "matches": []
+                    }
+                },
+                "total_matches": 3,
+                "total_files": 3
+            },
+            {
+                "query_val": "//div",
+                "query_type": "XPath",
+                "scan_results": {
+                    "/test/file1.html": {
+                        "ok": True,
+                        "matches": [{"line": 10}]
+                    },
+                    "/test/file2.html": {
+                        "ok": True,
+                        "matches": [{"line": 20}, {"line": 30}, {"line": 40}]
+                    }
+                },
+                "total_matches": 4,
+                "total_files": 3
+            }
+        ]
+
+        html = extractor.generate_consolidated_summary_report(
+            all_selector_results, "/test", "20260101_120000", False
+        )
+
+        # Should contain the selector names
+        self.assertIn("span", html)
+        self.assertIn("//div", html)
+
+        # Should show correct file counts in cards
+        # span: 2 files with matches out of 3 total
+        # //div: 2 files with matches out of 3 total
+        self.assertIn("3 files", html)
+
+        # Should show correct instance counts - search for the number in context
+        # The HTML contains "3" and "instances" separately (with possible Unicode encoding)
+        self.assertIn("3", html)  # span has 3 instances
+        self.assertIn("4", html)  # //div has 4 instances
+        self.assertIn("instances", html)
+
+        # Should have overall stats
+        self.assertIn("Selectors Queried", html)
+        self.assertIn("Total Matches", html)
+
+        # Overall total should be 7
+        self.assertIn(">7<", html)
+
+    def test_export_csv_row_counts_match_total_instances(self) -> None:
+        """Test that CSV export produces one row per match instance."""
+        extractor = ElementExtractor()
+
+        # Create mock multi-selector results
+        all_selector_results = [
+            {
+                "query_val": "span",
+                "query_type": "Tag Name",
+                "scan_results": {
+                    "/test/file1.html": {
+                        "ok": True,
+                        "matches": [
+                            {"line": 1, "tag": "span", "text": "Text 1", "html": "<span>Text 1</span>"},
+                            {"line": 5, "tag": "span", "text": "Text 2", "html": "<span>Text 2</span>"}
+                        ]
+                    },
+                    "/test/file2.html": {
+                        "ok": True,
+                        "matches": [
+                            {"line": 10, "tag": "span", "text": "Text 3", "html": "<span>Text 3</span>"}
+                        ]
+                    }
+                },
+                "total_matches": 3,
+                "total_files": 2
+            },
+            {
+                "query_val": "//div",
+                "query_type": "XPath",
+                "scan_results": {
+                    "/test/file1.html": {
+                        "ok": True,
+                        "matches": [
+                            {"line": 20, "tag": "div", "text": "Div 1", "html": "<div>Div 1</div>"}
+                        ]
+                    }
+                },
+                "total_matches": 1,
+                "total_files": 2
+            }
+        ]
+
+        output_path = Path(self.temp_dir.name) / "test_export.csv"
+        result_path = extractor.export_csv(all_selector_results, output_path)
+
+        # Verify file was created
+        self.assertTrue(result_path.exists())
+
+        # Read CSV and verify row count
+        import csv
+        with open(result_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+
+        # Should have header + 4 data rows (3 from span, 1 from //div)
+        self.assertEqual(len(rows), 5)
+
+        # Verify header
+        self.assertEqual(rows[0], [
+            'selector', 'query_type', 'file_path', 'file_name',
+            'instance_no', 'line', 'tag', 'inner_text', 'outer_xml'
+        ])
+
+        # Verify data rows
+        data_rows = rows[1:]
+        self.assertEqual(len(data_rows), 4)
+
+        # Verify all rows have correct selectors
+        span_rows = [r for r in data_rows if r[0] == "span"]
+        div_rows = [r for r in data_rows if r[0] == "//div"]
+
+        # Should have 3 span rows and 1 div row
+        self.assertEqual(len(span_rows), 3)
+        self.assertEqual(len(div_rows), 1)
+
+        # Verify query types
+        for row in span_rows:
+            self.assertEqual(row[1], "Tag Name")
+        for row in div_rows:
+            self.assertEqual(row[1], "XPath")
+
+        # Verify instance_no increments within each file
+        # First 2 rows should have instance_no 1, 2 (from file1.html)
+        self.assertEqual(span_rows[0][4], "1")
+        self.assertEqual(span_rows[1][4], "2")
+        # Third row should be instance_no 1 (from file2.html)
+        self.assertEqual(span_rows[2][4], "1")
+
+        # Verify file names are correct
+        file_names = {row[3] for row in data_rows}
+        self.assertEqual(file_names, {"file1.html", "file2.html"})
+
+        # Verify line numbers are correct
+        line_numbers = [int(row[5]) for row in data_rows]
+        self.assertEqual(sorted(line_numbers), [1, 5, 10, 20])
+
+    def test_export_csv_respects_empty_results(self) -> None:
+        """Test that CSV export handles empty scan results correctly."""
+        extractor = ElementExtractor()
+
+        all_selector_results = [
+            {
+                "query_val": "span",
+                "query_type": "Tag Name",
+                "scan_results": {},
+                "total_matches": 0,
+                "total_files": 1
+            }
+        ]
+
+        output_path = Path(self.temp_dir.name) / "empty_export.csv"
+        result_path = extractor.export_csv(all_selector_results, output_path)
+
+        self.assertTrue(result_path.exists())
+
+        import csv
+        with open(result_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+
+        # Should have header only
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], "selector")
+
+    # ------------------------------------------------------------------
+    # Copy Matched Files Tests
+    # ------------------------------------------------------------------
+
+    def test_history_includes_copy_matched_files_option(self) -> None:
+        """Test that copy_matched_files option is persisted in history."""
+        # Create a mock history entry with copy option enabled
+        sample_entry = {
+            "tool_id": "element_extractor",
+            "mode": "Folder Scan",
+            "source_path": "/test/path",
+            "query_type": "Tag Name",
+            "query_value": "span",
+            "show_outer_xml": True,
+            "show_inner_text": True,
+            "generate_csv": True,
+            "copy_matched_files": True,
+            "params": {
+                "copy_matched_files": True,
+            }
+        }
+
+        # Save and load
+        ElementExtractorTab._save_history_entries([sample_entry])
+        loaded = ElementExtractorTab._load_history_entries()
+
+        # Verify copy_matched_files is preserved
+        self.assertTrue(len(loaded) > 0)
+        self.assertEqual(loaded[0].get("copy_matched_files"), True)
+        self.assertEqual(loaded[0]["params"].get("copy_matched_files"), True)
+
+    def test_history_includes_copied_files_info(self) -> None:
+        """Test that copied files count and path are persisted in history."""
+        sample_entry = {
+            "tool_id": "element_extractor",
+            "mode": "Folder Scan",
+            "source_path": "/test/path",
+            "query_type": "Tag Name",
+            "query_value": "span",
+            "params": {
+                "copied_files_count": 5,
+                "copied_folder_path": "/output/matched_files_20260101_120000",
+            }
+        }
+
+        ElementExtractorTab._save_history_entries([sample_entry])
+        loaded = ElementExtractorTab._load_history_entries()
+
+        # Verify copied files info is preserved
+        self.assertTrue(len(loaded) > 0)
+        self.assertEqual(loaded[0]["params"].get("copied_files_count"), 5)
+        self.assertEqual(
+            loaded[0]["params"].get("copied_folder_path"),
+            "/output/matched_files_20260101_120000"
+        )
+
+    def test_copy_checkbox_defaults_to_false(self) -> None:
+        """Test that copy_matched_files defaults to False for safety in history params."""
+        # When no value is provided in history, it should default to False
+        sample_entry = {
+            "tool_id": "element_extractor",
+            "mode": "Folder Scan",
+            "source_path": "/test/path",
+            "query_type": "Tag Name",
+            "query_value": "span",
+            "params": {}  # Empty params
+        }
+
+        # Save and load
+        ElementExtractorTab._save_history_entries([sample_entry])
+        loaded = ElementExtractorTab._load_history_entries()
+
+        # Default should be False when not specified
+        self.assertTrue(len(loaded) > 0)
+        # Top-level copy_matched_files should default to False
+        self.assertEqual(loaded[0].get("copy_matched_files", False), False)
+        # Params copy_matched_files should default to False
+        params = loaded[0].get("params", {})
+        self.assertEqual(params.get("copy_matched_files", False), False)
+
+    # ------------------------------------------------------------------
+    # Doc-Title Reading Tests
+    # ------------------------------------------------------------------
+
+    def test_load_impact_config_returns_doc_title_and_project_title(self) -> None:
+        """Test that _load_impact_config_filters returns doc-title and project-title."""
+        extractor = ElementExtractor()
+
+        # Create temp directory with impact_config.xml containing both titles
+        temp_dir = Path(self.temp_dir.name) / "doc_title_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="JATS"/>
+            <client name="OUP"/>
+            <doc-title>Test Article Title</doc-title>
+            <project-title>Test Project Title</project-title>
+        </impact-config>
+        """
+        config_path = temp_dir / "impact_config.xml"
+        config_path.write_text(config_content, encoding="utf-8")
+
+        dtd, client, doc_title, project_title, identifier, link_info, doc_type = \
+            extractor._load_impact_config_filters(config_path)
+        self.assertEqual(dtd, "JATS")
+        self.assertEqual(client, "OUP")
+        self.assertEqual(doc_title, "Test Article Title")
+        self.assertEqual(project_title, "Test Project Title")
+        self.assertEqual(identifier, "")
+        self.assertEqual(link_info, "")
+        self.assertEqual(doc_type, "")
+
+    def test_get_doc_title_method(self) -> None:
+        """Test the public get_doc_title method."""
+        extractor = ElementExtractor()
+
+        # Create temp directory with impact_config.xml
+        temp_dir = Path(self.temp_dir.name) / "doc_title_test2"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <doc-title>My Document Title</doc-title>
+        </impact-config>
+        """
+        config_path = temp_dir / "impact_config.xml"
+        config_path.write_text(config_content, encoding="utf-8")
+
+        # Create a dummy file in the same directory
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        doc_title = extractor.get_doc_title(dummy_file)
+        self.assertEqual(doc_title, "My Document Title")
+
+    def test_get_doc_title_returns_empty_when_no_config(self) -> None:
+        """Test that get_doc_title returns empty string when no impact_config.xml exists."""
+        extractor = ElementExtractor()
+
+        # Create temp directory without impact_config.xml
+        temp_dir = Path(self.temp_dir.name) / "no_config_test"
+        temp_dir.mkdir()
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        doc_title = extractor.get_doc_title(dummy_file)
+        self.assertEqual(doc_title, "")
+
+    def test_get_doc_title_returns_empty_when_no_doc_title_element(self) -> None:
+        """Test that get_doc_title returns empty string when doc-title element is missing."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "no_doc_title_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="JATS"/>
+            <client name="OUP"/>
+        </impact-config>
+        """
+        config_path = temp_dir / "impact_config.xml"
+        config_path.write_text(config_content, encoding="utf-8")
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        doc_title = extractor.get_doc_title(dummy_file)
+        self.assertEqual(doc_title, "")
+
+    def test_config_cache_avoids_repeated_parsing(self) -> None:
+        """Test that config cache prevents repeated XML parsing."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "cache_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="JATS"/>
+            <client>OUP</client>
+            <doc-title>Caching Test</doc-title>
+        </impact-config>
+        """
+        config_path = temp_dir / "impact_config.xml"
+        config_path.write_text(config_content, encoding="utf-8")
+
+        # First call should parse (returns 7 values)
+        result1 = extractor._load_impact_config_filters(config_path)
+        self.assertEqual(result1[2], "Caching Test")
+
+        # Second call should use cache
+        result2 = extractor._load_impact_config_filters(config_path)
+        self.assertEqual(result2[2], "Caching Test")
+
+        # Verify cache entry exists and has all 7 fields
+        self.assertIn(str(config_path), extractor._config_cache)
+        cache_entry = extractor._config_cache[str(config_path)]
+        self.assertIn("identifier", cache_entry)
+        self.assertIn("link_info", cache_entry)
+        self.assertIn("doc_type", cache_entry)
+
+    def test_clear_config_cache_clears_cache(self) -> None:
+        """Test that clear_config_cache clears the config cache."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "clear_cache_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <doc-title>Cache Clear Test</doc-title>
+        </impact-config>
+        """
+        config_path = temp_dir / "impact_config.xml"
+        config_path.write_text(config_content, encoding="utf-8")
+
+        # Load to populate cache
+        extractor._load_impact_config_filters(config_path)
+        self.assertIn(str(config_path), extractor._config_cache)
+
+        # Clear cache
+        extractor.clear_config_cache()
+        self.assertEqual(len(extractor._config_cache), 0)
+
+    def test_get_file_title_returns_bits_project_title(self) -> None:
+        """Test that get_file_title returns project-title for BITS DTD."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "bits_title_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="BITS"/>
+            <client name="OSO"/>
+            <doc-title>Doc Title Value</doc-title>
+            <project-title>Project Title Value</project-title>
+            <identifier type="isbn">9780197833216_NOVST</identifier>
+            <link-info>pubkituat</link-info>
+            <type>Books</type>
+        </impact-config>
+        """
+        (temp_dir / "impact_config.xml").write_text(config_content, encoding="utf-8")
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        title_type, title_value = extractor.get_file_title(dummy_file)
+        self.assertEqual(title_type, "project-title")
+        self.assertEqual(title_value, "Project Title Value")
+
+        # Also test that metadata is accessible
+        metadata = extractor.get_file_metadata(dummy_file)
+        self.assertEqual(metadata["dtd"], "BITS")
+        self.assertEqual(metadata["client"], "OSO")
+        self.assertEqual(metadata["identifier"], "9780197833216_NOVST")
+        self.assertEqual(metadata["link_info"], "pubkituat")
+        self.assertEqual(metadata["doc_type"], "Books")
+
+    def test_get_file_title_returns_jats_doc_title(self) -> None:
+        """Test that get_file_title returns doc-title for JATS DTD."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "jats_title_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="JATS"/>
+            <client>PLOS</client>
+            <doc-title>JATS Article Title</doc-title>
+            <project-title>Project Title</project-title>
+            <type>Journals</type>
+        </impact-config>
+        """
+        (temp_dir / "impact_config.xml").write_text(config_content, encoding="utf-8")
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        title_type, title_value = extractor.get_file_title(dummy_file)
+        self.assertEqual(title_type, "doc-title")
+        self.assertEqual(title_value, "JATS Article Title")
+
+        # Test metadata for JATS
+        metadata = extractor.get_file_metadata(dummy_file)
+        self.assertEqual(metadata["dtd"], "JATS")
+        self.assertEqual(metadata["client"], "PLOS")
+        self.assertEqual(metadata["doc_type"], "Journals")
+
+    def test_get_file_title_returns_filename_when_no_config(self) -> None:
+        """Test that get_file_title returns filename when no impact_config.xml exists."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "no_config_title_test"
+        temp_dir.mkdir()
+
+        dummy_file = temp_dir / "myfile.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        title_type, title_value = extractor.get_file_title(dummy_file)
+        self.assertEqual(title_type, "filename")
+        self.assertEqual(title_value, "myfile.html")
+
+    def test_get_file_title_returns_filename_when_no_titles(self) -> None:
+        """Test that get_file_title returns filename when no titles exist in config."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "no_titles_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="JATS"/>
+        </impact-config>
+        """
+        (temp_dir / "impact_config.xml").write_text(config_content, encoding="utf-8")
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        title_type, title_value = extractor.get_file_title(dummy_file)
+        self.assertEqual(title_type, "filename")
+        self.assertEqual(title_value, "test.html")
+
+    # ------------------------------------------------------------------
+    # Metadata Display Tests
+    # ------------------------------------------------------------------
+
+    def test_load_impact_config_returns_all_metadata(self) -> None:
+        """Test that _load_impact_config_filters returns all metadata fields."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "full_metadata_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="BITS"/>
+            <client name="OSO"/>
+            <doc-title>Book Title</doc-title>
+            <project-title>Project Name</project-title>
+            <identifier type="isbn">9780197833216_NOVST</identifier>
+            <link-info>pubkituat</link-info>
+            <type>Books</type>
+        </impact-config>
+        """
+        config_path = temp_dir / "impact_config.xml"
+        config_path.write_text(config_content, encoding="utf-8")
+
+        dtd, client, doc_title, project_title, identifier, link_info, doc_type = \
+            extractor._load_impact_config_filters(config_path)
+
+        self.assertEqual(dtd, "BITS")
+        self.assertEqual(client, "OSO")
+        self.assertEqual(doc_title, "Book Title")
+        self.assertEqual(project_title, "Project Name")
+        self.assertEqual(identifier, "9780197833216_NOVST")
+        self.assertEqual(link_info, "pubkituat")
+        self.assertEqual(doc_type, "Books")
+
+    def test_get_file_metadata_returns_all_fields(self) -> None:
+        """Test that get_file_metadata returns complete metadata dict."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "metadata_dict_test"
+        temp_dir.mkdir()
+
+        config_content = """<?xml version="1.0"?>
+        <impact-config>
+            <dtd name="JATS"/>
+            <client>PLOS</client>
+            <doc-title>Article</doc-title>
+            <type>Journals</type>
+        </impact-config>
+        """
+        (temp_dir / "impact_config.xml").write_text(config_content, encoding="utf-8")
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        metadata = extractor.get_file_metadata(dummy_file)
+        self.assertEqual(metadata["dtd"], "JATS")
+        self.assertEqual(metadata["client"], "PLOS")
+        self.assertEqual(metadata["doc_title"], "Article")
+        self.assertEqual(metadata["doc_type"], "Journals")
+        self.assertEqual(metadata["identifier"], "")
+        self.assertEqual(metadata["link_info"], "")
+        self.assertEqual(metadata["project_title"], "")
+
+    def test_get_file_metadata_returns_empty_dict_when_no_config(self) -> None:
+        """Test that get_file_metadata returns empty dict when no impact_config.xml exists."""
+        extractor = ElementExtractor()
+
+        temp_dir = Path(self.temp_dir.name) / "no_config_metadata_test"
+        temp_dir.mkdir()
+
+        dummy_file = temp_dir / "test.html"
+        dummy_file.write_text("<html></html>", encoding="utf-8")
+
+        metadata = extractor.get_file_metadata(dummy_file)
+        self.assertEqual(metadata["dtd"], "")
+        self.assertEqual(metadata["client"], "")
+        self.assertEqual(metadata["doc_title"], "")
+        self.assertEqual(metadata["project_title"], "")
+        self.assertEqual(metadata["identifier"], "")
+        self.assertEqual(metadata["link_info"], "")
+        self.assertEqual(metadata["doc_type"], "")
+
+    def test_format_metadata_line(self) -> None:
+        """Test metadata line formatting."""
+        extractor = ElementExtractor()
+
+        metadata = {
+            "doc_type": "Books",
+            "client": "OSO",
+            "link_info": "pubkituat",
+            "identifier": "9780197833216_NOVST"
+        }
+        result = extractor.format_metadata_line(metadata)
+        self.assertEqual(result, "Books|OSO|pubkituat|9780197833216_NOVST")
+
+        # Empty metadata returns empty string
+        empty_metadata = {"doc_type": "", "client": "", "link_info": "", "identifier": ""}
+        result = extractor.format_metadata_line(empty_metadata)
+        self.assertEqual(result, "")
+
+        # Partial metadata with empty values still included
+        partial_metadata = {
+            "doc_type": "Journals",
+            "client": "PLOS",
+            "link_info": "",
+            "identifier": ""
+        }
+        result = extractor.format_metadata_line(partial_metadata)
+        self.assertEqual(result, "Journals|PLOS||")
+
+    def test_format_metadata_line_ignores_extra_keys(self) -> None:
+        """Test that format_metadata_line ignores extra keys in metadata dict."""
+        extractor = ElementExtractor()
+
+        metadata = {
+            "doc_type": "Books",
+            "client": "OSO",
+            "link_info": "pubkituat",
+            "identifier": "9780197833216_NOVST",
+            "dtd": "BITS",  # Extra key should be ignored
+            "doc_title": "Extra Title"  # Extra key should be ignored
+        }
+        result = extractor.format_metadata_line(metadata)
+        self.assertEqual(result, "Books|OSO|pubkituat|9780197833216_NOVST")
+
 
 if __name__ == "__main__":
     unittest.main()

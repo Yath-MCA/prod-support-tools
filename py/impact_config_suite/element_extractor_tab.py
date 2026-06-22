@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import json
 import os
 import re
+import shutil
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,8 @@ class ElementExtractorTab(ttk.Frame):
         self.scan_thread = None
         self.cancelled = False
         self.last_report_path = None
+        self.last_summary_report_path = None
+        self.last_csv_path = None
         self.history_entries = self._load_history_entries()
         self.filtered_history_entries = list(self.history_entries)
         self._build_ui()
@@ -388,6 +391,60 @@ class ElementExtractorTab(ttk.Frame):
         )
         self.open_report_chk.grid(row=6, column=1, columnspan=2, sticky="w", pady=5)
 
+        # 8. Report Content Options
+        tk.Label(
+            settings_frame,
+            text="Report Content:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=7, column=0, sticky="w", pady=5)
+
+        report_options_frame = tk.Frame(settings_frame, bg="#1e293b")
+        report_options_frame.grid(row=7, column=1, columnspan=2, sticky="ew", pady=5)
+
+        self.show_outer_xml_var = tk.BooleanVar(value=True)
+        self.show_outer_xml_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Include Outer XML/HTML",
+            variable=self.show_outer_xml_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.show_outer_xml_chk.pack(side="left", padx=(0, 15))
+
+        self.show_inner_text_var = tk.BooleanVar(value=True)
+        self.show_inner_text_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Include Inner Text Content",
+            variable=self.show_inner_text_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.show_inner_text_chk.pack(side="left", padx=(0, 15))
+
+        self.generate_csv_var = tk.BooleanVar(value=True)
+        self.generate_csv_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Export CSV Summary",
+            variable=self.generate_csv_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.generate_csv_chk.pack(side="left", padx=(0, 15))
+
+        self.copy_matched_files_var = tk.BooleanVar(value=False)
+        self.copy_matched_files_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Copy matched source files",
+            variable=self.copy_matched_files_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.copy_matched_files_chk.pack(side="left")
+
         history_frame = tk.LabelFrame(
             main_container,
             text="Run History",
@@ -666,10 +723,19 @@ class ElementExtractorTab(ttk.Frame):
             self.clipboard_append(content)
             self.status_var.set("Logs copied to clipboard.")
 
+    @staticmethod
+    def _parse_query_list(raw: str) -> list[str]:
+        """Parse comma-separated query string into list of individual queries."""
+        return [q.strip() for q in raw.split(",") if q.strip()]
+
     def _normalize_query_input(self, query_type: str, query_val: str) -> str:
         normalized = query_val.strip()
         if not normalized:
             raise ValueError("Please enter a tag, selector, or XPath query.")
+
+        # Fix XPath label normalization - UI sends "XPath Query" but core expects "XPath"
+        if query_type == "XPath Query":
+            query_type = "XPath"
 
         if query_type == "CSS Selector":
             normalized = re.sub(r"\s+", " ", normalized).strip()
@@ -703,6 +769,14 @@ class ElementExtractorTab(ttk.Frame):
         if report_path and os.path.exists(report_path):
             self.last_report_path = report_path
             self.open_last_btn.config(state="normal")
+        # Restore additional report paths from params if available
+        params = latest.get("params", {})
+        summary_path = str(params.get("summary_report_path", "")).strip()
+        csv_path = str(params.get("csv_path", "")).strip()
+        if summary_path and os.path.exists(summary_path):
+            self.last_summary_report_path = summary_path
+        if csv_path and os.path.exists(csv_path):
+            self.last_csv_path = csv_path
 
     def _refresh_history_list(self) -> None:
         values = [self._history_summary(entry) for entry in self.filtered_history_entries]
@@ -751,6 +825,11 @@ class ElementExtractorTab(ttk.Frame):
         self.client_filter_var.set(str(entry.get("client_filter", "None")).strip() or "None")
         self.output_dir_var.set(str(entry.get("output_dir", str(self._default_output_dir()))).strip() or str(self._default_output_dir()))
         self.open_report_var.set(bool(entry.get("open_report", True)))
+        # Restore new report content options
+        self.show_outer_xml_var.set(bool(entry.get("show_outer_xml", True)))
+        self.show_inner_text_var.set(bool(entry.get("show_inner_text", True)))
+        self.generate_csv_var.set(bool(entry.get("generate_csv", True)))
+        self.copy_matched_files_var.set(bool(entry.get("copy_matched_files", False)))
         report_path = str(entry.get("report_path", "")).strip()
         if report_path:
             self.last_report_path = report_path
@@ -793,7 +872,9 @@ class ElementExtractorTab(ttk.Frame):
         self._start_extraction()
         return True
 
-    def _current_run_settings(self, source_path: str, query_val: str, output_dir: str, report_path: str) -> dict:
+    def _current_run_settings(self, source_path: str, query_val: str, output_dir: str, report_path: str,
+                               summary_report_path: str = "", csv_path: str = "",
+                               copied_files_count: int = 0, copied_folder_path: str = "") -> dict:
         return {
             "tool_id": self.history_tool_id,
             "tool_label": self.history_tool_label,
@@ -814,6 +895,11 @@ class ElementExtractorTab(ttk.Frame):
             "open_report": bool(self.open_report_var.get()),
             "report_path": report_path,
             "summary": f"{self.mode_var.get().strip()} | {self.selector_type_var.get().strip()}: {query_val}",
+            # New report content options
+            "show_outer_xml": bool(self.show_outer_xml_var.get()),
+            "show_inner_text": bool(self.show_inner_text_var.get()),
+            "generate_csv": bool(self.generate_csv_var.get()),
+            "copy_matched_files": bool(self.copy_matched_files_var.get()),
             "params": {
                 "mode": self.mode_var.get().strip(),
                 "query_type": self.selector_type_var.get().strip(),
@@ -825,36 +911,67 @@ class ElementExtractorTab(ttk.Frame):
                 "filename_filter": self.filename_filter_var.get().strip() or "None",
                 "dtd_filter": self.dtd_filter_var.get().strip() or "None",
                 "client_filter": self.client_filter_var.get().strip() or "None",
+                "show_outer_xml": bool(self.show_outer_xml_var.get()),
+                "show_inner_text": bool(self.show_inner_text_var.get()),
+                "generate_csv": bool(self.generate_csv_var.get()),
+                "copy_matched_files": bool(self.copy_matched_files_var.get()),
+                "summary_report_path": summary_report_path,
+                "csv_path": csv_path,
+                "copied_files_count": copied_files_count,
+                "copied_folder_path": copied_folder_path,
             },
         }
 
     def _record_history_entry(self, entry: dict) -> None:
-        RunHistoryStore.add_entry(entry)
-        self.history_entries = self._load_history_entries()
-        self.filtered_history_entries = list(self.history_entries)
-        self._refresh_history_list()
+        try:
+            RunHistoryStore.add_entry(entry)
+            # Schedule UI update on main thread (tkinter is not thread-safe)
+            self.after(0, self._update_history_ui)
+        except Exception as e:
+            # Log error but don't fail the extraction due to history issues
+            self.after(0, lambda msg=str(e): self._log(f"⚠️ Failed to save history: {msg}"))
+
+    def _update_history_ui(self) -> None:
+        """Update history UI - must be called from main thread."""
+        try:
+            self.history_entries = self._load_history_entries()
+            self.filtered_history_entries = list(self.history_entries)
+            self._refresh_history_list()
+        except Exception as e:
+            self._log(f"⚠️ Failed to refresh history UI: {e}")
 
     def _start_extraction(self):
         # Validate inputs
         source_path = self.path_var.get().strip()
         query_type = self.selector_type_var.get()
-        query_val = self.query_var.get().strip()
+        raw_query_val = self.query_var.get().strip()
         output_dir = self.output_dir_var.get().strip()
 
-        try:
-            query_val = self._normalize_query_input(query_type, query_val)
-        except ValueError as exc:
-            messagebox.showerror("Error", str(exc))
+        # Fix XPath label normalization before validation
+        if query_type == "XPath Query":
+            query_type = "XPath"
+
+        # Parse comma-separated queries
+        queries = self._parse_query_list(raw_query_val)
+        if not queries:
+            messagebox.showerror("Error", "Please enter a tag, selector, or XPath query.")
             return
-        
+
+        # Validate each query
+        normalized_queries = []
+        for query in queries:
+            try:
+                normalized = self._normalize_query_input(query_type, query)
+                normalized_queries.append(normalized)
+            except ValueError as exc:
+                messagebox.showerror("Error", f"Invalid query '{query}': {str(exc)}")
+                return
+
         if not source_path:
             messagebox.showerror("Error", "Please provide a valid source path (file or folder).")
             return
         if not os.path.exists(source_path):
             messagebox.showerror("Error", f"Source path does not exist:\n{source_path}")
-            return
-        if not query_val:
-            messagebox.showerror("Error", "Please enter a tag, selector, or XPath query.")
             return
         if not output_dir:
             messagebox.showerror("Error", "Please specify an output folder to save the HTML report.")
@@ -871,13 +988,13 @@ class ElementExtractorTab(ttk.Frame):
         self.run_btn.config(state="disabled", text="⏳ EXTRACTING ELEMENTS...")
         self.cancel_btn.config(state="normal")
         self.progress_bar.config(value=0)
-        
+
         self.cancelled = False
-        
-        # Start Thread
+
+        # Start Thread with multiple queries
         self.scan_thread = threading.Thread(
             target=self._run_extraction_thread,
-            args=(source_path, query_val, output_dir),
+            args=(source_path, normalized_queries, query_type, output_dir),
             daemon=True
         )
         self.scan_thread.start()
@@ -894,68 +1011,79 @@ class ElementExtractorTab(ttk.Frame):
         else:
             messagebox.showerror("Error", "Last report path is invalid or missing.")
 
-    def _run_extraction_thread(self, source_path_str: str, query_val: str, output_dir_str: str):
+    def _run_extraction_thread(self, source_path_str: str, queries: list[str], query_type: str, output_dir_str: str):
         try:
             mode = self.mode_var.get()
-            query_type = self.selector_type_var.get()
+            # Fix XPath label normalization
+            if query_type == "XPath Query":
+                query_type = "XPath"
             attr_name = self.attr_name_var.get().strip()
             attr_val = self.attr_val_var.get().strip()
-            
+
+            # Report content options
+            show_outer_xml = bool(self.show_outer_xml_var.get())
+            show_inner_text = bool(self.show_inner_text_var.get())
+            generate_csv = bool(self.generate_csv_var.get())
+
             source_path = Path(source_path_str)
             output_dir = Path(output_dir_str)
-            
+
+            is_single = (mode == "Single File")
+
             # Print scan meta
             self._log(f"🚀 Starting Element Extraction - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             self._log(f"  Mode:          {mode}")
             self._log(f"  Source Path:   {source_path}")
             self._log(f"  Query Type:    {query_type}")
-            self._log(f"  Query Value:   '{query_val}'")
+            self._log(f"  Queries:       {len(queries)} selector(s) to process")
+            for i, q in enumerate(queries, 1):
+                self._log(f"    [{i}] {q}")
             if query_type == "Tag Name" and attr_name:
                 self._log(f"  Attr Filter:   {attr_name} = '{attr_val}'")
+            copy_matched_files = bool(self.copy_matched_files_var.get())
+            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}")
             self._log("---------------------------------------------------------------------\n")
-            
-            scan_results = {}
-            total_matches = 0
-            total_files = 0
-            
-            is_single = (mode == "Single File")
-            
-            if is_single:
-                if source_path.is_dir():
-                    raise ValueError("Single File mode selected, but a directory was provided.")
-                
-                total_files = 1
-                self.status_var.set("Parsing file...")
-                self._log(f"Parsing: {source_path.name}")
-                
-                matches = self.extractor.parse_and_extract(
-                    source_path, query_type, query_val, attr_name, attr_val
-                )
-                
-                scan_results[str(source_path.absolute())] = {
-                    "ok": True,
-                    "matches": matches
-                }
-                total_matches = len(matches)
-                
-                self.progress_bar.config(value=100)
-                self._log(f"  ✔ Found {total_matches} matching element(s) in {source_path.name}")
-                
-            else:
-                # Folder scan mode
-                if not source_path.is_dir():
-                    raise ValueError("Folder Scan mode selected, but a file path was provided.")
-                    
+
+            # Collect results for all selectors
+            all_selector_results = []
+            grand_total_matches = 0
+            total_files_scanned = 0
+
+            # Pre-scan file list for folder mode to avoid re-scanning
+            all_files = []
+            if not is_single:
                 recursive = self.recursive_var.get()
                 ext_str = self.extensions_var.get()
                 filename_filter = self.filename_filter_var.get().strip()
                 dtd_filter = self.dtd_filter_var.get().strip()
                 client_filter = self.client_filter_var.get().strip()
-                # Parse extensions (e.g. ".xml, .html")
                 extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
-                
+
+                # Build file list once
+                pattern = "**/*" if recursive else "*"
+                normalized_filter = filename_filter.strip() if filename_filter else ""
+                if normalized_filter and normalized_filter.lower() != "none" and not any(
+                    char in normalized_filter for char in "*?[]"
+                ):
+                    normalized_filter = f"*{normalized_filter}"
+
+                for file in source_path.glob(pattern):
+                    if not file.is_file():
+                        continue
+                    if normalized_filter and normalized_filter.lower() != "none" and not self.extractor._matches_filename_filter(
+                        file.name, normalized_filter
+                    ):
+                        continue
+                    if file.suffix.lower() in extensions:
+                        if not self.extractor._matches_config_filters(file, dtd_filter, client_filter):
+                            continue
+                        all_files.append(file)
+
+                all_files = sorted(all_files)
+                total_files_scanned = len(all_files)
+
                 filter_label = filename_filter if filename_filter != "None" else "No filename filter"
                 dtd_label = dtd_filter if dtd_filter != "None" else "No DTD filter"
                 client_label = client_filter if client_filter != "None" else "No client filter"
@@ -964,88 +1092,231 @@ class ElementExtractorTab(ttk.Frame):
                     f"(Recursive: {'Yes' if recursive else 'No'}, Filename: {filter_label}, "
                     f"DTD: {dtd_label}, Client: {client_label})"
                 )
-                
-                def progress_update(current, total, file_name):
-                    percent = int((current / total) * 100)
-                    self.progress_bar.config(value=percent)
-                    self.status_var.set(f"Scanning ({current}/{total}): {file_name}")
-                    
-                scan_results, total_matches, total_files = self.extractor.scan_directory(
-                    source_path, query_type, query_val, attr_name, attr_val,
-                    recursive=recursive, extensions=extensions, filename_filter=filename_filter,
-                    dtd_filter=dtd_filter, client_filter=client_filter,
-                    progress_callback=progress_update
-                )
-                
-                # Check for cancellation
+                self._log(f"Found {total_files_scanned} file(s) to scan\n")
+
+            # Process each query
+            for query_idx, query_val in enumerate(queries):
                 if self.cancelled:
                     self._log("\n❌ Process Cancelled by User.")
                     self.status_var.set("Extraction cancelled.")
                     return
-                
-                # Log summary list of matches in console
-                self._log("\nScan Summary:")
-                for fp, details in scan_results.items():
-                    fname = os.path.basename(fp)
-                    if not details.get("ok", True):
-                        self._log(f"  ✖ {fname} - Error: {details.get('error')}")
-                    elif details.get("matches"):
-                        count = len(details["matches"])
-                        lines_str = ", ".join([str(m["line"]) for m in details["matches"][:15]])
-                        if len(details["matches"]) > 15:
-                            lines_str += ", ..."
-                        self._log(f"  ✔ {fname} - Found {count} match(es) at line(s): [{lines_str}]")
-            
+
+                self._log(f"Processing query [{query_idx + 1}/{len(queries)}]: '{query_val}'")
+                self.status_var.set(f"Processing query {query_idx + 1}/{len(queries)}: {query_val}")
+
+                scan_results = {}
+                total_matches = 0
+                total_files = 0
+
+                if is_single:
+                    if source_path.is_dir():
+                        raise ValueError("Single File mode selected, but a directory was provided.")
+
+                    total_files = 1
+                    matches = self.extractor.parse_and_extract(
+                        source_path, query_type, query_val, attr_name, attr_val
+                    )
+                    scan_results[str(source_path.absolute())] = {
+                        "ok": True,
+                        "matches": matches
+                    }
+                    total_matches = len(matches)
+                    self._log(f"  ✔ Found {total_matches} matching element(s)")
+
+                else:
+                    # Folder scan mode - use pre-built file list
+                    if not source_path.is_dir():
+                        raise ValueError("Folder Scan mode selected, but a file path was provided.")
+
+                    total_files = total_files_scanned
+
+                    def progress_update(current, total, file_name):
+                        percent = int((current / total) * 100)
+                        self.progress_bar.config(value=percent)
+                        self.status_var.set(f"Query {query_idx + 1}/{len(queries)} - Scanning ({current}/{total}): {file_name}")
+
+                    # Process each file with caching
+                    for i, file_path in enumerate(all_files):
+                        if self.cancelled:
+                            break
+                        progress_update(i + 1, total_files, file_path.name)
+
+                        try:
+                            cached = self.extractor._get_cached(file_path, query_type, query_val, attr_name, attr_val)
+                            if cached is not None:
+                                matches = cached
+                            else:
+                                matches = self.extractor.parse_and_extract(file_path, query_type, query_val, attr_name, attr_val)
+                                self.extractor._set_cache(file_path, query_type, query_val, attr_name, attr_val, matches)
+
+                            if matches:
+                                scan_results[str(file_path.absolute())] = {
+                                    "ok": True,
+                                    "matches": matches
+                                }
+                                total_matches += len(matches)
+                        except Exception as e:
+                            scan_results[str(file_path.absolute())] = {
+                                "ok": False,
+                                "error": str(e),
+                                "matches": []
+                            }
+
+                    # Log summary for this query
+                    files_with_matches = sum(1 for data in scan_results.values() if data.get("matches"))
+                    self._log(f"  ✔ Found {total_matches} match(es) in {files_with_matches} file(s)")
+
+                # Store results for this selector
+                all_selector_results.append({
+                    "query_val": query_val,
+                    "query_type": query_type,
+                    "scan_results": scan_results,
+                    "total_matches": total_matches,
+                    "total_files": total_files
+                })
+                grand_total_matches += total_matches
+
+            # Check for cancellation
+            if self.cancelled:
+                self._log("\n❌ Process Cancelled by User.")
+                self.status_var.set("Extraction cancelled.")
+                return
+
             self._log("\n---------------------------------------------------------------------")
-            self._log(f"Scan complete! Total Files Checked: {total_files}")
-            self._log(f"Total Matching Elements Found: {total_matches}")
-            
-            # Generate Reports
-            self.status_var.set("Generating HTML Reports...")
+            self._log(f"All queries complete! Total Files Checked: {total_files_scanned if not is_single else 1}")
+            self._log(f"Total Matching Elements Found: {grand_total_matches} across {len(queries)} selector(s)")
+
+            # Generate timestamp for file names
+            safe_target_name = self._slugify(source_path.stem, "selected_file")
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # Build query slug (use first query + count if multiple)
+            if len(queries) == 1:
+                query_slug = self._slugify(queries[0][:60], "selector")
+            else:
+                query_slug = f"{self._slugify(queries[0][:30], 'selector')}_and_{len(queries)-1}_more"
+
+            # Create run folder for all outputs (reports, CSV, copied files)
+            run_folder_name = f"extraction_{safe_target_name}_{query_slug}_{ts}"
+            run_folder = output_dir / run_folder_name
+            run_folder.mkdir(exist_ok=True)
+
+            # Generate and save detailed report (with display flags)
+            self.status_var.set("Generating detailed HTML report...")
             report_html = self.extractor.generate_html_report(
-                str(source_path), query_type, query_val, attr_name, attr_val,
-                scan_results, total_matches, total_files, is_single
+                str(source_path), query_type, ", ".join(queries), attr_name, attr_val,
+                all_selector_results, grand_total_matches, total_files_scanned if not is_single else 1, is_single,
+                show_outer_xml=show_outer_xml, show_inner_text=show_inner_text
             )
 
-            # Save file paths
-            safe_target_name = self._slugify(source_path.stem, "selected_file")
-            safe_selector = self._slugify(query_val[:60], "selector")
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            report_name = f"Element_Extraction_Report_{safe_target_name}_{safe_selector}_{ts}.html"
-            report_path = output_dir / report_name
-            
-            # Save Detailed Report
-            with open(report_path, "w", encoding="utf-8") as f:
+            detailed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+            detailed_report_path = run_folder / detailed_report_name
+
+            with open(detailed_report_path, "w", encoding="utf-8") as f:
                 f.write(report_html)
-                
-            self.last_report_path = str(report_path.absolute())
-            self.last_simple_report_path = None
-            self.last_pattern_report_path = None
+
+            self.last_report_path = str(detailed_report_path.absolute())
+            self._log(f"\n📄 Detailed report saved: {run_folder_name}/{detailed_report_name}")
+
+            # Generate and save consolidated summary report
+            self.status_var.set("Generating consolidated summary report...")
+            summary_html = self.extractor.generate_consolidated_summary_report(
+                all_selector_results, str(source_path), ts, is_single
+            )
+
+            summary_report_name = f"Element_Extraction_Summary_{safe_target_name}_{query_slug}.html"
+            summary_report_path = run_folder / summary_report_name
+
+            with open(summary_report_path, "w", encoding="utf-8") as f:
+                f.write(summary_html)
+
+            self.last_summary_report_path = str(summary_report_path.absolute())
+            self._log(f"📊 Summary report saved: {run_folder_name}/{summary_report_name}")
+
+            # Generate and save CSV if enabled
+            csv_path = ""
+            if generate_csv:
+                self.status_var.set("Generating CSV export...")
+                csv_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.csv"
+                csv_report_path = run_folder / csv_report_name
+
+                self.extractor.export_csv(all_selector_results, csv_report_path)
+
+                self.last_csv_path = str(csv_report_path.absolute())
+                csv_path = self.last_csv_path
+                self._log(f"📋 CSV export saved: {run_folder_name}/{csv_report_name}")
+
+            # Copy matched files if enabled
+            copied_files_count = 0
+            copied_folder_path = ""
+            if copy_matched_files and grand_total_matches > 0:
+                self.status_var.set("Copying matched files...")
+                self._log("\n📁 Copying matched source files...")
+
+                # Create subfolder inside run folder for matched files
+                copy_folder = run_folder / "matched_files"
+                copy_folder.mkdir(exist_ok=True)
+
+                # Collect unique files with matches across all selectors
+                files_to_copy = set()
+                for selector_result in all_selector_results:
+                    for file_path_str, data in selector_result["scan_results"].items():
+                        if data.get("ok", True) and data.get("matches"):
+                            files_to_copy.add(Path(file_path_str))
+
+                # Copy each file with collision handling
+                for src_path in files_to_copy:
+                    try:
+                        if not src_path.exists():
+                            self._log(f"  ⚠️ Source file no longer exists: {src_path.name}")
+                            continue
+
+                        dst_path = copy_folder / src_path.name
+
+                        # Handle name collisions
+                        counter = 1
+                        original_dst = dst_path
+                        while dst_path.exists():
+                            stem = original_dst.stem
+                            suffix = original_dst.suffix
+                            dst_path = original_dst.with_name(f"{stem}_{counter}{suffix}")
+                            counter += 1
+
+                        shutil.copy2(src_path, dst_path)  # copy2 preserves timestamps
+                        copied_files_count += 1
+                    except Exception as e:
+                        self._log(f"  ⚠️ Could not copy {src_path.name}: {e}")
+
+                copied_folder_path = str(copy_folder.absolute())
+                self._log(f"  ✔ Copied {copied_files_count} file(s) to: {run_folder_name}/matched_files/")
+
+            # Record history
             self._record_history_entry(
                 self._current_run_settings(
                     str(source_path),
-                    query_val,
+                    ", ".join(queries),
                     str(output_dir),
                     self.last_report_path,
+                    self.last_summary_report_path,
+                    csv_path,
+                    copied_files_count if copy_matched_files else 0,
+                    copied_folder_path if copy_matched_files else ""
                 )
             )
-            
-            self._log(f"📄 Detailed report saved to: {report_path.name}")
-            self._log(f"Folder: {output_dir}")
-            
-            self.status_var.set(f"Complete! Found {total_matches} match(es) in {total_files} file(s).")
+
+            self._log(f"\nAll outputs saved to: {run_folder}")
+            self.status_var.set(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).")
             self.open_last_btn.config(state="normal")
-            
-            # Auto-open report if checked
+
+            # Auto-open detailed report if checked
             if self.open_report_var.get():
                 webbrowser.open(f"file:///{self.last_report_path}")
-                
+
         except Exception as e:
             self._log(f"\n❌ Error during extraction:\n{str(e)}")
             self.status_var.set("Extraction failed with errors.")
             messagebox.showerror("Extraction Error", f"An error occurred:\n{str(e)}")
-            
+
         finally:
             self.run_btn.config(state="normal", text="🚀  RUN ELEMENT EXTRACTION")
             self.cancel_btn.config(state="disabled")
