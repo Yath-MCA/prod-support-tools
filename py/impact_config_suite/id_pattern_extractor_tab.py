@@ -472,7 +472,8 @@ class IDPatternExtractorTab(ttk.Frame):
         doc_type = str(entry.get("doc_type", "")).strip() or "All"
         client = str(entry.get("client_filter", "")).strip() or "All"
         source_name = Path(str(entry.get("source_path", "")).strip() or ".").name
-        return f"{ts} | {doc_type} | {client} | {source_name}"
+        element_count = entry.get("params", {}).get("element_count", 0)
+        return f"{ts} | {doc_type} | {client} | {source_name} | {element_count} elements"
 
     def _restore_last_history_state(self) -> None:
         if not self.history_entries:
@@ -482,6 +483,10 @@ class IDPatternExtractorTab(ttk.Frame):
         if report_path and os.path.exists(report_path):
             self.last_report_path = report_path
             self.open_last_btn.config(state="normal")
+        # Also restore element CSV path if available
+        element_csv_path = str(latest.get("element_csv_path", "")).strip()
+        if element_csv_path:
+            self.last_element_csv_path = element_csv_path
 
     def _refresh_history_list(self) -> None:
         values = [self._history_summary(entry) for entry in self.filtered_history_entries]
@@ -553,7 +558,9 @@ class IDPatternExtractorTab(ttk.Frame):
         self._apply_history_entry(self.history_entries[0])
         self._start_extraction()
 
-    def _current_run_settings(self, source_path: str, output_dir: str, report_path: str, csv_path: str) -> dict:
+    def _current_run_settings(self, source_path: str, output_dir: str, report_path: str,
+                               csv_path: str, element_csv_path: str,
+                               total_docs: int, element_count: int, clients: list) -> dict:
         return {
             "tool_id": self.history_tool_id,
             "tool_label": self.history_tool_label,
@@ -567,12 +574,16 @@ class IDPatternExtractorTab(ttk.Frame):
             "open_report": bool(self.open_report_var.get()),
             "report_path": report_path,
             "csv_path": csv_path,
+            "element_csv_path": element_csv_path,
             "summary": f"{self.type_var.get().strip()} | {self.client_var.get().strip()}",
             "params": {
                 "doc_type": self.type_var.get().strip(),
                 "client_filter": self.client_var.get().strip(),
                 "recursive": bool(self.recursive_var.get()),
                 "open_report": bool(self.open_report_var.get()),
+                "total_docs": total_docs,
+                "element_count": element_count,
+                "clients": clients,
             },
         }
 
@@ -704,13 +715,18 @@ class IDPatternExtractorTab(ttk.Frame):
             # Store paths
             self.last_report_path = result['html_path']
             self.last_csv_path = result['csv_path']
+            self.last_element_csv_path = result.get('element_csv_path', '')
 
             # Record history
             history_entry = self._current_run_settings(
                 source_path,
                 output_dir,
                 self.last_report_path,
-                self.last_csv_path
+                self.last_csv_path,
+                self.last_element_csv_path,
+                result['total_docs'],
+                result.get('element_count', 0),
+                result.get('clients', [])
             )
             self._record_history_entry(history_entry)
 

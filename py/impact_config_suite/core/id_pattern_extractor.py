@@ -193,6 +193,52 @@ class IDPatternExtractor:
 
         return result
 
+    def extract_ids_from_xml(self, xml_path: Path, xpath: str) -> List[str]:
+        """Extract all id attribute values from XML matching the given XPath."""
+        try:
+            parser = etree.XMLParser(recover=True, encoding='utf-8', resolve_entities=False)
+            tree = etree.parse(str(xml_path), parser=parser)
+            elements = tree.xpath(xpath)
+
+            seen_ids = set()
+            ids = []
+            for elem in elements:
+                id_val = None
+                if isinstance(elem, etree._Element):
+                    id_val = elem.get("id")
+                elif isinstance(elem, (str, bytes)):
+                    id_val = str(elem)
+
+                if id_val and id_val not in seen_ids:
+                    seen_ids.add(id_val)
+                    ids.append(id_val)
+            return ids
+        except Exception:
+            return []
+
+    def aggregate_patterns(self, ids: List[str]) -> Tuple[str, int]:
+        """
+        Aggregate list of IDs to most frequent pattern.
+        Returns (pattern, variant_count).
+        """
+        if not ids:
+            return ("—", 0)
+
+        patterns = [self.normalize_id_to_pattern(id_val) for id_val in ids]
+        pattern_counts = defaultdict(int)
+
+        for p in patterns:
+            pattern_counts[p] += 1
+
+        most_frequent = max(pattern_counts.items(), key=lambda x: (x[1], x[0]))
+        pattern = most_frequent[0]
+        variants = len(pattern_counts) - 1
+
+        if variants > 0:
+            pattern = f"{pattern} (+{variants} variants)"
+
+        return (pattern, variants)
+
     def _get_element_tag(self, elem: etree._Element) -> str:
         """Get clean tag name without namespace."""
         tag = elem.tag
@@ -291,14 +337,14 @@ class IDPatternExtractor:
             return {}
 
     def build_matrix_data(self, documents_by_client: Dict[str, List[Dict]],
-                          doc_type: str) -> Tuple[List[Dict], List[str], Dict, List[Dict]]:
+                          doc_type: str) -> Tuple[List[Dict], List[str], Dict, List[Dict], List[Dict]]:
         """
         Build matrix data from analyzed documents.
         Matrix rows = unique element types (book-part, front-matter-part, ref, etc.)
         Matrix columns = clients
-        Cells = pattern for that element type + client combination
+        Cells = all patterns for that element type + client combination (line-by-line)
         Deduplication: same (client, element_type, pattern) = 1 row
-        Returns (rows, client_keys, detail_data, element_details).
+        Returns (rows, client_keys, detail_data, element_details, doc_metadata).
         """
         # Collect all unique clients
         all_clients = set()
@@ -308,6 +354,10 @@ class IDPatternExtractor:
                 all_clients.add(parts[1])
 
         client_keys = sorted(all_clients)
+
+        # Get area definitions for this document type (used for area detection in analyze_document)
+        type_config = self.profiles.get(doc_type, self.profiles.get("Books", {}))
+        areas = type_config.get("areas", [])
 
         # Data structure for collecting patterns:
         # {element_tag: {client: {pattern: count}}}
@@ -320,6 +370,9 @@ class IDPatternExtractor:
         element_details = []
         element_counter = 0
 
+        # Document metadata for header (TYPE|CLIENT|IDENTIFIER)
+        doc_metadata = []
+
         # First pass: collect all element types and patterns per client
         for key, docs in documents_by_client.items():
             parts = key.split("|", 1)
@@ -330,13 +383,23 @@ class IDPatternExtractor:
             for doc in docs:
                 doc_key = f"{doc['folder']}"
                 doc_title = doc.get("doc_title", "") or os.path.basename(doc_key)
-                element_data = self.analyze_document(doc, [])
+                element_data = self.analyze_document(doc, areas)
 
                 # Store detail data (now keyed by element_tag)
                 detail_data[doc_key] = {
                     "doc_info": doc,
                     "element_data": element_data
                 }
+
+                # Collect document metadata for header
+                doc_metadata.append({
+                    "type": doc.get("doc_type", ""),
+                    "client": doc.get("client", ""),
+                    "identifier": doc.get("identifier", ""),
+                    "doc_title": doc_title,
+                    "folder": doc_key,
+                    "xml_file": doc.get("xml_file", "")
+                })
 
                 # element_data structure: {element_tag: {sample_id, pattern, count, area, all_ids}}
                 for tag, info in element_data.items():
@@ -374,26 +437,25 @@ class IDPatternExtractor:
             for client in client_keys:
                 client_patterns = patterns_by_element_client[element_tag].get(client, {})
                 if client_patterns:
-                    # Find most frequent pattern
-                    most_frequent = max(client_patterns.items(), key=lambda x: (x[1], x[0]))
-                    pattern = most_frequent[0]
-                    total_count = sum(client_patterns.values())
-                    variants = len(client_patterns) - 1
-
-                    if variants > 0:
-                        pattern = f"{pattern} (+{variants} variants)"
-
-                    row[client] = pattern
+                    # Sort patterns by frequency (most frequent first)
+                    sorted_patterns = sorted(client_patterns.items(), key=lambda x: (-x[1], x[0]))
+                    # Store all patterns as list for HTML display
+                    row[client] = {
+                        "patterns": [p[0] for p in sorted_patterns],
+                        "counts": [p[1] for p in sorted_patterns],
+                        "total_count": sum(client_patterns.values())
+                    }
                 else:
-                    row[client] = "—"
+                    row[client] = None
 
             rows.append(row)
 
-        return rows, client_keys, detail_data, element_details
+        return rows, client_keys, detail_data, element_details, doc_metadata
 
     def generate_html_report(self, root_path: str, doc_type: str, client_filter: str,
                             rows: List[Dict], clients: List[str],
-                            detail_data: Dict, element_details: List[Dict], total_docs: int) -> str:
+                            detail_data: Dict, element_details: List[Dict], total_docs: int,
+                            doc_metadata: List[Dict] = None) -> str:
         """Generate HTML matrix report with element-wise consolidated table."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         folder_name = os.path.basename(root_path)
@@ -403,18 +465,24 @@ class IDPatternExtractor:
         for client in clients:
             header_cols += f"<th>{html.escape(client)}</th>"
 
-        # Build matrix table rows - element types as rows
+        # Build matrix table rows - element types as rows with all patterns displayed
         table_rows = ""
         for row in rows:
             element_type = row.get("element_type", "")
             tr = f'<tr><td class="element-type">{html.escape(element_type)}</td>'
             for client in clients:
-                cell_value = row.get(client, "—")
-                # Format code-like patterns
-                if cell_value != "—":
-                    tr += f'<td><code class="pattern">{html.escape(cell_value)}</code></td>'
+                cell_data = row.get(client)
+                if cell_data and cell_data["patterns"]:
+                    # Display all patterns line-by-line with counts
+                    patterns_html = ""
+                    for i, (pattern, count) in enumerate(zip(cell_data["patterns"], cell_data["counts"])):
+                        count_display = f" <span class='pattern-count'>({count})</span>" if len(cell_data["patterns"]) > 1 else ""
+                        patterns_html += f'<code class="pattern">{html.escape(pattern)}</code>{count_display}'
+                        if i < len(cell_data["patterns"]) - 1:
+                            patterns_html += "<br>"
+                    tr += f'<td class="multi-pattern">{patterns_html}</td>'
                 else:
-                    tr += f'<td class="empty">{html.escape(cell_value)}</td>'
+                    tr += f'<td class="empty">—</td>'
             tr += "</tr>"
             table_rows += tr
 
@@ -423,7 +491,8 @@ class IDPatternExtractor:
         for elem in element_details:
             tr = f'<tr>'
             tr += f'<td>{elem["seq"]}</td>'
-            tr += f'<td class="doc-name" title="{html.escape(elem["document"]}">{html.escape(elem["document"][:35])}{"..." if len(elem["document"]) > 35 else ""}</td>'
+            doc_title_escaped = html.escape(elem["document"])
+            tr += f'<td class="doc-name" title="{doc_title_escaped}">{html.escape(elem["document"][:35])}{"..." if len(elem["document"]) > 35 else ""}</td>'
             tr += f'<td><span class="client-badge">{html.escape(elem["client"])}</span></td>'
             tr += f'<td><span class="area-badge area-{elem["area"]}">{html.escape(elem["area"])}</span></td>'
             tr += f'<td><code class="tag">{html.escape(elem["element"])}</code></td>'
@@ -433,15 +502,43 @@ class IDPatternExtractor:
             tr += '</tr>'
             element_table_rows += tr
 
-        # Build detail section (collapsed by default) - shows grouped element details per document
+        # Build document metadata badges for header
+        metadata_badges = ""
+        if doc_metadata:
+            for doc in doc_metadata:
+                type_val = html.escape(doc.get("type", "") or "Unknown")
+                client_val = html.escape(doc.get("client", "") or "Unknown")
+                identifier_val = html.escape(doc.get("identifier", "") or "N/A")
+                metadata_badges += f'<div class="metadata-badge"><span class="meta-type">{type_val}</span><span class="meta-sep">|</span><span class="meta-client">{client_val}</span><span class="meta-sep">|</span><span class="meta-identifier">{identifier_val}</span></div>'
+
+        # Build detail section (collapsed by default) - shows grouped element details per document with action buttons
         detail_sections = ""
         for doc_key, doc_detail in detail_data.items():
             doc_info = doc_detail["doc_info"]
             element_data = doc_detail["element_data"]
+            xml_file = doc_info.get("xml_file", "")
+            xml_file_escaped = html.escape(xml_file.replace("\\", "/"))
 
-            detail_html = f'<div class="doc-detail">'
+            detail_html = f'<div class="doc-detail" data-xml-path="{xml_file_escaped}">'
+
+            # Header row with title and action buttons
+            detail_html += f'<div class="doc-detail-header">'
+            detail_html += f'<div class="doc-title-section">'
             detail_html += f'<h4>{html.escape(doc_info["doc_title"] or os.path.basename(doc_key))}</h4>'
             detail_html += f'<p class="meta">Client: {html.escape(doc_info["client"])} | Type: {html.escape(doc_info["doc_type"])}</p>'
+            detail_html += f'</div>'
+
+            # Action buttons
+            if xml_file:
+                detail_html += f'<div class="doc-actions">'
+                # Open File button - opens XML in new tab
+                file_url = f"file:///{xml_file_escaped}"
+                detail_html += f'<a href="{file_url}" target="_blank" class="action-btn open-btn">📄 Open File</a>'
+                # Copy Path button - uses JavaScript to copy to clipboard
+                detail_html += f'<button class="action-btn copy-btn" onclick="copyToClipboard(this, \'{xml_file_escaped}\')" title="Copy full file path to clipboard">📋 Copy Path</button>'
+                detail_html += f'</div>'
+
+            detail_html += f'</div>'
 
             # element_data structure: {element_tag: {sample_id, pattern, count, area, all_ids}}
             if element_data:
@@ -675,6 +772,119 @@ class IDPatternExtractor:
             margin-bottom: 12px;
         }}
 
+        /* Multi-pattern cell styles */
+        .multi-pattern {{
+            line-height: 1.6;
+        }}
+
+        .pattern-count {{
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-left: 4px;
+        }}
+
+        /* Document metadata badges in header */
+        .metadata-section {{
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }}
+
+        .metadata-badge {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-family: 'Consolas', 'Courier New', monospace;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }}
+
+        .meta-type {{
+            color: #fbbf24;
+            font-weight: 600;
+        }}
+
+        .meta-sep {{
+            color: var(--text-muted);
+        }}
+
+        .meta-client {{
+            color: #34d399;
+            font-weight: 600;
+        }}
+
+        .meta-identifier {{
+            color: #a5b4fc;
+        }}
+
+        /* Document detail header with action buttons */
+        .doc-detail-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }}
+
+        .doc-title-section {{
+            flex: 1;
+        }}
+
+        .doc-actions {{
+            display: flex;
+            gap: 8px;
+        }}
+
+        .action-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s, transform 0.1s;
+        }}
+
+        .action-btn:hover {{
+            transform: translateY(-1px);
+        }}
+
+        .action-btn:active {{
+            transform: translateY(0);
+        }}
+
+        .open-btn {{
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+        }}
+
+        .open-btn:hover {{
+            background: rgba(99, 102, 241, 0.3);
+        }}
+
+        .copy-btn {{
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }}
+
+        .copy-btn:hover {{
+            background: rgba(16, 185, 129, 0.3);
+        }}
+
+        .copy-btn.copied {{
+            background: rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }}
+
         .elements-detail {{
             font-size: 0.9rem;
             margin-bottom: 8px;
@@ -811,6 +1021,11 @@ class IDPatternExtractor:
             <div class="timestamp">Generated: {timestamp}</div>
         </header>
 
+        <!-- Document Metadata Section (TYPE|CLIENT|IDENTIFIER) -->
+        <div class="metadata-section">
+            {metadata_badges}
+        </div>
+
         <div class="summary-stats">
             <div class="stat-card">
                 <div class="stat-label">Documents Scanned</div>
@@ -886,6 +1101,43 @@ class IDPatternExtractor:
             content.classList.toggle('expanded');
             icon.classList.toggle('expanded');
         }}
+
+        // Copy file path to clipboard
+        async function copyToClipboard(button, text) {{
+            try {{
+                await navigator.clipboard.writeText(text);
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {{
+                    button.innerHTML = originalText;
+                    button.classList.remove('copied');
+                }}, 2000);
+            }} catch (err) {{
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {{
+                    document.execCommand('copy');
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '✅ Copied!';
+                    button.classList.add('copied');
+                    setTimeout(() => {{
+                        button.innerHTML = originalText;
+                        button.classList.remove('copied');
+                    }}, 2000);
+                }} catch (err) {{
+                    alert('Failed to copy path. Please copy manually: ' + text);
+                }}
+                document.body.removeChild(textArea);
+            }}
+        }}
     </script>
 </body>
 </html>
@@ -905,9 +1157,12 @@ class IDPatternExtractor:
                 element_type = row.get("element_type", "")
                 data_row = [element_type]
                 for client in clients:
-                    value = row.get(client, "—")
-                    # Strip variant suffix for cleaner CSV
-                    value = re.sub(r' \\\\(\\+\\d+ variants\\)', '', value)
+                    cell_data = row.get(client)
+                    if cell_data and cell_data.get("patterns"):
+                        # For CSV, use the most frequent pattern only (first in sorted list)
+                        value = cell_data["patterns"][0]
+                    else:
+                        value = "—"
                     data_row.append(value)
                 writer.writerow(data_row)
 
@@ -971,7 +1226,7 @@ class IDPatternExtractor:
             progress_callback("analyze", 0, total_docs, "Analyzing documents...")
 
         # Build matrix data
-        rows, clients, detail_data, element_details = self.build_matrix_data(documents_by_client, doc_type)
+        rows, clients, detail_data, element_details, doc_metadata = self.build_matrix_data(documents_by_client, doc_type)
 
         if progress_callback:
             progress_callback("report", 0, 3, "Generating reports...")
@@ -979,7 +1234,7 @@ class IDPatternExtractor:
         # Generate HTML report
         html_report = self.generate_html_report(
             root_path, doc_type, client_filter,
-            rows, clients, detail_data, element_details, total_docs
+            rows, clients, detail_data, element_details, total_docs, doc_metadata
         )
 
         html_path = run_folder / f"id_pattern_report_{ts}.html"

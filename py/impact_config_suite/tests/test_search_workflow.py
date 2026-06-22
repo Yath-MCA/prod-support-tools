@@ -1335,7 +1335,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"TNF\"/></impact-config>",
             encoding="utf-8"
         )
-        (tnf_dir / "TNF_Book_001.xml").write_text(
+        (tnf_dir / "TNF_Book_001_original.xml").write_text(
             "<book><front-matter-part id=\"front-matter-part-001\"/><book-part id=\"book-part-001\"/></book>",
             encoding="utf-8"
         )
@@ -1347,7 +1347,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"OSO\"/></impact-config>",
             encoding="utf-8"
         )
-        (oso_dir / "OSO_Book_001.xml").write_text(
+        (oso_dir / "OSO_Book_001_original.xml").write_text(
             "<book><front-matter-part id=\"workid-OSO12345-front-1\"/><book-part id=\"workid-OSO12345-book-part-2\"/></book>",
             encoding="utf-8"
         )
@@ -1374,7 +1374,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"TNF\"/></impact-config>",
             encoding="utf-8"
         )
-        (books_dir / "book.xml").write_text("<book/>", encoding="utf-8")
+        (books_dir / "Books_001_original.xml").write_text("<book/>", encoding="utf-8")
 
         # Journals document
         journals_dir = source / "Journals_001"
@@ -1383,7 +1383,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "<?xml version=\"1.0\"?><impact-config><type>Journals</type><client name=\"OUP\"/></impact-config>",
             encoding="utf-8"
         )
-        (journals_dir / "journal.xml").write_text("<article/>", encoding="utf-8")
+        (journals_dir / "Journals_001_original.xml").write_text("<article/>", encoding="utf-8")
 
         # Filter for Books only
         books_docs = extractor.scan_documents(source, recursive=True, type_filter="Books")
@@ -1409,7 +1409,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"TNF\"/></impact-config>",
             encoding="utf-8"
         )
-        (tnf_dir / "book.xml").write_text("<book/>", encoding="utf-8")
+        (tnf_dir / "TNF_001_original.xml").write_text("<book/>", encoding="utf-8")
 
         # OSO document
         oso_dir = source / "OSO_001"
@@ -1418,7 +1418,7 @@ class SearchWorkflowTests(unittest.TestCase):
             "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"OSO\"/></impact-config>",
             encoding="utf-8"
         )
-        (oso_dir / "book.xml").write_text("<book/>", encoding="utf-8")
+        (oso_dir / "OSO_001_original.xml").write_text("<book/>", encoding="utf-8")
 
         # Filter for TNF only
         tnf_docs = extractor.scan_documents(source, recursive=True, client_filter="TNF")
@@ -1518,28 +1518,22 @@ class SearchWorkflowTests(unittest.TestCase):
         self.assertIn("TNF", clients)
         self.assertIn("OSO", clients)
 
-        # Check rows - should have front, body, back areas
-        area_keys = [row["area"] for row in rows]
-        self.assertIn("front", area_keys)
-        self.assertIn("body", area_keys)
-        self.assertIn("back", area_keys)
+        # Check rows - should have front-matter-part element type
+        element_types = [row["element_type"] for row in rows]
+        self.assertIn("front-matter-part", element_types)
 
-        # Find front row
-        front_row = next(row for row in rows if row["area"] == "front")
+        # Find front-matter-part row
+        front_row = next(row for row in rows if row["element_type"] == "front-matter-part")
         self.assertEqual(front_row["TNF"], "front-matter-part-{nnn}")
         self.assertEqual(front_row["OSO"], "workid-{work}-front-{n}")
-
-        # Body and back should be empty (em-dash)
-        body_row = next(row for row in rows if row["area"] == "body")
-        self.assertEqual(body_row["TNF"], "—")
 
     def test_id_pattern_csv_export(self) -> None:
         """Test that CSV export produces correct output."""
         extractor = IDPatternExtractor()
 
         rows = [
-            {"area": "front", "label": "Front Matter", "TNF": "front-part-{nnn}", "OSO": "workid-{work}-front-{n}"},
-            {"area": "body", "label": "Body Matter", "TNF": "book-part-{nnn}", "OSO": "workid-{work}-book-part-{n}"},
+            {"element_type": "front-matter-part", "TNF": "front-part-{nnn}", "OSO": "workid-{work}-front-{n}"},
+            {"element_type": "book-part", "TNF": "book-part-{nnn}", "OSO": "workid-{work}-book-part-{n}"},
         ]
         clients = ["TNF", "OSO"]
 
@@ -1556,14 +1550,14 @@ class SearchWorkflowTests(unittest.TestCase):
             csv_rows = list(reader)
 
         # Header row
-        self.assertEqual(csv_rows[0], ["Area", "TNF", "OSO"])
+        self.assertEqual(csv_rows[0], ["Element Type", "TNF", "OSO"])
 
         # Data rows
-        self.assertEqual(csv_rows[1], ["Front Matter", "front-part-{nnn}", "workid-{work}-front-{n}"])
-        self.assertEqual(csv_rows[2], ["Body Matter", "book-part-{nnn}", "workid-{work}-book-part-{n}"])
+        self.assertEqual(csv_rows[1], ["front-matter-part", "front-part-{nnn}", "workid-{work}-front-{n}"])
+        self.assertEqual(csv_rows[2], ["book-part", "book-part-{nnn}", "workid-{work}-book-part-{n}"])
 
-    def test_id_pattern_empty_cell_for_missing_area(self) -> None:
-        """Test that empty cells show '—' when client has no IDs for an area."""
+    def test_id_pattern_empty_cell_for_missing_element_type(self) -> None:
+        """Test that empty cells show '—' when client has no such element type."""
         extractor = IDPatternExtractor()
 
         source = Path(self.temp_dir.name) / "id_pattern_empty"
@@ -1609,10 +1603,16 @@ class SearchWorkflowTests(unittest.TestCase):
 
         rows, clients, detail_data, _element_details = extractor.build_matrix_data(documents_by_client, "Books")
 
-        # Check back row - OSO should be empty
-        back_row = next(row for row in rows if row["area"] == "back")
-        self.assertEqual(back_row["TNF"], "—")
-        self.assertEqual(back_row["OSO"], "—")  # Both empty since no back-matter in XML
+        # OSO has no book-part element type - check empty cell
+        book_part_row = next((row for row in rows if row["element_type"] == "book-part"), None)
+        if book_part_row:
+            self.assertEqual(book_part_row["OSO"], "—")
+
+        # TNF should have both element types with patterns
+        front_row = next(row for row in rows if row["element_type"] == "front-matter-part")
+        self.assertNotEqual(front_row["TNF"], "—")
+        book_row = next(row for row in rows if row["element_type"] == "book-part")
+        self.assertNotEqual(book_row["TNF"], "—")
 
 
 if __name__ == "__main__":
