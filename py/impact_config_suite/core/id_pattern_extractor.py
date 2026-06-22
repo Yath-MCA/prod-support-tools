@@ -6,7 +6,7 @@ import csv
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Set
 from lxml import etree
 
 
@@ -14,8 +14,8 @@ class IDPatternExtractor:
     """
     Core engine for ID Pattern Extraction.
     Scans folders for IMPACT document directories, groups XML by type|client,
-    extracts ID patterns per document area (front/body/back), and generates
-    a consolidated matrix report.
+    extracts ID patterns by element type, and generates
+    a consolidated matrix report with element types as rows and clients as columns.
     """
 
     def __init__(self, profiles_path: Optional[Path] = None):
@@ -99,11 +99,9 @@ class IDPatternExtractor:
         return (doc_type, client, doc_title, identifier)
 
     def _find_xml_file(self, folder: Path) -> Optional[Path]:
-        """Find primary document XML, excluding *_original.xml and impact_config.xml."""
-        xml_files = [
-            f for f in folder.glob("*.xml")
-            if f.name != "impact_config.xml" and not f.name.endswith("_original.xml")
-        ]
+        """Find primary document XML - only *_original.xml files."""
+        # Look for *_original.xml files specifically
+        xml_files = list(folder.glob("*_original.xml"))
         if not xml_files:
             return None
         folder_name = folder.name
@@ -193,62 +191,20 @@ class IDPatternExtractor:
         # Replace 1-2 digit sequences with {n} (only if not already part of {nnn})
         result = re.sub(r'(?<!\d)\d{1,2}(?!\d)', '{n}', result)
 
-        # If element tag provided and ID doesn't already include element context,
-        # prepend it for clarity
-        if element_tag and element_tag not in result.lower():
-            # Check if this looks like a generic ID that needs context
-            if result.startswith("workid-"):
-                # Already has workid prefix, context should be in the middle
-                pass
-
         return result
 
-    def extract_ids_from_xml(self, xml_path: Path, xpath: str) -> List[str]:
-        """Extract all id attribute values from XML matching the given XPath.
-        Returns deduplicated list (each id appears only once)."""
-        try:
-            parser = etree.XMLParser(recover=True, encoding='utf-8', resolve_entities=False)
-            tree = etree.parse(str(xml_path), parser=parser)
-            elements = tree.xpath(xpath)
-
-            seen_ids = set()  # Track unique IDs to avoid duplicates
-            ids = []
-            for elem in elements:
-                id_val = None
-                if isinstance(elem, etree._Element):
-                    id_val = elem.get("id")
-                elif isinstance(elem, (str, bytes)):
-                    # XPath might return attribute value directly
-                    id_val = str(elem)
-
-                if id_val and id_val not in seen_ids:
-                    seen_ids.add(id_val)
-                    ids.append(id_val)
-            return ids
-        except Exception:
-            return []
-
-    def _get_element_path(self, tree, elem) -> str:
-        """Get path of element in tree for ancestor checking."""
-        try:
-            return tree.getpath(elem)
-        except Exception:
-            # Build path manually if getpath fails
-            parts = []
-            current = elem
-            while current is not None and isinstance(current, etree._Element):
-                tag = current.tag.split('}')[-1] if '}' in str(current.tag) else str(current.tag)
-                parts.append(tag)
-                current = current.getparent()
-            return '/' + '/'.join(reversed(parts))
+    def _get_element_tag(self, elem: etree._Element) -> str:
+        """Get clean tag name without namespace."""
+        tag = elem.tag
+        if isinstance(tag, str) and '}' in tag:
+            return tag.split('}')[-1]
+        return str(tag) if tag else "unknown"
 
     def _determine_area(self, elem: etree._Element, tree, area_keys: List[str]) -> Optional[str]:
         """Determine which area an element belongs to based on ancestors."""
-        path = self._get_element_path(tree, elem).lower()
-
         # Check ancestors by walking up the tree
-        current = elem
         ancestor_tags = []
+        current = elem
         while current is not None and isinstance(current, etree._Element):
             tag = current.tag.split('}')[-1] if '}' in str(current.tag) else str(current.tag)
             ancestor_tags.append(tag.lower())
@@ -258,122 +214,92 @@ class IDPatternExtractor:
         for area_key in area_keys:
             area_key_lower = area_key.lower()
             if area_key_lower == "front":
-                if any(t in path or t in ancestor_tags for t in ["front-matter", "book-front", "front"]):
+                if any(t in ancestor_tags for t in ["front-matter", "book-front", "front"]):
                     return area_key
             elif area_key_lower == "body":
-                if any(t in path or t in ancestor_tags for t in ["book-body", "body"]):
+                if any(t in ancestor_tags for t in ["book-body", "body"]):
                     return area_key
             elif area_key_lower == "back":
-                if any(t in path or t in ancestor_tags for t in ["back-matter", "book-back", "back"]):
+                if any(t in ancestor_tags for t in ["back-matter", "book-back", "back"]):
                     return area_key
 
         return None
 
-    def _get_element_tag(self, elem: etree._Element) -> str:
-        """Get clean tag name without namespace."""
-        tag = elem.tag
-        if isinstance(tag, str) and '}' in tag:
-            return tag.split('}')[-1]
-        return str(tag) if tag else "unknown"
-
-    def analyze_document(self, doc_info: Dict, areas: List[Dict]) -> Dict[str, List[Dict]]:
+    def analyze_document(self, doc_info: Dict, areas: List[Dict]) -> Dict[str, Dict[str, Dict]]:
         """
-        Analyze a single document and extract element details per area.
-        Uses a single XPath `//*[@id]` to get ALL elements with IDs,
-        then categorizes by area without duplicates (each ID assigned to only one area).
-        Returns dict mapping area_key -> list of element dicts with 'id', 'tag', 'pattern'.
+        Analyze a single document and extract element details by element tag.
+        Uses a single XPath `//*[@id]` to get ALL elements with IDs globally,
+        then categorizes by element tag (not by area).
+        Groups by element tag to avoid repeated element types.
+        Deduplicates by (element_tag, pattern) - same pattern appears only once.
+        Returns dict mapping element_tag -> {sample_id, pattern, count, area, variants}.
         """
         xml_path = Path(doc_info["xml_file"])
         if not xml_path.exists():
-            return {area["key"]: [] for area in areas}
+            return {}
 
         try:
             parser = etree.XMLParser(recover=True, encoding='utf-8', resolve_entities=False)
             tree = etree.parse(str(xml_path), parser=parser)
 
-            # Get ALL elements with id attribute - single query gets all elements
+            # Get ALL elements with id attribute - single global XPath query
             all_elements = tree.xpath("//*[@id]")
 
-            # Track assigned IDs and result per area
-            assigned_ids = set()
-            result = {area["key"]: [] for area in areas}
             area_keys = [area["key"] for area in areas]
 
-            # Process each element and assign to exactly one area
+            # Result structure: element_tag -> {sample_id, pattern, count, area, all_ids}
+            result = {}
+
+            # Track seen (element_tag, pattern) combinations for deduplication
+            seen_patterns = set()
+
+            # Process each element and group by element tag
             for elem in all_elements:
                 if not isinstance(elem, etree._Element):
                     continue
 
                 id_val = elem.get("id")
-                if not id_val or id_val in assigned_ids:
-                    continue  # Skip if already assigned (avoid duplicates)
+                if not id_val:
+                    continue
 
-                # Determine which area this element belongs to
+                tag = self._get_element_tag(elem)
+                pattern = self.normalize_id_to_pattern(id_val)
                 area_key = self._determine_area(elem, tree, area_keys)
 
-                if area_key:
-                    tag = self._get_element_tag(elem)
-                    pattern = self.normalize_id_to_pattern(id_val)
-                    result[area_key].append({
-                        "id": id_val,
-                        "tag": tag,
-                        "pattern": pattern
-                    })
-                    assigned_ids.add(id_val)
+                # Create deduplication key
+                pattern_key = (tag, pattern)
+
+                if pattern_key not in seen_patterns:
+                    # First occurrence of this element tag + pattern
+                    seen_patterns.add(pattern_key)
+                    result[tag] = {
+                        "sample_id": id_val,
+                        "pattern": pattern,
+                        "count": 1,
+                        "area": area_key or "unknown",
+                        "all_ids": [id_val]
+                    }
+                else:
+                    # Already seen this pattern for this element tag, just increment count
+                    if tag in result:
+                        result[tag]["count"] += 1
+                        result[tag]["all_ids"].append(id_val)
 
             return result
 
         except Exception:
-            # Fallback: use original area-based XPath extraction
-            result = {}
-            for area in areas:
-                ids = self.extract_ids_from_xml(xml_path, area["xpath"])
-                result[area["key"]] = [
-                    {"id": id_val, "tag": "unknown", "pattern": self.normalize_id_to_pattern(id_val)}
-                    for id_val in ids
-                ]
-            return result
-
-    def aggregate_patterns(self, ids: List[str]) -> Tuple[str, int]:
-        """
-        Aggregate list of IDs to most frequent pattern.
-        Returns (pattern, variant_count).
-        If multiple patterns found, returns the most frequent with variant count.
-        """
-        if not ids:
-            return ("—", 0)
-
-        patterns = [self.normalize_id_to_pattern(id_val) for id_val in ids]
-        pattern_counts = defaultdict(int)
-
-        for p in patterns:
-            pattern_counts[p] += 1
-
-        # Find most frequent
-        most_frequent = max(pattern_counts.items(), key=lambda x: (x[1], x[0]))
-        pattern = most_frequent[0]
-        count = most_frequent[1]
-
-        # Count variants (other distinct patterns)
-        variants = len(pattern_counts) - 1
-
-        if variants > 0:
-            pattern = f"{pattern} (+{variants} variants)"
-
-        return (pattern, variants)
+            return {}
 
     def build_matrix_data(self, documents_by_client: Dict[str, List[Dict]],
                           doc_type: str) -> Tuple[List[Dict], List[str], Dict, List[Dict]]:
         """
         Build matrix data from analyzed documents.
+        Matrix rows = unique element types (book-part, front-matter-part, ref, etc.)
+        Matrix columns = clients
+        Cells = pattern for that element type + client combination
+        Deduplication: same (client, element_type, pattern) = 1 row
         Returns (rows, client_keys, detail_data, element_details).
-        rows: list of dicts with 'area', 'label', and client columns
-        element_details: list of element-wise records for consolidated table
         """
-        # Get area definitions for this document type
-        type_config = self.profiles.get(doc_type, self.profiles.get("Books", {}))
-        areas = type_config.get("areas", [])
-
         # Collect all unique clients
         all_clients = set()
         for key in documents_by_client:
@@ -383,15 +309,18 @@ class IDPatternExtractor:
 
         client_keys = sorted(all_clients)
 
-        # Collect patterns per client per area
-        # Structure: {area_key: {client: [(pattern, count), ...]}}
-        patterns_by_area_client = defaultdict(lambda: defaultdict(list))
+        # Data structure for collecting patterns:
+        # {element_tag: {client: {pattern: count}}}
+        patterns_by_element_client = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+
+        # Detail data for per-document breakdown
         detail_data = {}
 
-        # Element-wise details for consolidated table
+        # Element-wise details for consolidated table (ALL elements)
         element_details = []
         element_counter = 0
 
+        # First pass: collect all element types and patterns per client
         for key, docs in documents_by_client.items():
             parts = key.split("|", 1)
             if len(parts) != 2:
@@ -401,51 +330,55 @@ class IDPatternExtractor:
             for doc in docs:
                 doc_key = f"{doc['folder']}"
                 doc_title = doc.get("doc_title", "") or os.path.basename(doc_key)
-                area_elements = self.analyze_document(doc, areas)
+                element_data = self.analyze_document(doc, [])
 
-                # Store detail data (now includes tag info)
+                # Store detail data (now keyed by element_tag)
                 detail_data[doc_key] = {
                     "doc_info": doc,
-                    "area_elements": area_elements
+                    "element_data": element_data
                 }
 
-                for area_key, elements in area_elements.items():
-                    for elem in elements:
-                        element_counter += 1
-                        pattern = elem["pattern"]
-                        patterns_by_area_client[area_key][client].append(pattern)
+                # element_data structure: {element_tag: {sample_id, pattern, count, area, all_ids}}
+                for tag, info in element_data.items():
+                    element_counter += 1
+                    pattern = info["pattern"]
+                    count = info["count"]
+                    area = info["area"]
+                    sample_id = info["sample_id"]
 
-                        # Build element-wise record
-                        element_details.append({
-                            "seq": element_counter,
-                            "document": doc_title,
-                            "client": client,
-                            "area": area_key,
-                            "element": elem["tag"],
-                            "id": elem["id"],
-                            "pattern": pattern
-                        })
+                    # Accumulate pattern count for this element type + client
+                    patterns_by_element_client[tag][client][pattern] += count
 
-        # Build matrix rows
+                    # Build element-wise record (ALL elements for detail table)
+                    element_details.append({
+                        "seq": element_counter,
+                        "document": doc_title,
+                        "client": client,
+                        "area": area,
+                        "element": tag,
+                        "sample_id": sample_id,
+                        "count": count,
+                        "pattern": pattern
+                    })
+
+        # Collect all unique element types (rows)
+        all_element_tags = sorted(patterns_by_element_client.keys())
+
+        # Build matrix rows with element types as rows
         rows = []
-        for area in areas:
-            area_key = area["key"]
+        for element_tag in all_element_tags:
             row = {
-                "area": area_key,
-                "label": area["label"]
+                "element_type": element_tag
             }
 
             for client in client_keys:
-                patterns = patterns_by_area_client[area_key][client]
-                if patterns:
-                    pattern_counts = defaultdict(int)
-                    for p in patterns:
-                        pattern_counts[p] += 1
-
-                    # Find most frequent
-                    most_frequent = max(pattern_counts.items(), key=lambda x: (x[1], x[0]))
+                client_patterns = patterns_by_element_client[element_tag].get(client, {})
+                if client_patterns:
+                    # Find most frequent pattern
+                    most_frequent = max(client_patterns.items(), key=lambda x: (x[1], x[0]))
                     pattern = most_frequent[0]
-                    variants = len(pattern_counts) - 1
+                    total_count = sum(client_patterns.values())
+                    variants = len(client_patterns) - 1
 
                     if variants > 0:
                         pattern = f"{pattern} (+{variants} variants)"
@@ -465,15 +398,16 @@ class IDPatternExtractor:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         folder_name = os.path.basename(root_path)
 
-        # Build matrix table header
-        header_cols = "<th>Area</th>"
+        # Build matrix table header - Element Type as first column, then clients
+        header_cols = "<th>Element Type</th>"
         for client in clients:
             header_cols += f"<th>{html.escape(client)}</th>"
 
-        # Build matrix table rows
+        # Build matrix table rows - element types as rows
         table_rows = ""
         for row in rows:
-            tr = f'<tr><td class="area-label">{html.escape(row["label"])}</td>'
+            element_type = row.get("element_type", "")
+            tr = f'<tr><td class="element-type">{html.escape(element_type)}</td>'
             for client in clients:
                 cell_value = row.get(client, "—")
                 # Format code-like patterns
@@ -484,39 +418,43 @@ class IDPatternExtractor:
             tr += "</tr>"
             table_rows += tr
 
-        # Build element-wise consolidated table
+        # Build element-wise consolidated table (grouped by element type)
         element_table_rows = ""
         for elem in element_details:
             tr = f'<tr>'
             tr += f'<td>{elem["seq"]}</td>'
-            tr += f'<td class="doc-name" title="{html.escape(elem["document"])}">{html.escape(elem["document"][:40])}{"..." if len(elem["document"]) > 40 else ""}</td>'
+            tr += f'<td class="doc-name" title="{html.escape(elem["document"]}">{html.escape(elem["document"][:35])}{"..." if len(elem["document"]) > 35 else ""}</td>'
             tr += f'<td><span class="client-badge">{html.escape(elem["client"])}</span></td>'
             tr += f'<td><span class="area-badge area-{elem["area"]}">{html.escape(elem["area"])}</span></td>'
             tr += f'<td><code class="tag">{html.escape(elem["element"])}</code></td>'
-            tr += f'<td><code class="id-value">{html.escape(elem["id"])}</code></td>'
+            tr += f'<td><code class="id-value">{html.escape(elem["sample_id"])}</code></td>'
+            tr += f'<td><span class="count">×{elem["count"]}</span></td>'
             tr += f'<td><code class="pattern">{html.escape(elem["pattern"])}</code></td>'
             tr += '</tr>'
             element_table_rows += tr
 
-        # Build detail section (collapsed by default) - now shows element details per document
+        # Build detail section (collapsed by default) - shows grouped element details per document
         detail_sections = ""
         for doc_key, doc_detail in detail_data.items():
             doc_info = doc_detail["doc_info"]
-            area_elements = doc_detail["area_elements"]
+            element_data = doc_detail["element_data"]
 
             detail_html = f'<div class="doc-detail">'
             detail_html += f'<h4>{html.escape(doc_info["doc_title"] or os.path.basename(doc_key))}</h4>'
             detail_html += f'<p class="meta">Client: {html.escape(doc_info["client"])} | Type: {html.escape(doc_info["doc_type"])}</p>'
 
-            for area_key, elements in area_elements.items():
-                if elements:
-                    detail_html += f'<div class="area-detail"><strong>{html.escape(area_key)}:</strong> '
-                    # Show element tags with IDs
-                    items = [f'<code class="tag">{html.escape(e["tag"])}</code>:<code>{html.escape(e["id"])}</code>' for e in elements[:10]]
-                    detail_html += ', '.join(items)
-                    if len(elements) > 10:
-                        detail_html += f' <em>(+{len(elements) - 10} more)</em>'
-                    detail_html += '</div>'
+            # element_data structure: {element_tag: {sample_id, pattern, count, area, all_ids}}
+            if element_data:
+                detail_html += f'<div class="elements-detail"><strong>Elements Found:</strong> '
+                items = []
+                for tag, info in list(element_data.items())[:10]:
+                    count_badge = f'<span class="count-badge-small">×{info["count"]}</span>' if info["count"] > 1 else ''
+                    area_badge = f'<span class="area-badge-small area-{info["area"]}">{info["area"]}</span>'
+                    items.append(f'<code class="tag">{html.escape(tag)}</code>{count_badge}{area_badge}:<code>{html.escape(info["sample_id"])}</code>')
+                detail_html += ', '.join(items)
+                if len(element_data) > 10:
+                    detail_html += f' <em>(+{len(element_data) - 10} more types)</em>'
+                detail_html += '</div>'
 
             detail_html += '</div>'
             detail_sections += detail_html
@@ -668,9 +606,10 @@ class IDPatternExtractor:
             background: rgba(255, 255, 255, 0.02);
         }}
 
-        .area-label {{
+        .element-type {{
             font-weight: 600;
             color: var(--text-main);
+            font-family: 'Consolas', 'Courier New', monospace;
         }}
 
         .pattern {{
@@ -736,7 +675,7 @@ class IDPatternExtractor:
             margin-bottom: 12px;
         }}
 
-        .area-detail {{
+        .elements-detail {{
             font-size: 0.9rem;
             margin-bottom: 8px;
         }}
@@ -811,6 +750,16 @@ class IDPatternExtractor:
         .area-front {{ background: rgba(245, 158, 11, 0.2); color: #fbbf24; }}
         .area-body {{ background: rgba(16, 185, 129, 0.2); color: #34d399; }}
         .area-back {{ background: rgba(239, 68, 68, 0.2); color: #f87171; }}
+        .area-unknown {{ background: rgba(107, 114, 128, 0.2); color: #9ca3af; }}
+
+        .area-badge-small {{
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            margin-left: 4px;
+            text-transform: capitalize;
+        }}
 
         .tag {{
             background: rgba(56, 189, 248, 0.15);
@@ -818,6 +767,24 @@ class IDPatternExtractor:
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.8rem;
+        }}
+
+        .count {{
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }}
+
+        .count-badge-small {{
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            padding: 1px 4px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 4px;
         }}
 
         .id-value {{
@@ -854,7 +821,7 @@ class IDPatternExtractor:
                 <div class="stat-value">{len(clients)}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Areas Analyzed</div>
+                <div class="stat-label">Element Types</div>
                 <div class="stat-value">{len(rows)}</div>
             </div>
             <div class="stat-card">
@@ -865,7 +832,7 @@ class IDPatternExtractor:
 
         <div class="matrix-container">
             <div class="matrix-header">
-                <h2>ID Pattern Matrix</h2>
+                <h2>ID Pattern Matrix (Element Types × Clients)</h2>
             </div>
             <table>
                 <thead>
@@ -890,7 +857,8 @@ class IDPatternExtractor:
                             <th>Client</th>
                             <th>Area</th>
                             <th>Element</th>
-                            <th>ID</th>
+                            <th>Sample ID</th>
+                            <th>Count</th>
                             <th>Pattern</th>
                         </tr>
                     </thead>
@@ -929,27 +897,28 @@ class IDPatternExtractor:
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             # Header
-            header = ["Area"] + clients
+            header = ["Element Type"] + clients
             writer.writerow(header)
 
             # Data rows
             for row in rows:
-                data_row = [row["label"]]
+                element_type = row.get("element_type", "")
+                data_row = [element_type]
                 for client in clients:
                     value = row.get(client, "—")
                     # Strip variant suffix for cleaner CSV
-                    value = re.sub(r' \(\+\d+ variants\)', '', value)
+                    value = re.sub(r' \\\\(\\+\\d+ variants\\)', '', value)
                     data_row.append(value)
                 writer.writerow(data_row)
 
         return output_path
 
     def export_element_csv(self, element_details: List[Dict], output_path: Path) -> Path:
-        """Export element-wise details to CSV file."""
+        """Export element-wise details to CSV file (grouped by element type)."""
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             # Header
-            writer.writerow(["#", "Document", "Client", "Area", "Element", "ID", "Pattern"])
+            writer.writerow(["#", "Document", "Client", "Area", "Element", "Sample ID", "Count", "Pattern"])
 
             # Data rows
             for elem in element_details:
@@ -959,7 +928,8 @@ class IDPatternExtractor:
                     elem["client"],
                     elem["area"],
                     elem["element"],
-                    elem["id"],
+                    elem["sample_id"],
+                    elem["count"],
                     elem["pattern"]
                 ])
 
