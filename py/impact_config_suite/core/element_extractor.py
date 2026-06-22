@@ -154,7 +154,7 @@ class ElementExtractor:
             project_title = (project_title_node.text or "").strip()
 
         # Read additional metadata fields
-        identifier_node = root.find(".//identifier[@type='isbn']")
+        identifier_node = root.find(".//identifier[@type]")
         if identifier_node is not None:
             identifier = (identifier_node.text or "").strip()
 
