@@ -1,0 +1,81 @@
+{
+  "Books": {
+    "label": "Books Document Type",
+    "description": "ID pattern extraction for book documents with front, body, and back matter sections",
+    "areas": [
+      {
+        "key": "front",
+        "label": "Front Matter",
+        "xpath": "//front-matter//*[@id] | //front-matter-part[@id] | //front[@id] | //book-front[@id]"
+      },
+      {
+        "key": "body",
+        "label": "Body Matter",
+        "xpath": "//book-body//book-part[@id] | //book-part[@book-part-type='chapter'][@id] | //book-part[@id] | //body//book-part[@id]"
+      },
+      {
+        "key": "back",
+        "label": "Back Matter",
+        "xpath": "//back-matter//*[@id] | //back-matter-part[@id] | //back[@id] | //book-back[@id]"
+      }
+    ],
+    "clients": {
+      "TNF": {
+        "description": "TNF Books client"
+      },
+      "OSO": {
+        "description": "Oxford Scholarship Online"
+      },
+      "LSE": {
+        "description": "LSE Books client"
+      },
+      "YUP": {
+        "description": "Yale University Press"
+      },
+      "CUP": {
+        "description": "Cambridge University Press"
+      }
+    }
+  },
+  "Journals": {
+    "label": "Journals Document Type",
+    "description": "ID pattern extraction for journal documents",
+    "areas": [
+      {
+        "key": "front",
+        "label": "Front Matter",
+        "xpath": "//front[@id] | //front-matter[@id] | //article-front[@id]"
+      },
+      {
+        "key": "body",
+        "label": "Article Body",
+        "xpath": "//body[@id] | //article-body[@id] | //sub-article[@id]"
+      },
+      {
+        "key": "back",
+        "label": "Back Matter",
+        "xpath": "//back[@id] | //back-matter[@id] | //article-back[@id]"
+      }
+    ],
+    "clients": {
+      "OUP": {
+        "description": "Oxford University Press Journals"
+      },
+      "PLOS": {
+        "description": "Public Library of Science"
+      },
+      "BRILL": {
+        "description": "Brill Academic Publishers"
+      },
+      "ACS": {
+        "description": "American Chemical Society"
+      },
+      "LWW": {
+        "description": "Lippincott Williams & Wilkins"
+      },
+      "MEDKNOW": {
+        "description": "Medknow Publications"
+      }
+    }
+  }
+}

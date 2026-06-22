@@ -40,7 +40,8 @@
       "name": "Extractor Tools",
       "tools": [
         { "id": "element_extractor", "label": "Element Extractor" },
-        { "id": "word_extractor", "label": "Word Extractor" }
+        { "id": "word_extractor", "label": "Word Extractor" },
+        { "id": "id_pattern_extractor", "label": "ID Pattern Extractor" }
       ]
     },
     {

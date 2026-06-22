@@ -19,6 +19,7 @@ from search_service.app.app import app
 from search_service.app.services.file_search import copy_files_for_batch, fetch_doc_ids, search_in_batch
 from core.element_extractor import ElementExtractor
 from core.run_history import RunHistoryStore
+from core.id_pattern_extractor import IDPatternExtractor
 from element_extractor_tab import ElementExtractorTab
 from search_tab import SearchTab
 from tools_app import CommonToolsApp
@@ -1227,6 +1228,391 @@ class SearchWorkflowTests(unittest.TestCase):
         }
         result = extractor.format_metadata_line(metadata)
         self.assertEqual(result, "Books|OSO|pubkituat|9780197833216_NOVST")
+
+    # ------------------------------------------------------------------
+    # ID Pattern Extractor Tests
+    # ------------------------------------------------------------------
+
+    def test_id_pattern_normalization_3digit_sequence(self) -> None:
+        """Test that 3+ digit sequences normalize to {nnn}."""
+        extractor = IDPatternExtractor()
+
+        # 3+ digit sequences -> {nnn}
+        self.assertEqual(extractor.normalize_id_to_pattern("front-matter-part-001"), "front-matter-part-{nnn}")
+        self.assertEqual(extractor.normalize_id_to_pattern("front-matter-part-005"), "front-matter-part-{nnn}")
+        self.assertEqual(extractor.normalize_id_to_pattern("book-part-001"), "book-part-{nnn}")
+        self.assertEqual(extractor.normalize_id_to_pattern("book-part-002"), "book-part-{nnn}")
+
+    def test_id_pattern_normalization_workid_pattern(self) -> None:
+        """Test that workid patterns normalize correctly."""
+        extractor = IDPatternExtractor()
+
+        # workid-{work}-book-part-{n} pattern
+        self.assertEqual(
+            extractor.normalize_id_to_pattern("workid-USAC0048448-book-part-2"),
+            "workid-{work}-book-part-{n}"
+        )
+        self.assertEqual(
+            extractor.normalize_id_to_pattern("workid-ABC1234567-chapter-5"),
+            "workid-{work}-chapter-{n}"
+        )
+
+    def test_id_pattern_normalization_short_codes(self) -> None:
+        """Test that short numeric patterns normalize correctly."""
+        extractor = IDPatternExtractor()
+
+        # Short codes (1-2 digits -> {n}, 3+ digits -> {nnn})
+        self.assertEqual(extractor.normalize_id_to_pattern("IMP35"), "IMP{n}")
+        self.assertEqual(extractor.normalize_id_to_pattern("fig1"), "fig{n}")
+        self.assertEqual(extractor.normalize_id_to_pattern("tab12"), "tab{n}")
+        self.assertEqual(extractor.normalize_id_to_pattern("tab123"), "tab{nnn}")
+
+    def test_id_pattern_normalization_mixed(self) -> None:
+        """Test mixed normalization scenarios."""
+        extractor = IDPatternExtractor()
+
+        # Mixed digits
+        self.assertEqual(extractor.normalize_id_to_pattern("ch-01-sec-001"), "ch-{n}-sec-{nnn}")
+        self.assertEqual(extractor.normalize_id_to_pattern("part-1-chapter-042"), "part-{n}-chapter-{nnn}")
+
+    def test_id_pattern_aggregation_most_frequent(self) -> None:
+        """Test that aggregation returns most frequent pattern."""
+        extractor = IDPatternExtractor()
+
+        # All same pattern
+        pattern, variants = extractor.aggregate_patterns(["front-001", "front-002", "front-003"])
+        self.assertEqual(pattern, "front-{nnn}")
+        self.assertEqual(variants, 0)
+
+        # Different patterns should show variant count
+        pattern, variants = extractor.aggregate_patterns(["front-001", "front-002", "back-01"])
+        self.assertEqual(pattern, "front-{nnn} (+1 variants)")
+        self.assertEqual(variants, 1)
+
+    def test_id_pattern_aggregation_empty(self) -> None:
+        """Test aggregation with empty list."""
+        extractor = IDPatternExtractor()
+
+        pattern, variants = extractor.aggregate_patterns([])
+        self.assertEqual(pattern, "—")
+        self.assertEqual(variants, 0)
+
+    def test_tool_registry_includes_id_pattern_extractor(self) -> None:
+        """Test that ID Pattern Extractor is registered in navigation."""
+        config = CommonToolsApp._load_navigation_config()
+
+        # Find Extractor Tools category
+        extractor_category = None
+        for category in config["categories"]:
+            if category["name"] == "Extractor Tools":
+                extractor_category = category
+                break
+
+        self.assertIsNotNone(extractor_category, "Extractor Tools category should exist")
+
+        tool_ids = [tool["id"] for tool in extractor_category["tools"]]
+        self.assertIn("id_pattern_extractor", tool_ids)
+
+    def test_tool_class_registry_includes_id_pattern_extractor(self) -> None:
+        """Test that ID Pattern Extractor class is registered in TOOL_CLASS_BY_ID."""
+        from id_pattern_extractor_tab import IDPatternExtractorTab
+
+        self.assertIn("id_pattern_extractor", CommonToolsApp.TOOL_CLASS_BY_ID)
+        self.assertEqual(CommonToolsApp.TOOL_CLASS_BY_ID["id_pattern_extractor"], IDPatternExtractorTab)
+
+    def test_id_pattern_scan_documents_finds_impact_config(self) -> None:
+        """Test that scan_documents finds folders with impact_config.xml."""
+        extractor = IDPatternExtractor()
+
+        # Create test directory structure
+        source = Path(self.temp_dir.name) / "id_pattern_scan"
+        source.mkdir()
+
+        # Create Books|TNF document
+        tnf_dir = source / "TNF_Book_001"
+        tnf_dir.mkdir()
+        (tnf_dir / "impact_config.xml").write_text(
+            "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"TNF\"/></impact-config>",
+            encoding="utf-8"
+        )
+        (tnf_dir / "TNF_Book_001.xml").write_text(
+            "<book><front-matter-part id=\"front-matter-part-001\"/><book-part id=\"book-part-001\"/></book>",
+            encoding="utf-8"
+        )
+
+        # Create Books|OSO document
+        oso_dir = source / "OSO_Book_001"
+        oso_dir.mkdir()
+        (oso_dir / "impact_config.xml").write_text(
+            "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"OSO\"/></impact-config>",
+            encoding="utf-8"
+        )
+        (oso_dir / "OSO_Book_001.xml").write_text(
+            "<book><front-matter-part id=\"workid-OSO12345-front-1\"/><book-part id=\"workid-OSO12345-book-part-2\"/></book>",
+            encoding="utf-8"
+        )
+
+        documents = extractor.scan_documents(source, recursive=True)
+
+        # Should find both clients
+        self.assertIn("Books|TNF", documents)
+        self.assertIn("Books|OSO", documents)
+        self.assertEqual(len(documents["Books|TNF"]), 1)
+        self.assertEqual(len(documents["Books|OSO"]), 1)
+
+    def test_id_pattern_scan_documents_respects_type_filter(self) -> None:
+        """Test that scan_documents respects type filter."""
+        extractor = IDPatternExtractor()
+
+        source = Path(self.temp_dir.name) / "id_pattern_filter"
+        source.mkdir()
+
+        # Books document
+        books_dir = source / "Books_001"
+        books_dir.mkdir()
+        (books_dir / "impact_config.xml").write_text(
+            "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"TNF\"/></impact-config>",
+            encoding="utf-8"
+        )
+        (books_dir / "book.xml").write_text("<book/>", encoding="utf-8")
+
+        # Journals document
+        journals_dir = source / "Journals_001"
+        journals_dir.mkdir()
+        (journals_dir / "impact_config.xml").write_text(
+            "<?xml version=\"1.0\"?><impact-config><type>Journals</type><client name=\"OUP\"/></impact-config>",
+            encoding="utf-8"
+        )
+        (journals_dir / "journal.xml").write_text("<article/>", encoding="utf-8")
+
+        # Filter for Books only
+        books_docs = extractor.scan_documents(source, recursive=True, type_filter="Books")
+        self.assertIn("Books|TNF", books_docs)
+        self.assertNotIn("Journals|OUP", books_docs)
+
+        # Filter for Journals only
+        journals_docs = extractor.scan_documents(source, recursive=True, type_filter="Journals")
+        self.assertIn("Journals|OUP", journals_docs)
+        self.assertNotIn("Books|TNF", journals_docs)
+
+    def test_id_pattern_scan_documents_respects_client_filter(self) -> None:
+        """Test that scan_documents respects client filter."""
+        extractor = IDPatternExtractor()
+
+        source = Path(self.temp_dir.name) / "id_pattern_client_filter"
+        source.mkdir()
+
+        # TNF document
+        tnf_dir = source / "TNF_001"
+        tnf_dir.mkdir()
+        (tnf_dir / "impact_config.xml").write_text(
+            "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"TNF\"/></impact-config>",
+            encoding="utf-8"
+        )
+        (tnf_dir / "book.xml").write_text("<book/>", encoding="utf-8")
+
+        # OSO document
+        oso_dir = source / "OSO_001"
+        oso_dir.mkdir()
+        (oso_dir / "impact_config.xml").write_text(
+            "<?xml version=\"1.0\"?><impact-config><type>Books</type><client name=\"OSO\"/></impact-config>",
+            encoding="utf-8"
+        )
+        (oso_dir / "book.xml").write_text("<book/>", encoding="utf-8")
+
+        # Filter for TNF only
+        tnf_docs = extractor.scan_documents(source, recursive=True, client_filter="TNF")
+        self.assertIn("Books|TNF", tnf_docs)
+        self.assertNotIn("Books|OSO", tnf_docs)
+
+    def test_id_pattern_extract_ids_from_xml(self) -> None:
+        """Test that extract_ids_from_xml correctly extracts IDs."""
+        extractor = IDPatternExtractor()
+
+        source = Path(self.temp_dir.name) / "id_pattern_extract"
+        source.mkdir()
+
+        xml_content = """<?xml version="1.0"?>
+        <book>
+            <front-matter>
+                <front-matter-part id="front-matter-part-001"/>
+                <front-matter-part id="front-matter-part-002"/>
+            </front-matter>
+            <book-body>
+                <book-part id="book-part-001"/>
+                <book-part id="book-part-002"/>
+            </book-body>
+        </book>
+        """
+        xml_file = source / "test.xml"
+        xml_file.write_text(xml_content, encoding="utf-8")
+
+        # Extract front matter IDs
+        front_ids = extractor.extract_ids_from_xml(xml_file, "//front-matter-part[@id]")
+        self.assertEqual(len(front_ids), 2)
+        self.assertIn("front-matter-part-001", front_ids)
+        self.assertIn("front-matter-part-002", front_ids)
+
+        # Extract body IDs
+        body_ids = extractor.extract_ids_from_xml(xml_file, "//book-part[@id]")
+        self.assertEqual(len(body_ids), 2)
+        self.assertIn("book-part-001", body_ids)
+        self.assertIn("book-part-002", body_ids)
+
+    def test_id_pattern_build_matrix_data(self) -> None:
+        """Test that build_matrix_data creates correct matrix structure."""
+        extractor = IDPatternExtractor()
+
+        # Create mock documents_by_client data
+        documents_by_client = {
+            "Books|TNF": [
+                {
+                    "folder": "/docs/TNF_001",
+                    "xml_file": "/docs/TNF_001/doc.xml",
+                    "doc_type": "Books",
+                    "client": "TNF",
+                    "doc_title": "TNF Book 1",
+                    "identifier": ""
+                }
+            ],
+            "Books|OSO": [
+                {
+                    "folder": "/docs/OSO_001",
+                    "xml_file": "/docs/OSO_001/doc.xml",
+                    "doc_type": "Books",
+                    "client": "OSO",
+                    "doc_title": "OSO Book 1",
+                    "identifier": ""
+                }
+            ]
+        }
+
+        # We need to mock the XML extraction - let's create real files
+        source = Path(self.temp_dir.name) / "id_pattern_matrix"
+        source.mkdir()
+
+        # TNF document with front-matter-part IDs
+        tnf_dir = source / "TNF_001"
+        tnf_dir.mkdir()
+        (tnf_dir / "doc.xml").write_text(
+            "<book><front-matter><front-matter-part id=\"front-matter-part-001\"/></front-matter></book>",
+            encoding="utf-8"
+        )
+        documents_by_client["Books|TNF"][0]["folder"] = str(tnf_dir)
+        documents_by_client["Books|TNF"][0]["xml_file"] = str(tnf_dir / "doc.xml")
+
+        # OSO document with workid pattern
+        oso_dir = source / "OSO_001"
+        oso_dir.mkdir()
+        (oso_dir / "doc.xml").write_text(
+            "<book><front-matter><front-matter-part id=\"workid-OSO123-front-1\"/></front-matter></book>",
+            encoding="utf-8"
+        )
+        documents_by_client["Books|OSO"][0]["folder"] = str(oso_dir)
+        documents_by_client["Books|OSO"][0]["xml_file"] = str(oso_dir / "doc.xml")
+
+        rows, clients, detail_data, _element_details = extractor.build_matrix_data(documents_by_client, "Books")
+
+        # Check structure
+        self.assertEqual(len(clients), 2)
+        self.assertIn("TNF", clients)
+        self.assertIn("OSO", clients)
+
+        # Check rows - should have front, body, back areas
+        area_keys = [row["area"] for row in rows]
+        self.assertIn("front", area_keys)
+        self.assertIn("body", area_keys)
+        self.assertIn("back", area_keys)
+
+        # Find front row
+        front_row = next(row for row in rows if row["area"] == "front")
+        self.assertEqual(front_row["TNF"], "front-matter-part-{nnn}")
+        self.assertEqual(front_row["OSO"], "workid-{work}-front-{n}")
+
+        # Body and back should be empty (em-dash)
+        body_row = next(row for row in rows if row["area"] == "body")
+        self.assertEqual(body_row["TNF"], "—")
+
+    def test_id_pattern_csv_export(self) -> None:
+        """Test that CSV export produces correct output."""
+        extractor = IDPatternExtractor()
+
+        rows = [
+            {"area": "front", "label": "Front Matter", "TNF": "front-part-{nnn}", "OSO": "workid-{work}-front-{n}"},
+            {"area": "body", "label": "Body Matter", "TNF": "book-part-{nnn}", "OSO": "workid-{work}-book-part-{n}"},
+        ]
+        clients = ["TNF", "OSO"]
+
+        output_path = Path(self.temp_dir.name) / "test_matrix.csv"
+        result_path = extractor.export_csv(rows, clients, output_path)
+
+        # Verify file was created
+        self.assertTrue(result_path.exists())
+
+        # Read and verify content
+        import csv
+        with open(result_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            csv_rows = list(reader)
+
+        # Header row
+        self.assertEqual(csv_rows[0], ["Area", "TNF", "OSO"])
+
+        # Data rows
+        self.assertEqual(csv_rows[1], ["Front Matter", "front-part-{nnn}", "workid-{work}-front-{n}"])
+        self.assertEqual(csv_rows[2], ["Body Matter", "book-part-{nnn}", "workid-{work}-book-part-{n}"])
+
+    def test_id_pattern_empty_cell_for_missing_area(self) -> None:
+        """Test that empty cells show '—' when client has no IDs for an area."""
+        extractor = IDPatternExtractor()
+
+        source = Path(self.temp_dir.name) / "id_pattern_empty"
+        source.mkdir()
+
+        # TNF document with front and body
+        tnf_dir = source / "TNF_001"
+        tnf_dir.mkdir()
+        (tnf_dir / "doc.xml").write_text(
+            """<book>
+                <front-matter><front-matter-part id="front-001"/></front-matter>
+                <book-body><book-part id="body-001"/></book-body>
+            </book>""",
+            encoding="utf-8"
+        )
+
+        # OSO document with only front (no back)
+        oso_dir = source / "OSO_001"
+        oso_dir.mkdir()
+        (oso_dir / "doc.xml").write_text(
+            "<book><front-matter><front-matter-part id=\"oso-front-001\"/></front-matter></book>",
+            encoding="utf-8"
+        )
+
+        documents_by_client = {
+            "Books|TNF": [{
+                "folder": str(tnf_dir),
+                "xml_file": str(tnf_dir / "doc.xml"),
+                "doc_type": "Books",
+                "client": "TNF",
+                "doc_title": "",
+                "identifier": ""
+            }],
+            "Books|OSO": [{
+                "folder": str(oso_dir),
+                "xml_file": str(oso_dir / "doc.xml"),
+                "doc_type": "Books",
+                "client": "OSO",
+                "doc_title": "",
+                "identifier": ""
+            }]
+        }
+
+        rows, clients, detail_data, _element_details = extractor.build_matrix_data(documents_by_client, "Books")
+
+        # Check back row - OSO should be empty
+        back_row = next(row for row in rows if row["area"] == "back")
+        self.assertEqual(back_row["TNF"], "—")
+        self.assertEqual(back_row["OSO"], "—")  # Both empty since no back-matter in XML
 
 
 if __name__ == "__main__":
