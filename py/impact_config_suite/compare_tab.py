@@ -12,6 +12,18 @@ try:
 except ImportError:  # fallback if bs4 isn't installed
     BeautifulSoup = None
 
+# XML Compare package import
+try:
+    from xml_compare.gui_panel import XmlComparePanel
+    from xml_compare.pipeline import run_xml_compare
+    from xml_compare.models import CompareOptions
+    XML_COMPARE_AVAILABLE = True
+except ImportError:
+    XmlComparePanel = None
+    run_xml_compare = None
+    CompareOptions = None
+    XML_COMPARE_AVAILABLE = False
+
 PRIORITY_WRAPPER_ORDER = ("sup", "sub", "a", "em", "strong", "sc")
 PRIORITY_DEL_SELECTOR = "del[data-username]"
 
@@ -322,22 +334,35 @@ class HTMLCompareTab(ttk.Frame):
             activebackground="#0f172a",
             activeforeground="#ffffff",
         ).pack(side="left", padx=(16, 0))
+        tk.Radiobutton(
+            method_frame,
+            text="XML to XML",
+            variable=self.method_var,
+            value="method4",
+            command=self._on_method_change,
+            bg="#0f172a",
+            fg="#cbd5e1",
+            selectcolor="#0f172a",
+            activebackground="#0f172a",
+            activeforeground="#ffffff",
+        ).pack(side="left", padx=(16, 0))
 
         self.selector_var = tk.StringVar(value="[data-username][data-time]")
         self.compare_mode_var = tk.StringVar(value="data-time")
         
-        tk.Label(
+        self.compare_mode_label = tk.Label(
             control_frame,
             text="Compare Mode:",
             bg="#0f172a",
             fg="#94a3b8",
             font=("Segoe UI", 10),
-        ).grid(row=1, column=0, sticky="w")
-        
-        mode_frame = tk.Frame(control_frame, bg="#0f172a")
-        mode_frame.grid(row=1, column=1, sticky="w", padx=(10, 0))
+        )
+        self.compare_mode_label.grid(row=1, column=0, sticky="w")
+
+        self.mode_frame = tk.Frame(control_frame, bg="#0f172a")
+        self.mode_frame.grid(row=1, column=1, sticky="w", padx=(10, 0))
         tk.Radiobutton(
-            mode_frame,
+            self.mode_frame,
             text="data-time",
             variable=self.compare_mode_var,
             value="data-time",
@@ -349,7 +374,7 @@ class HTMLCompareTab(ttk.Frame):
             font=("Segoe UI", 9),
         ).pack(side="left", padx=(0, 12))
         tk.Radiobutton(
-            mode_frame,
+            self.mode_frame,
             text="data-cid",
             variable=self.compare_mode_var,
             value="data-cid",
@@ -361,28 +386,31 @@ class HTMLCompareTab(ttk.Frame):
             font=("Segoe UI", 9),
         ).pack(side="left", padx=(0, 12))
         
-        tk.Label(
+        self.selector_label = tk.Label(
             control_frame,
             text="Query selector:",
             bg="#0f172a",
             fg="#94a3b8",
             font=("Segoe UI", 10),
-        ).grid(row=2, column=0, sticky="w", pady=(10, 0))
-        tk.Entry(
+        )
+        self.selector_label.grid(row=2, column=0, sticky="w", pady=(10, 0))
+        self.selector_entry = tk.Entry(
             control_frame,
             textvariable=self.selector_var,
             bg="#1f2937",
             fg="white",
             border=0,
             font=("Segoe UI", 11),
-        ).grid(row=2, column=1, sticky="ew", padx=(10, 0), pady=(10, 0), ipady=5)
-        tk.Label(
+        )
+        self.selector_entry.grid(row=2, column=1, sticky="ew", padx=(10, 0), pady=(10, 0), ipady=5)
+        self.selector_help = tk.Label(
             control_frame,
             text="e.g. [data-username='copyeditor'][data-time]  or  [data-username][data-time]",
             bg="#0f172a",
             fg="#64748b",
             font=("Segoe UI", 9),
-        ).grid(row=2, column=2, sticky="w", padx=(10, 0), pady=(10, 0))
+        )
+        self.selector_help.grid(row=2, column=2, sticky="w", padx=(10, 0), pady=(10, 0))
 
         self.first_html_var = tk.StringVar()
         self.second_html_var = tk.StringVar()
@@ -404,20 +432,20 @@ class HTMLCompareTab(ttk.Frame):
         )
         self.compare_btn.grid(row=6, column=0, columnspan=3, pady=(12, 0))
 
-        filter_frame = tk.Frame(control_frame, bg="#0f172a")
-        filter_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 0))
-        filter_frame.columnconfigure(1, weight=1)
+        self.filter_frame = tk.Frame(control_frame, bg="#0f172a")
+        self.filter_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        self.filter_frame.columnconfigure(1, weight=1)
 
         self.filter_var = tk.StringVar()
         tk.Label(
-            filter_frame,
+            self.filter_frame,
             text="Filter:",
             bg="#0f172a",
             fg="#94a3b8",
             font=("Segoe UI", 10),
         ).grid(row=0, column=0, sticky="w")
         tk.Entry(
-            filter_frame,
+            self.filter_frame,
             textvariable=self.filter_var,
             bg="#1f2937",
             fg="white",
@@ -425,7 +453,7 @@ class HTMLCompareTab(ttk.Frame):
             font=("Segoe UI", 11),
         ).grid(row=0, column=1, sticky="ew", padx=(10, 0), ipady=5)
         tk.Button(
-            filter_frame,
+            self.filter_frame,
             text="Apply Filter",
             command=self._apply_filter,
             bg="#3b82f6",
@@ -436,7 +464,7 @@ class HTMLCompareTab(ttk.Frame):
             pady=6,
         ).grid(row=0, column=2, padx=(10, 0))
         tk.Button(
-            filter_frame,
+            self.filter_frame,
             text="Clear",
             command=self._clear_filter,
             bg="#475569",
@@ -449,7 +477,7 @@ class HTMLCompareTab(ttk.Frame):
 
         self.show_changes_only_var = tk.BooleanVar(value=False)
         tk.Checkbutton(
-            filter_frame,
+            self.filter_frame,
             text="Show Changes Only (Hide clean 'Same' rows)",
             variable=self.show_changes_only_var,
             command=self._apply_filter,
@@ -463,14 +491,14 @@ class HTMLCompareTab(ttk.Frame):
 
         self.priority_user_var = tk.StringVar(value="copyeditor")
         tk.Label(
-            filter_frame,
+            self.filter_frame,
             text="Priority User:",
             bg="#0f172a",
             fg="#94a3b8",
             font=("Segoe UI", 10),
         ).grid(row=2, column=0, sticky="w", pady=(8, 0))
         tk.Entry(
-            filter_frame,
+            self.filter_frame,
             textvariable=self.priority_user_var,
             bg="#1f2937",
             fg="white",
@@ -478,7 +506,7 @@ class HTMLCompareTab(ttk.Frame):
             font=("Segoe UI", 10),
         ).grid(row=2, column=1, sticky="ew", padx=(10, 0), pady=(8, 0), ipady=3)
         tk.Button(
-            filter_frame,
+            self.filter_frame,
             text="Update Priority",
             command=self._apply_filter,
             bg="#6366f1",
@@ -491,7 +519,7 @@ class HTMLCompareTab(ttk.Frame):
 
         self.strict_review_var = tk.BooleanVar(value=False)
         tk.Checkbutton(
-            filter_frame,
+            self.filter_frame,
             text="Strict Review Mode (Copyeditor only, No interference)",
             variable=self.strict_review_var,
             command=self._apply_filter,
@@ -504,11 +532,11 @@ class HTMLCompareTab(ttk.Frame):
         ).grid(row=3, column=0, columnspan=4, sticky="w", pady=(4, 0))
 
         # ── Status + Parent Status dropdowns ─────────────────────────────────
-        tk.Label(filter_frame, text="Status:", bg="#0f172a", fg="#94a3b8",
+        tk.Label(self.filter_frame, text="Status:", bg="#0f172a", fg="#94a3b8",
                  font=("Segoe UI", 10)).grid(row=4, column=0, sticky="w", pady=(10, 0))
         self.status_filter_var = tk.StringVar(value="")
         self.status_filter_cb = ttk.Combobox(
-            filter_frame, textvariable=self.status_filter_var,
+            self.filter_frame, textvariable=self.status_filter_var,
             state="readonly", width=22, font=("Segoe UI", 10)
         )
         self.status_filter_cb.grid(row=4, column=1, sticky="w", padx=(10, 0), pady=(10, 0))
@@ -519,14 +547,14 @@ class HTMLCompareTab(ttk.Frame):
                                              padx=(16, 0), pady=(10, 0))
         self.parent_filter_var = tk.StringVar(value="")
         self.parent_filter_cb = ttk.Combobox(
-            filter_frame, textvariable=self.parent_filter_var,
+            self.filter_frame, textvariable=self.parent_filter_var,
             state="readonly", width=28, font=("Segoe UI", 10)
         )
         self.parent_filter_cb.grid(row=4, column=3, sticky="w", padx=(6, 0), pady=(10, 0))
         self.parent_filter_cb.bind("<<ComboboxSelected>>", lambda _e: self._apply_filter())
 
         # ── Find bar ─────────────────────────────────────────────────────────
-        find_frame = tk.Frame(filter_frame, bg="#0f172a")
+        find_frame = tk.Frame(self.filter_frame, bg="#0f172a")
         find_frame.grid(row=5, column=0, columnspan=4, sticky="ew", pady=(10, 0))
 
         tk.Label(find_frame, text="🔍 Find:", bg="#0f172a", fg="#94a3b8",
@@ -578,12 +606,22 @@ class HTMLCompareTab(ttk.Frame):
         )
         self.restore_btn.grid(row=9, column=0, columnspan=3, pady=(10, 0))
 
-        summary_frame = tk.Frame(self, bg="#111827", padx=30, pady=18)
-        summary_frame.pack(fill="both", expand=True)
-        summary_frame.columnconfigure(0, weight=1)
+        # ── XML Compare Panel (hidden by default, shown for method4) ──────────
+        if XML_COMPARE_AVAILABLE:
+            self.xml_panel = XmlComparePanel(
+                control_frame,
+                first_path_var=self.first_html_var,
+                second_path_var=self.second_html_var,
+            )
+            self.xml_panel.grid(row=10, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+            self.xml_panel.grid_remove()  # Hidden by default
+
+        self.summary_frame = tk.Frame(self, bg="#111827", padx=30, pady=18)
+        self.summary_frame.pack(fill="both", expand=True)
+        self.summary_frame.columnconfigure(0, weight=1)
 
         self.summary_label = tk.Label(
-            summary_frame,
+            self.summary_frame,
             text="No comparison run yet.",
             bg="#111827",
             fg="#cbd5e1",
@@ -592,7 +630,7 @@ class HTMLCompareTab(ttk.Frame):
         )
         self.summary_label.pack(fill="x", pady=(0, 10))
 
-        self._build_result_table(summary_frame)
+        self._build_result_table(self.summary_frame)
 
         self._on_method_change()
 
@@ -1251,13 +1289,17 @@ tr[data-status="Changed (Div Replace)"] td{background:#fdf4ff}
             self.multi_frame.grid_remove()
             self.single_frame.grid_remove()
             self.file_frame.grid()
+            self._show_html_ui(True)
+            self._show_xml_ui(False)
         elif method == "method2":
             self.file_frame.grid_remove()
             self.single_frame.grid_remove()
             self.multi_frame.grid()
             self.first_html_var.set("")
             self.second_html_var.set("")
-        else:
+            self._show_html_ui(True)
+            self._show_xml_ui(False)
+        elif method == "method3":
             self.file_frame.grid_remove()
             self.multi_frame.grid_remove()
             self.single_frame.grid()
@@ -1265,6 +1307,65 @@ tr[data-status="Changed (Div Replace)"] td{background:#fdf4ff}
             self.second_html_var.set("")
             self.multi_html_files = []
             self.multi_files_var.set("No files selected")
+            self._show_html_ui(True)
+            self._show_xml_ui(False)
+        elif method == "method4":
+            # XML mode: show xml_panel, hide HTML-specific UI
+            self.multi_frame.grid_remove()
+            self.single_frame.grid_remove()
+            self.file_frame.grid_remove()
+            self._show_html_ui(False)
+            self._show_xml_ui(True)
+
+    def _show_html_ui(self, show: bool) -> None:
+        """Show or hide HTML comparison specific UI elements."""
+        # Toggle Compare Mode label and radios (row 1)
+        if hasattr(self, 'compare_mode_label'):
+            if show:
+                self.compare_mode_label.grid()
+                self.mode_frame.grid()
+            else:
+                self.compare_mode_label.grid_remove()
+                self.mode_frame.grid_remove()
+        # Toggle Query selector row (row 2)
+        if hasattr(self, 'selector_label'):
+            if show:
+                self.selector_label.grid()
+                self.selector_entry.grid()
+                self.selector_help.grid()
+            else:
+                self.selector_label.grid_remove()
+                self.selector_entry.grid_remove()
+                self.selector_help.grid_remove()
+        # Toggle filter frame (row 7)
+        if hasattr(self, 'filter_frame'):
+            if show:
+                self.filter_frame.grid()
+            else:
+                self.filter_frame.grid_remove()
+        # Toggle summary frame (contains tree results)
+        if hasattr(self, 'summary_frame'):
+            if show:
+                self.summary_frame.pack(fill="both", expand=True)
+            else:
+                self.summary_frame.pack_forget()
+        # Toggle export/restore buttons
+        if hasattr(self, 'export_btn'):
+            if show:
+                self.export_btn.grid()
+                self.restore_btn.grid()
+            else:
+                self.export_btn.grid_remove()
+                self.restore_btn.grid_remove()
+
+    def _show_xml_ui(self, show: bool) -> None:
+        """Show or hide XML comparison specific UI elements."""
+        if XML_COMPARE_AVAILABLE and hasattr(self, 'xml_panel'):
+            if show:
+                self.xml_panel.grid()
+                self.xml_panel.clear_log()
+            else:
+                self.xml_panel.grid_remove()
 
     def _browse_html_file(self, target_var: tk.StringVar) -> None:
         selected = filedialog.askopenfilename(

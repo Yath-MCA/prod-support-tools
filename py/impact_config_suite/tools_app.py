@@ -283,11 +283,13 @@ class CommonToolsApp:
             tk.Label(self.header_frame, text="IMPACT", font=("Arial", 12, "bold"), bg="#ffffff").grid(row=0, column=0, padx=20)
 
         # Col 2: Title Text
+        version = self.app_metadata.get('version', '')
+        title_text = f"Developer Supporting Framework  v{version}" if version else "Developer Supporting Framework"
         self.header_title = tk.Label(
-            self.header_frame, 
-            text="Developer Supporting Framework", 
-            font=("Segoe UI", 22, "bold"), 
-            bg="#ffffff", 
+            self.header_frame,
+            text=title_text,
+            font=("Segoe UI", 22, "bold"),
+            bg="#ffffff",
             fg="#1e293b"
         )
         self.header_title.grid(row=0, column=1, sticky="w")

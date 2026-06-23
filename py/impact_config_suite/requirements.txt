@@ -6,6 +6,7 @@ tkintertable>=0.1  # For table widgets (if used)
 
 # Data Processing
 lxml>=4.9.0        # XML/HTML parsing (analyses, patterns, cjk_checker)
+xmldiff>=2.6.0     # XML comparison engine for xml_compare package
 requests>=2.28.0   # HTTP requests for API calls
 beautifulsoup4>=4.11.0  # HTML parsing fallback
 

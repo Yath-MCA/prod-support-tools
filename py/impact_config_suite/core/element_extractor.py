@@ -103,6 +103,9 @@ class ElementExtractor:
         if lowered_filter == "*_updated.html":
             stem = Path(file_name).stem
             return bool(re.fullmatch(r"[^_]+_updated", stem, flags=re.IGNORECASE))
+        if lowered_filter == "*._original.xml":
+            stem = Path(file_name).stem
+            return bool(re.fullmatch(r"[^.]+\._original", stem, flags=re.IGNORECASE))
 
         return fnmatch.fnmatchcase(lowered_name, lowered_filter)
 

@@ -297,7 +297,7 @@ class ElementExtractorTab(ttk.Frame):
         self.filename_filter_combo = ttk.Combobox(
             options_frame,
             textvariable=self.filename_filter_var,
-            values=["*_original.html", "*_updated.html", "None"],
+            values=["*_original.html", "*_updated.html", "*._original.xml", "None"],
             state="readonly",
             width=18,
             font=("Segoe UI", 9),
