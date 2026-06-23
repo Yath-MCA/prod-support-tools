@@ -846,6 +846,10 @@ class HtmlTemplateRenderer:
         Returns:
             str: HTML with highlighted differences
         """
+        # Coerce to Python strings to handle lxml/xmldiff Cython objects
+        old_text = str(old_text) if old_text is not None else ""
+        new_text = str(new_text) if new_text is not None else ""
+        
         if not old_text and not new_text:
             return ""
         

@@ -193,13 +193,22 @@ class DiffEngine:
         """
         cache: Dict[str, str] = {}
         root = tree.getroot()
-        
-        # Walk all elements and capture text at each path
+
+        # Walk only Element nodes (not Comment, ProcessingInstruction)
+        # Comment/PI nodes have Cython tag objects that crash getpath()
         for elem in root.iter():
-            path = tree.getpath(elem)
-            if elem.text:
-                cache[path] = str(elem.text)
-        
+            # Skip non-element nodes (comments, processing instructions)
+            # Their tag is a Cython factory, not a string
+            if not isinstance(elem.tag, str):
+                continue
+            try:
+                path = tree.getpath(elem)
+                if elem.text:
+                    cache[path] = str(elem.text)
+            except (TypeError, ValueError):
+                # Skip elements that can't be pathed
+                continue
+
         return cache
 
     def _process_actions(
@@ -333,7 +342,7 @@ class DiffEngine:
         """
         if isinstance(action, InsertNode):
             path = self._normalize_xpath(action.target)
-            tag = action.tag
+            tag = str(action.tag)
             preview = f"<{tag}>...</{tag}>"
             structure_diff = StructureDiff(
                 path=path,
@@ -346,7 +355,7 @@ class DiffEngine:
         elif isinstance(action, DeleteNode):
             path = self._normalize_xpath(action.node)
             element = self._get_element_by_path(left_tree, action.node)
-            tag = element.tag if element is not None else "unknown"
+            tag = str(element.tag) if element is not None else "unknown"
             preview = self._get_element_preview(element)
             structure_diff = StructureDiff(
                 path=path,
@@ -360,7 +369,7 @@ class DiffEngine:
             old_path = self._normalize_xpath(action.node)
             new_path = self._normalize_xpath(action.target)
             element = self._get_element_by_path(left_tree, action.node)
-            tag = element.tag if element is not None else "unknown"
+            tag = str(element.tag) if element is not None else "unknown"
             preview = self._get_element_preview(element)
             structure_diff = StructureDiff(
                 path=new_path,
@@ -373,8 +382,8 @@ class DiffEngine:
             
         elif isinstance(action, RenameNode):
             path = self._normalize_xpath(action.node)
-            old_tag = action.oldtag
-            new_tag = action.tag
+            old_tag = str(action.oldtag)
+            new_tag = str(action.tag)
             # Rename is both structural and formatting
             # Add as structure change
             element = self._get_element_by_path(left_tree, action.node)
@@ -456,8 +465,8 @@ class DiffEngine:
         if left_elem is None or right_elem is None:
             return False
         
-        left_tag = left_elem.tag
-        right_tag = right_elem.tag
+        left_tag = str(left_elem.tag)
+        right_tag = str(right_elem.tag)
         
         # Strip namespace if present
         left_tag = left_tag.split("}")[-1] if "}" in left_tag else left_tag
@@ -488,7 +497,7 @@ class DiffEngine:
         def clean_tag(elem):
             if elem is None:
                 return None
-            tag = elem.tag
+            tag = str(elem.tag)
             return tag.split("}")[-1] if "}" in tag else tag
         
         return clean_tag(left_elem), clean_tag(right_elem)
@@ -560,7 +569,7 @@ class DiffEngine:
         if element is None:
             return ""
         
-        tag = element.tag
+        tag = str(element.tag)
         tag = tag.split("}")[-1] if "}" in tag else tag
         
         text = self._normalize_text(element.text)

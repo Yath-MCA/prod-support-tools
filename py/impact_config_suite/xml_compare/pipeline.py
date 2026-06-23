@@ -142,7 +142,7 @@ def run_xml_compare_simple(
     # Add attribute comparison if enabled
     if options.include_attributes:
         result.attribute_diffs = attr_comparator.compare_attributes(
-            original_tree, revised_tree
+            original_tree, revised_tree, options
         )
         stats_builder.update_result_statistics(result)
 
