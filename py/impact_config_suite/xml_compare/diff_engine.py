@@ -35,6 +35,36 @@ from .models import (
 from .parser_service import XMLParserService
 
 
+# Monkey patch xmldiff's node_text method to handle Cython objects
+def _patched_node_text(diff_instance, node):
+    """
+    Patched version of xmldiff's node_text that handles Cython objects.
+    
+    The original xmldiff code can fail when text content contains Cython objects
+    from lxml processing. This version ensures all text elements are converted
+    to proper strings before joining.
+    """
+    if hasattr(node, 'itertext'):
+        # This is an Element - get all text content
+        texts = [str(t) for t in node.itertext()]
+    else:
+        # This is a Comment or other node type
+        texts = [str(node.text) if node.text else '']
+    
+    return " ".join(texts).strip()
+
+
+# Apply the monkey patch to xmldiff's Differ class
+try:
+    from xmldiff.diff import Differ
+    original_node_text = Differ.node_text
+    Differ.node_text = _patched_node_text
+except (ImportError, AttributeError):
+    # If we can't patch it, we'll just continue
+    # This handles the case where xmldiff structure is different
+    pass
+
+
 class DiffEngine:
     """
     Main engine for comparing XML documents.

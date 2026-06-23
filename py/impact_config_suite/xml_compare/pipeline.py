@@ -19,6 +19,12 @@ from .statistics import StatisticsBuilder
 if TYPE_CHECKING:
     pass
 
+# Import RunHistoryStore - handle import based on execution context
+try:
+    from core.run_history import RunHistoryStore
+except ImportError:
+    from ..core.run_history import RunHistoryStore
+
 
 def run_xml_compare(
     original: Path,
@@ -37,7 +43,7 @@ def run_xml_compare(
         original: Path to the original XML file
         revised: Path to the revised XML file
         options: Comparison options (uses defaults if None)
-        output_dir: Directory for output report (defaults to revised file's parent)
+        output_dir: Directory for output report (defaults to ~/Documents/impact-support-log/xml_compare_reports)
         log_callback: Optional callback for progress messages
 
     Returns:
@@ -52,7 +58,9 @@ def run_xml_compare(
         options = CompareOptions()
 
     if output_dir is None:
-        output_dir = revised.parent
+        # Use centralized support log directory for all XML comparison reports
+        output_dir = RunHistoryStore.base_dir() / "xml_compare_reports"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     if log_callback:
         log_callback("Initializing comparison pipeline...")

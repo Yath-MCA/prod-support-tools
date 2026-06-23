@@ -395,6 +395,376 @@ class HtmlTemplateRenderer:
             border-radius: 2px;
         }
         
+        /* Full text compare styles - red deleted, blue inserted */
+        .text-compare {
+            display: block !important;
+            background: #ffffff !important;
+            border-left: 4px solid var(--color-primary);
+        }
+        
+        .text-compare-row {
+            display: flex;
+            margin: 5px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .text-compare-label {
+            display: inline-block;
+            width: 70px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding-right: 10px;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
+        .text-compare-label.old {
+            color: var(--color-deleted-text);
+        }
+
+        .text-compare-label.new {
+            color: var(--color-inserted-text);
+        }
+
+        .text-compare-header {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        
+        .text-compare-old, .text-compare-new {
+            flex: 1;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 8px 12px;
+            border-radius: 4px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+        }
+
+        .text-compare-old:hover {
+            background: #fafafa;
+        }
+
+        .text-compare-new:hover {
+            background: #fafafa;
+        }
+        
+        .text-delete-highlight {
+            background: #ffcdd2;
+            color: #c62828;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .text-insert-highlight {
+            background: #bbdefb;
+            color: #1565c0;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        
+        .text-delete-full {
+            background: #ffcdd2;
+            color: #c62828;
+            padding: 2px 4px;
+            border-radius: 3px;
+            display: block;
+        }
+        
+        .text-insert-full {
+            background: #bbdefb;
+            color: #1565c0;
+            padding: 2px 4px;
+            border-radius: 3px;
+            display: block;
+        }
+        
+        /* Enhanced Attribute diff styles */
+        .attr-group {
+            border-bottom: 1px solid var(--color-border);
+            padding: 15px 20px;
+        }
+        
+        .attr-group:last-child {
+            border-bottom: none;
+        }
+        
+        .attr-group-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        
+        .attr-group-changes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .attr-change-item {
+            flex: 1;
+            min-width: 280px;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .attr-change-item.added {
+            border-left: 4px solid var(--color-inserted-text);
+        }
+        
+        .attr-change-item.removed {
+            border-left: 4px solid var(--color-deleted-text);
+        }
+        
+        .attr-change-item.changed {
+            border-left: 4px solid var(--color-formatting);
+        }
+        
+        .attr-change-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f9f9f9;
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .attr-name {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        
+        .attr-badge {
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+        
+        .attr-badge.added {
+            background: var(--color-inserted-bg);
+            color: var(--color-inserted-text);
+        }
+        
+        .attr-badge.removed {
+            background: var(--color-deleted-bg);
+            color: var(--color-deleted-text);
+        }
+        
+        .attr-badge.changed {
+            background: #e3f2fd;
+            color: var(--color-formatting);
+        }
+        
+        .attr-change-values {
+            padding: 10px 12px;
+        }
+        
+        .attr-old-value, .attr-new-value {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            padding: 4px 0;
+            word-break: break-all;
+        }
+        
+        .attr-old-value {
+            color: #d32f2f;
+        }
+        
+        .attr-new-value {
+            color: #1976d2;
+        }
+        
+        .attr-label {
+            font-weight: 600;
+            margin-right: 5px;
+            color: var(--color-text-secondary);
+        }
+        
+        /* Full Compare items */
+        .full-compare-list {
+            padding: 10px;
+        }
+        
+        .full-compare-item {
+            margin-bottom: 15px;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .full-compare-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 15px;
+            background: #f9f9f9;
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .full-compare-type {
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+        
+        .full-compare-type.text {
+            background: var(--color-deleted-bg);
+            color: var(--color-deleted-text);
+        }
+        
+        .full-compare-type.format {
+            background: #e3f2fd;
+            color: var(--color-formatting);
+        }
+        
+        .full-compare-type.attribute {
+            background: #fff3e0;
+            color: var(--color-attribute-old);
+        }
+        
+        .full-compare-type.structure {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .full-compare-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            flex: 1;
+        }
+        
+        .full-compare-content {
+            padding: 15px;
+        }
+        
+        .format-change-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        
+        .format-old {
+            background: #ffcdd2;
+            color: #c62828;
+            padding: 3px 8px;
+            border-radius: 3px;
+        }
+        
+        .format-new {
+            background: #bbdefb;
+            color: #1565c0;
+            padding: 3px 8px;
+            border-radius: 3px;
+        }
+        
+        .format-arrow {
+            color: var(--color-text-secondary);
+            font-weight: bold;
+        }
+        
+        .format-content {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+            border-left: 3px solid var(--color-formatting);
+        }
+        
+        .attr-element-tag {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-weight: bold;
+            color: var(--color-text-secondary);
+            margin-bottom: 10px;
+        }
+        
+        .attr-changes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .attr-change-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: #fafafa;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .attr-change-name {
+            font-weight: 600;
+            color: var(--color-text);
+            min-width: 100px;
+        }
+        
+        .attr-change-old {
+            color: var(--color-deleted-text);
+            background: var(--color-deleted-bg);
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+        
+        .attr-change-new {
+            color: var(--color-inserted-text);
+            background: var(--color-inserted-bg);
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+        
+        .attr-change-arrow {
+            color: var(--color-text-secondary);
+        }
+        
+        .struct-tag {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-weight: bold;
+            color: #7b1fa2;
+            margin-bottom: 8px;
+        }
+        
+        .struct-preview {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .struct-move-info {
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            font-style: italic;
+        }
+        
         /* Formatting diff specific */
         .diff-row.formatting .diff-side.old {
             background: #e3f2fd;
@@ -495,9 +865,8 @@ class HtmlTemplateRenderer:
             font-size: 0.85rem;
             color: var(--color-text-secondary);
             font-family: monospace;
-            max-height: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         
         /* Full compare details */
@@ -950,37 +1319,80 @@ class HtmlTemplateRenderer:
         return html
     
     def _render_text_tab(self, result: CompareResult) -> str:
-        """Render the Text Corrections tab content."""
+        """Render the Text Corrections tab content with inline highlighting."""
         html = '<div id="tab-text" class="tab-panel">\n'
-        html += self._render_tab_header("Text Corrections", "Side-by-side comparison of text content changes")
-        
+        html += self._render_tab_header("Text Corrections", "Full text comparison with inline change highlighting")
+
         if not result.text_diffs:
             html += self._render_empty_state("No text corrections found", "The text content matches between the two files.")
         else:
             html += '<div class="diff-container">\n'
             html += f'<div class="diff-header"><h3>{len(result.text_diffs)} Text Changes</h3></div>\n'
-            
+
             for diff in result.text_diffs:
-                inline_html = self._generate_inline_diff(diff.old_text, diff.new_text)
+                # Generate inline diff with red for deleted, blue for inserted
+                inline_html = self._generate_inline_diff_full(diff.old_text, diff.new_text)
                 html += f'''
-                <div class="diff-row" data-category="text">
-                    <div class="diff-side old">
-                        <div class="diff-side-label">Original</div>
-                        <div class="diff-path">{escape(diff.path)}</div>
-                        <div class="diff-content">{escape(diff.old_text) if not inline_html else escape(diff.old_text)}</div>
-                    </div>
-                    <div class="diff-side new">
-                        <div class="diff-side-label">Revised</div>
-                        <div class="diff-path">{escape(diff.path)}</div>
-                        <div class="diff-content">{inline_html or escape(diff.new_text)}</div>
+                <div class="diff-row text-compare" data-category="text">
+                    <div class="text-compare-header">{escape(diff.path)}</div>
+                    <div class="text-compare-content">
+                        {inline_html}
                     </div>
                 </div>
                 '''
-            
+
             html += '</div>\n'
-        
+
         html += '</div>\n'
         return html
+    
+    def _generate_inline_diff_full(self, old_text: str, new_text: str) -> str:
+        """Generate inline diff showing full text with red deleted and blue inserted.
+
+        Unlike _generate_inline_diff which uses strikethrough, this shows
+        the full text with color highlighting only on changed portions.
+        """
+        if not old_text and not new_text:
+            return "<em>(no text)</em>"
+
+        if not old_text:
+            # All new - wrap entire text in blue
+            return f'<div class="text-compare-row"><span class="text-compare-label new">NEW</span><div class="text-compare-new"><span class="text-insert-full">{escape(str(new_text))}</span></div></div>'
+
+        if not new_text:
+            # All deleted - wrap entire text in red
+            return f'<div class="text-compare-row"><span class="text-compare-label old">DELETED</span><div class="text-compare-old"><span class="text-delete-full">{escape(str(old_text))}</span></div></div>'
+
+        old_text = str(old_text)
+        new_text = str(new_text)
+
+        sm = SequenceMatcher(None, old_text, new_text)
+        result = []
+
+        result.append('<div class="text-compare-row"><span class="text-compare-label old">Original</span><div class="text-compare-old">')
+        # Build old text line with deletions highlighted
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag == 'equal':
+                result.append(escape(old_text[i1:i2]))
+            elif tag in ('delete', 'replace'):
+                deleted = old_text[i1:i2]
+                if deleted:
+                    result.append(f'<span class="text-delete-highlight">{escape(deleted)}</span>')
+        result.append('</div></div>')
+
+        result.append('<div class="text-compare-row"><span class="text-compare-label new">Revised</span><div class="text-compare-new">')
+        # Build new text line with insertions highlighted
+        sm2 = SequenceMatcher(None, old_text, new_text)
+        for tag, i1, i2, j1, j2 in sm2.get_opcodes():
+            if tag == 'equal':
+                result.append(escape(new_text[j1:j2]))
+            elif tag in ('insert', 'replace'):
+                inserted = new_text[j1:j2]
+                if inserted:
+                    result.append(f'<span class="text-insert-highlight">{escape(inserted)}</span>')
+        result.append('</div></div>')
+
+        return ''.join(result)
     
     def _render_formatting_tab(self, result: CompareResult) -> str:
         """Render the Formatting Only tab content."""
@@ -997,7 +1409,7 @@ class HtmlTemplateRenderer:
                 style_info = ""
                 if diff.old_style or diff.new_style:
                     style_info = f"<br>Style: {escape(str(diff.old_style))} → {escape(str(diff.new_style))}"
-                
+
                 html += f'''
                 <div class="diff-row formatting" data-category="format">
                     <div class="diff-side old">
@@ -1007,7 +1419,7 @@ class HtmlTemplateRenderer:
                             <strong>&lt;{escape(diff.old_tag)}&gt;</strong>
                             {style_info}
                             <br><br>
-                            {escape(diff.content[:200])}{"..." if len(diff.content) > 200 else ""}
+                            {escape(diff.content)}
                         </div>
                     </div>
                     <div class="diff-side new">
@@ -1017,7 +1429,7 @@ class HtmlTemplateRenderer:
                             <strong>&lt;{escape(diff.new_tag)}&gt;</strong>
                             {style_info}
                             <br><br>
-                            {escape(diff.content[:200])}{"..." if len(diff.content) > 200 else ""}
+                            {escape(diff.content)}
                         </div>
                     </div>
                 </div>
@@ -1029,34 +1441,57 @@ class HtmlTemplateRenderer:
         return html
     
     def _render_attribute_tab(self, result: CompareResult) -> str:
-        """Render the Attribute Changes tab content."""
+        """Render the Attribute Changes tab content - focused view."""
         html = '<div id="tab-attributes" class="tab-panel">\n'
-        html += self._render_tab_header("Attribute Changes", "Differences in element attributes")
+        html += self._render_tab_header("Attribute Changes", "Modified, added, and removed element attributes")
         
         if not result.attribute_diffs:
             html += self._render_empty_state("No attribute changes found", "The element attributes match between the two files.")
         else:
-            html += '<div class="diff-container">\n'
-            html += f'<div class="diff-header"><h3>{len(result.attribute_diffs)} Attribute Changes</h3></div>\n'
-            html += '<table class="attr-table">\n'
-            html += '<thead><tr><th>Element</th><th>Path</th><th>Attribute</th><th>Old Value</th><th>New Value</th></tr></thead>\n'
-            html += '<tbody>\n'
-            
+            # Group by element path for better organization
+            from collections import defaultdict
+            grouped = defaultdict(list)
             for diff in result.attribute_diffs:
-                old_val = escape(str(diff.old_value)) if diff.old_value is not None else "<em>(none)</em>"
-                new_val = escape(str(diff.new_value)) if diff.new_value is not None else "<em>(none)</em>"
-                
-                html += f'''
-                <tr data-category="attribute">
-                    <td><code>{escape(diff.element_tag)}</code></td>
-                    <td><code>{escape(diff.path)}</code></td>
-                    <td>{escape(diff.attribute_name)}</td>
-                    <td class="attr-old">{old_val}</td>
-                    <td class="attr-new">{new_val}</td>
-                </tr>
-                '''
+                grouped[diff.path].append(diff)
             
-            html += '</tbody></table>\n'
+            html += '<div class="diff-container">\n'
+            html += f'<div class="diff-header"><h3>{len(result.attribute_diffs)} Attribute Changes in {len(grouped)} Elements</h3></div>\n'
+            
+            for path, diffs in sorted(grouped.items()):
+                html += f'<div class="attr-group" data-category="attribute">\n'
+                html += f'<div class="attr-group-path"><code>{escape(path)}</code></div>\n'
+                html += '<div class="attr-group-changes">\n'
+                
+                for diff in diffs:
+                    old_val = escape(str(diff.old_value)) if diff.old_value is not None else ""
+                    new_val = escape(str(diff.new_value)) if diff.new_value is not None else ""
+                    
+                    # Determine change type
+                    if not old_val and new_val:
+                        change_type = "added"
+                        change_label = "ADDED"
+                    elif old_val and not new_val:
+                        change_type = "removed"
+                        change_label = "REMOVED"
+                    else:
+                        change_type = "changed"
+                        change_label = "CHANGED"
+                    
+                    html += f'''
+                    <div class="attr-change-item {change_type}">
+                        <div class="attr-change-header">
+                            <span class="attr-name">@{escape(diff.attribute_name)}</span>
+                            <span class="attr-badge {change_type}">{change_label}</span>
+                        </div>
+                        <div class="attr-change-values">
+                            <div class="attr-old-value"><span class="attr-label">Old:</span> {old_val if old_val else "<em>(none)</em>"}</div>
+                            <div class="attr-new-value"><span class="attr-label">New:</span> {new_val if new_val else "<em>(none)</em>"}</div>
+                        </div>
+                    </div>
+                    '''
+                
+                html += '</div>\n</div>\n'
+            
             html += '</div>\n'
         
         html += '</div>\n'
@@ -1077,14 +1512,14 @@ class HtmlTemplateRenderer:
                 move_info = ""
                 if diff.change_type == 'moved' and diff.old_path:
                     move_info = f'<div style="font-size: 0.8rem; color: #666; margin-top: 5px;">From: {escape(diff.old_path)}</div>'
-                
+
                 html += f'''
                 <div class="structure-item" data-category="structure">
                     <span class="structure-badge {diff.change_type}">{diff.change_type}</span>
                     <div class="structure-content">
                         <div class="structure-tag">&lt;{escape(diff.element_tag)}&gt;</div>
                         <div class="diff-path" style="margin-bottom: 5px;">{escape(diff.path)}</div>
-                        <div class="structure-preview">{escape(diff.element_preview[:150])}{"..." if len(diff.element_preview) > 150 else ""}</div>
+                        <div class="structure-preview">{escape(diff.element_preview)}</div>
                         {move_info}
                     </div>
                 </div>
@@ -1096,9 +1531,9 @@ class HtmlTemplateRenderer:
         return html
     
     def _render_full_compare_tab(self, result: CompareResult) -> str:
-        """Render the Full Compare tab content."""
+        """Render the Full Compare tab content with full text and inline highlighting."""
         html = '<div id="tab-full" class="tab-panel">\n'
-        html += self._render_tab_header("Full Comparison", "Complete list of all differences")
+        html += self._render_tab_header("Full Comparison", "Complete list of all differences with full text content")
         
         all_diffs = result.get_all_diffs()
         
@@ -1107,33 +1542,97 @@ class HtmlTemplateRenderer:
         else:
             html += '<div class="diff-container">\n'
             html += f'<div class="diff-header"><h3>All Changes ({len(all_diffs)} total)</h3></div>\n'
-            html += '<ul class="details-list">\n'
+            html += '<div class="full-compare-list">\n'
             
-            # Combine and categorize all diffs
-            items = []
+            # Text changes with full inline highlighting
             for diff in result.text_diffs:
-                items.append(('text', diff.path, 'Text Change', f"Old: {diff.old_text[:100]}...\nNew: {diff.new_text[:100]}..."))
-            for diff in result.format_diffs:
-                items.append(('format', diff.path, 'Format Change', f"Tag: {diff.old_tag} → {diff.new_tag}\nContent: {diff.content[:100]}..."))
-            for diff in result.attribute_diffs:
-                items.append(('attribute', diff.path, 'Attribute Change', f"Element: {diff.element_tag}\nAttr: {diff.attribute_name}\n{diff.old_value} → {diff.new_value}"))
-            for diff in result.structure_diffs:
-                items.append(('structure', diff.path, f"Structure: {diff.change_type.title()}", f"Tag: {diff.element_tag}\n{diff.element_preview[:100]}..."))
-            
-            for category, path, title, content in items:
+                inline_html = self._generate_inline_diff_full(diff.old_text, diff.new_text)
                 html += f'''
-                <li class="details-item" data-category="{category}">
-                    <div class="details-summary" aria-expanded="false">
-                        <span>{escape(path)}</span>
-                        <span class="details-type {category}">{category}</span>
+                <div class="full-compare-item text-item" data-category="text">
+                    <div class="full-compare-header">
+                        <span class="full-compare-type text">TEXT</span>
+                        <code class="full-compare-path">{escape(diff.path)}</code>
                     </div>
-                    <div class="details-content" style="display: none;">
-                        <pre>{escape(content)}</pre>
+                    <div class="full-compare-content" style="background: #ffffff;">
+                        {inline_html}
                     </div>
-                </li>
+                </div>
                 '''
             
-            html += '</ul>\n'
+            # Format changes
+            for diff in result.format_diffs:
+                html += f'''
+                <div class="full-compare-item format-item" data-category="format">
+                    <div class="full-compare-header">
+                        <span class="full-compare-type format">FORMAT</span>
+                        <code class="full-compare-path">{escape(diff.path)}</code>
+                    </div>
+                    <div class="full-compare-content">
+                        <div class="format-change-display">
+                            <span class="format-old">&lt;{escape(diff.old_tag)}&gt;</span>
+                            <span class="format-arrow">→</span>
+                            <span class="format-new">&lt;{escape(diff.new_tag)}&gt;</span>
+                        </div>
+                        <div class="format-content">{escape(diff.content)}</div>
+                    </div>
+                </div>
+                '''
+            
+            # Attribute changes - group by element
+            from collections import defaultdict
+            attr_by_element = defaultdict(list)
+            for diff in result.attribute_diffs:
+                attr_by_element[(diff.path, diff.element_tag)].append(diff)
+            
+            for (path, tag), diffs in sorted(attr_by_element.items()):
+                html += f'''
+                <div class="full-compare-item attr-item" data-category="attribute">
+                    <div class="full-compare-header">
+                        <span class="full-compare-type attribute">ATTRIBUTE</span>
+                        <code class="full-compare-path">{escape(path)}</code>
+                    </div>
+                    <div class="full-compare-content">
+                        <div class="attr-element-tag">&lt;{escape(tag)}&gt;</div>
+                        <div class="attr-changes-list">
+                '''
+                for diff in diffs:
+                    old_display = escape(str(diff.old_value)) if diff.old_value else "<em>(none)</em>"
+                    new_display = escape(str(diff.new_value)) if diff.new_value else "<em>(none)</em>"
+                    html += f'''
+                            <div class="attr-change-row">
+                                <span class="attr-change-name">@{escape(diff.attribute_name)}</span>
+                                <span class="attr-change-old">{old_display}</span>
+                                <span class="attr-change-arrow">→</span>
+                                <span class="attr-change-new">{new_display}</span>
+                            </div>
+                    '''
+                html += '''
+                        </div>
+                    </div>
+                </div>
+                '''
+            
+            # Structure changes
+            for diff in result.structure_diffs:
+                move_info = ""
+                if diff.change_type == 'moved' and diff.old_path:
+                    move_info = f'<div class="struct-move-info">Moved from: {escape(diff.old_path)}</div>'
+                
+                html += f'''
+                <div class="full-compare-item structure-item" data-category="structure">
+                    <div class="full-compare-header">
+                        <span class="full-compare-type structure">{escape(diff.change_type.upper())}</span>
+                        <code class="full-compare-path">{escape(diff.path)}</code>
+                    </div>
+                    <div class="full-compare-content">
+                        <div class="struct-tag">&lt;{escape(diff.element_tag)}&gt;</div>
+                        <div class="struct-preview">{escape(diff.element_preview)}</div>
+                        {move_info}
+                    </div>
+                </div>
+                '''
+            
+            html += '</div>\n'
             html += '</div>\n'
         
         html += '</div>\n'

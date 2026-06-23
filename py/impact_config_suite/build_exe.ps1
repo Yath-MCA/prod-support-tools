@@ -74,6 +74,22 @@ $args = @(
 
 if ($Clean) {
     $args = @("-m", "PyInstaller", "--clean") + $args[2..($args.Length - 1)]
+    
+    # Clear existing cache files
+    $cacheFiles = @(
+        "impact_to_ceg_cache.json",
+        "pgm_processor_cache.json",
+        "analyses\\analyzer_cache.json"
+    )
+    
+    Write-Host "Clearing cache files..."
+    foreach ($cacheFile in $cacheFiles) {
+        $cachePath = Join-Path $scriptRoot $cacheFile
+        if (Test-Path $cachePath) {
+            Remove-Item -Force $cachePath
+            Write-Host "  [REMOVED] $cacheFile"
+        }
+    }
 }
 
 Write-Host "Building EXE target: $Target"

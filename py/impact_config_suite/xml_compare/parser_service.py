@@ -70,14 +70,14 @@ class XMLParserService:
         Clean XML tree by removing comments and processing instructions.
         
         xmldiff struggles when text nodes contain comments or PIs.
-        This method removes them to ensure safe processing.
+        This method removes them and converts all text to proper strings.
         
         Args:
             tree: ElementTree to clean (modified in place)
         """
         root = tree.getroot()
         
-        # Remove comments and processing instructions
+        # Recursively process all elements
         for element in root.iter():
             # Remove comment and processing instruction children
             children_to_remove = [
@@ -87,11 +87,15 @@ class XMLParserService:
             for child in children_to_remove:
                 element.remove(child)
             
-            # Also clean up tail and text to ensure they're proper strings
+            # Convert text and tail to proper strings (handles Cython objects)
             if element.text is not None:
                 element.text = str(element.text)
             if element.tail is not None:
                 element.tail = str(element.tail)
+            
+            # Ensure all attributes are proper strings
+            for key, value in list(element.attrib.items()):
+                element.set(key, str(value))
 
     @staticmethod
     def get_file_size_mb(xml_path: Path) -> float:
