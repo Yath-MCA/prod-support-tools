@@ -39,6 +39,9 @@ from .models import (
     DiffType,
 )
 from .pipeline import run_xml_compare, run_xml_compare_with_result
+from .statistics import StatisticsBuilder
+from .html_renderer import HtmlTemplateRenderer
+from .report_builder import ReportBuilder
 
 __version__ = "1.0.0"
 
@@ -55,4 +58,8 @@ __all__ = [
     "AttributeDiff",
     "StructureDiff",
     "DiffType",
+    # Report generation
+    "StatisticsBuilder",
+    "HtmlTemplateRenderer",
+    "ReportBuilder",
 ]

@@ -1239,11 +1239,12 @@ class HtmlTemplateRenderer:
     
     def _render_tab_header(self, title: str, subtitle: str) -> str:
         """Render the standard tab content header with search."""
+        safe_id = title.lower().replace(' ', '-').replace('/', '-')
         return f'''
         <div class="content-header">
             <h2>{title}</h2>
             <div class="search-box">
-                <input type="text" id="searchInput-{title.lower().replace(' ', '-'}" placeholder="Search {title.lower()}..." class="search-input-alt">
+                <input type="text" id="searchInput-{safe_id}" placeholder="Search {title.lower()}..." class="search-input-alt">
             </div>
         </div>
         <p style="margin-bottom: 20px; color: #666;">{subtitle}</p>

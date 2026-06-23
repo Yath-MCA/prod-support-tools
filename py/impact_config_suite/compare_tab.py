@@ -1,6 +1,8 @@
 import os
 import json
+import threading
 import tkinter as tk
+import webbrowser
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from html import escape
@@ -1386,6 +1388,11 @@ tr[data-status="Changed (Div Replace)"] td{background:#fdf4ff}
             self.multi_files_var.set(display)
 
     def _run_compare(self) -> None:
+        # Handle XML comparison mode (method4)
+        if self.method_var.get() == "method4":
+            self._run_xml_compare()
+            return
+
         if BeautifulSoup is None:
             messagebox.showerror(
                 "Dependency Missing",
@@ -1436,6 +1443,112 @@ tr[data-status="Changed (Div Replace)"] td{background:#fdf4ff}
         self.export_btn.config(state="normal" if rows else "disabled")
         self.restore_btn.config(state="normal" if rows and self.method_var.get() == "method1" else "disabled")
         self._export_html_report()
+
+    def _run_xml_compare(self) -> None:
+        """
+        Run XML comparison using the xml_compare package.
+        
+        Validates inputs, runs comparison on background thread,
+        generates HTML report, and updates UI with results.
+        """
+        if not XML_COMPARE_AVAILABLE:
+            messagebox.showerror(
+                "Dependency Missing",
+                "XML Compare package is not available.",
+            )
+            return
+
+        # Validate paths
+        paths = self.xml_panel.validate_paths()
+        if paths is None:
+            return
+        original_path, revised_path = paths
+
+        # Get comparison options from panel
+        options = self.xml_panel.get_options()
+
+        # Clear previous log and show starting message
+        self.xml_panel.clear_log()
+        self.xml_panel.log("Starting XML comparison...", "info")
+        self.xml_panel.log(f"Original: {original_path.name}", "info")
+        self.xml_panel.log(f"Revised: {revised_path.name}", "info")
+
+        # Disable compare button during run
+        self.compare_btn.config(state="disabled")
+
+        def job():
+            try:
+                # Generate output filename: {revised_stem}_compare_{YYYYMMDD_HHMMSS}.html
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_filename = f"{revised_path.stem}_compare_{timestamp}.html"
+                output_dir = revised_path.parent
+
+                # Run the comparison
+                self.xml_panel.log("Parsing XML files...", "info")
+                result = run_xml_compare(
+                    original=original_path,
+                    revised=revised_path,
+                    options=options,
+                    output_dir=output_dir,
+                )
+
+                # Report path is set by run_xml_compare
+                report_path = output_dir / output_filename
+
+                # Update UI from main thread
+                def update_ui():
+                    if result and hasattr(result, 'success') and result.success:
+                        self.xml_panel.log(f"Comparison complete!", "success")
+                        self.xml_panel.log(f"Report saved: {report_path.name}", "info")
+
+                        # Update summary label
+                        stats = result.statistics if hasattr(result, 'statistics') else None
+                        if stats:
+                            summary = (
+                                f"XML Compare: {stats.total_differences} differences "
+                                f"({stats.text_changes} text, {stats.format_changes} format, "
+                                f"{stats.attribute_changes} attrs, {stats.added_nodes + stats.deleted_nodes} structure) | "
+                                f"{stats.match_percentage:.1f}% match"
+                            )
+                        else:
+                            summary = f"XML Compare complete: {report_path.name}"
+                        self.summary_label.config(text=summary)
+
+                        # Store report path and enable buttons
+                        self.xml_panel.set_report_path(report_path)
+
+                        # Optionally open report in browser
+                        try:
+                            webbrowser.open(f"file:///{report_path.resolve()}")
+                        except Exception:
+                            pass
+                    else:
+                        self.xml_panel.log("Comparison completed with warnings.", "warning")
+                        self.summary_label.config(text="XML comparison completed with warnings.")
+
+                    # Re-enable compare button
+                    self.compare_btn.config(state="normal")
+
+                # Schedule UI update on main thread
+                self.after(0, update_ui)
+
+            except Exception as e:
+                def show_error():
+                    self.xml_panel.log(f"Error: {str(e)}", "error")
+                    messagebox.showerror("XML Compare Error", f"Comparison failed:\n{str(e)}")
+                    self.compare_btn.config(state="normal")
+
+                self.after(0, show_error)
+
+            finally:
+                # Ensure button is re-enabled
+                def ensure_enabled():
+                    self.compare_btn.config(state="normal")
+
+                self.after(0, ensure_enabled)
+
+        # Start background thread
+        threading.Thread(target=job, daemon=True).start()
 
     def _compare_html_before_after_delmerge(self, source: str, selector: str) -> tuple[list[dict], list[str], dict[str, str], str]:
         original_doc = self._parse_html(source)

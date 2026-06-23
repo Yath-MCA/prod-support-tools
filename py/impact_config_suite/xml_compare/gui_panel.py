@@ -1,24 +1,27 @@
-"""GUI Panel for XML Compare functionality.
-
-Provides a reusable Tkinter panel for XML comparison options and file selection.
-"""
+"""GUI panel for XML Compare functionality with dark theme."""
 
 from __future__ import annotations
 
+import threading
 import tkinter as tk
+import webbrowser
 from pathlib import Path
-from tkinter import filedialog, messagebox, scrolledtext
-from typing import Callable
+from tkinter import filedialog, messagebox, scrolledtext, ttk
+from typing import TYPE_CHECKING, Callable
 
 from .models import CompareOptions
+from .pipeline import run_xml_compare
+
+if TYPE_CHECKING:
+    pass
 
 
-class XmlComparePanel(tk.Frame):
-    """
-    A reusable panel for XML comparison configuration.
-    
-    Provides checkboxes for comparison options, file pickers for original/revised
-    XML files, status log, and action buttons.
+class XmlComparePanel(ttk.Frame):
+    """Panel for XML comparison with option checkboxes and file pickers.
+
+    Provides a dark-themed interface matching the compare_tab.py styling
+    with file selection, comparison options, status logging, and report
+    opening capabilities.
     """
 
     def __init__(
@@ -26,393 +29,369 @@ class XmlComparePanel(tk.Frame):
         parent: tk.Widget,
         first_path_var: tk.StringVar | None = None,
         second_path_var: tk.StringVar | None = None,
-        on_compare: Callable[[], None] | None = None,
     ):
-        """
-        Initialize the XML compare panel.
-        
+        """Initialize the XML compare panel.
+
         Args:
-            parent: Parent widget
-            first_path_var: StringVar for original XML path (optional, will create if not provided)
-            second_path_var: StringVar for revised XML path (optional, will create if not provided)
-            on_compare: Callback when compare button is clicked
+            parent: Parent widget to contain this panel
+            first_path_var: Optional external StringVar for original path binding
+            second_path_var: Optional external StringVar for revised path binding
         """
-        super().__init__(parent, bg="#0f172a")
-        
-        # Use provided StringVars or create new ones
-        self.first_path_var = first_path_var or tk.StringVar()
-        self.second_path_var = second_path_var or tk.StringVar()
-        self.on_compare = on_compare
-        
-        # Report tracking
-        self.last_report_path: Path | None = None
-        self.last_output_dir: Path | None = None
-        
-        # Build the UI
+        super().__init__(parent)
+        self._external_first_var = first_path_var
+        self._external_second_var = second_path_var
         self._build_ui()
 
     def _build_ui(self) -> None:
-        """Build the panel UI components."""
-        self.columnconfigure(0, weight=1)
-        
-        row = 0
-        
-        # ── File Selection Frame ─────────────────────────────────────────────
-        file_frame = tk.LabelFrame(
-            self,
-            text="XML Files",
-            bg="#0f172a",
-            fg="#94a3b8",
-            font=("Segoe UI", 11, "bold"),
-            padx=15,
-            pady=10,
-        )
-        file_frame.grid(row=row, column=0, sticky="ew", pady=(0, 12))
-        file_frame.columnconfigure(1, weight=1)
-        row += 1
+        """Build the panel UI with dark theme."""
+        self.configure(style="Card.TFrame")
 
-        # Original XML file
+        # Title section
+        title_frame = tk.Frame(self, bg="#1e293b", padx=20, pady=12)
+        title_frame.pack(fill="x")
         tk.Label(
-            file_frame,
-            text="Original XML:",
-            bg="#0f172a",
-            fg="#94a3b8",
-            font=("Segoe UI", 10),
-        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
-        tk.Entry(
-            file_frame,
-            textvariable=self.first_path_var,
-            bg="#1f2937",
-            fg="white",
-            border=0,
-            font=("Segoe UI", 10),
-        ).grid(row=1, column=0, sticky="ew", ipady=5)
-        tk.Button(
-            file_frame,
-            text="Browse…",
-            command=lambda: self._browse_xml_file(self.first_path_var, "original"),
-            bg="#475569",
-            fg="white",
-            font=("Segoe UI", 9),
-            border=0,
-            padx=10,
-            pady=6,
-        ).grid(row=1, column=1, padx=(10, 0))
-
-        # Revised XML file
+            title_frame,
+            text="XML TO XML COMPARISON",
+            font=("Segoe UI", 14, "bold"),
+            fg="#38bdf8",
+            bg="#1e293b",
+        ).pack(anchor="w")
         tk.Label(
-            file_frame,
-            text="Revised XML:",
-            bg="#0f172a",
-            fg="#94a3b8",
-            font=("Segoe UI", 10),
-        ).grid(row=2, column=0, sticky="w", pady=(14, 4))
-        tk.Entry(
-            file_frame,
-            textvariable=self.second_path_var,
-            bg="#1f2937",
-            fg="white",
-            border=0,
-            font=("Segoe UI", 10),
-        ).grid(row=3, column=0, sticky="ew", ipady=5)
-        tk.Button(
-            file_frame,
-            text="Browse…",
-            command=lambda: self._browse_xml_file(self.second_path_var, "revised"),
-            bg="#475569",
-            fg="white",
+            title_frame,
+            text="Compare two XML files and generate a detailed HTML report with categorized differences.",
             font=("Segoe UI", 9),
-            border=0,
-            padx=10,
-            pady=6,
-        ).grid(row=3, column=1, padx=(10, 0))
+            fg="#94a3b8",
+            bg="#1e293b",
+            wraplength=600,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
 
-        # ── Options Frame ───────────────────────────────────────────────────
+        # Options Frame
         options_frame = tk.LabelFrame(
             self,
-            text="Compare Options",
+            text="Comparison Options",
             bg="#0f172a",
             fg="#94a3b8",
-            font=("Segoe UI", 11, "bold"),
-            padx=15,
-            pady=10,
+            font=("Segoe UI", 10, "bold"),
+            padx=16,
+            pady=12,
         )
-        options_frame.grid(row=row, column=0, sticky="ew", pady=(0, 12))
-        row += 1
+        options_frame.pack(fill="x", padx=12, pady=8)
 
-        # Option checkboxes
-        self.text_corrections_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            options_frame,
-            text="Text Corrections",
-            variable=self.text_corrections_var,
-            bg="#0f172a",
-            fg="#cbd5e1",
-            selectcolor="#1f2937",
-            activebackground="#0f172a",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 10),
-        ).grid(row=0, column=0, sticky="w", pady=2)
-
-        self.formatting_only_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            options_frame,
-            text="Formatting Only",
-            variable=self.formatting_only_var,
-            bg="#0f172a",
-            fg="#cbd5e1",
-            selectcolor="#1f2937",
-            activebackground="#0f172a",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 10),
-        ).grid(row=1, column=0, sticky="w", pady=2)
-
+        # Option variables with defaults per spec
+        self.text_corr_var = tk.BooleanVar(value=True)
+        self.format_only_var = tk.BooleanVar(value=True)
         self.full_compare_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            options_frame,
-            text="Full Compare",
-            variable=self.full_compare_var,
-            bg="#0f172a",
-            fg="#cbd5e1",
-            selectcolor="#1f2937",
-            activebackground="#0f172a",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 10),
-        ).grid(row=2, column=0, sticky="w", pady=2)
-
-        self.include_attributes_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(
-            options_frame,
-            text="Attribute Level Compare (expensive)",
-            variable=self.include_attributes_var,
-            bg="#0f172a",
-            fg="#cbd5e1",
-            selectcolor="#1f2937",
-            activebackground="#0f172a",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 10),
-        ).grid(row=0, column=1, sticky="w", pady=2, padx=(20, 0))
-
+        self.include_attr_var = tk.BooleanVar(value=False)  # Expensive, off by default
         self.structure_changes_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            options_frame,
-            text="Structure Changes",
-            variable=self.structure_changes_var,
-            bg="#0f172a",
-            fg="#cbd5e1",
-            selectcolor="#1f2937",
-            activebackground="#0f172a",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 10),
-        ).grid(row=1, column=1, sticky="w", pady=2, padx=(20, 0))
+        self.gen_stats_var = tk.BooleanVar(value=True)
 
-        self.generate_statistics_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            options_frame,
-            text="Generate Statistics Dashboard",
-            variable=self.generate_statistics_var,
-            bg="#0f172a",
-            fg="#cbd5e1",
-            selectcolor="#1f2937",
-            activebackground="#0f172a",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 10),
-        ).grid(row=2, column=1, sticky="w", pady=2, padx=(20, 0))
+        # Create checkboxes in two columns
+        left_col = tk.Frame(options_frame, bg="#0f172a")
+        left_col.pack(side="left", fill="y", expand=True)
+        right_col = tk.Frame(options_frame, bg="#0f172a")
+        right_col.pack(side="left", fill="y", expand=True)
 
-        # ── Status/Log Frame ────────────────────────────────────────────────
-        log_frame = tk.LabelFrame(
-            self,
-            text="Status Log",
-            bg="#0f172a",
-            fg="#94a3b8",
-            font=("Segoe UI", 11, "bold"),
-            padx=15,
-            pady=10,
+        self._create_checkbutton(
+            left_col, "Text Corrections + Formatting", self.text_corr_var
         )
-        log_frame.grid(row=row, column=0, sticky="ew", pady=(0, 12))
-        log_frame.columnconfigure(0, weight=1)
-        row += 1
-
-        self.status_text = scrolledtext.ScrolledText(
-            log_frame,
-            bg="#1f2937",
-            fg="#e2e8f0",
-            font=("Consolas", 9),
-            height=8,
-            wrap=tk.WORD,
-            border=0,
-            padx=8,
-            pady=8,
+        self._create_checkbutton(left_col, "Formatting Only", self.format_only_var)
+        self._create_checkbutton(left_col, "Full Compare", self.full_compare_var)
+        self._create_checkbutton(
+            right_col, "Attribute Level Compare (expensive)", self.include_attr_var
         )
-        self.status_text.grid(row=0, column=0, sticky="ew")
-        self.status_text.config(state=tk.DISABLED)
+        self._create_checkbutton(right_col, "Structure Changes", self.structure_changes_var)
+        self._create_checkbutton(
+            right_col, "Generate Statistics Dashboard", self.gen_stats_var
+        )
 
-        # ── Action Buttons ──────────────────────────────────────────────────
-        button_frame = tk.Frame(self, bg="#0f172a")
-        button_frame.grid(row=row, column=0, sticky="ew", pady=(0, 12))
-        row += 1
+        # File selection frame
+        files_frame = tk.Frame(self, bg="#0f172a", padx=12, pady=8)
+        files_frame.pack(fill="x")
 
-        self.open_report_btn = tk.Button(
-            button_frame,
-            text="📄 Open Report",
-            command=self._open_report,
+        # Use external vars if provided, otherwise create local ones
+        self.original_path_var = self._external_first_var or tk.StringVar()
+        self.revised_path_var = self._external_second_var or tk.StringVar()
+
+        self._create_file_row(
+            files_frame, "Original XML:", self.original_path_var, 0, self._browse_original
+        )
+        self._create_file_row(
+            files_frame, "Revised XML:", self.revised_path_var, 1, self._browse_revised
+        )
+
+        # Action buttons
+        btn_frame = tk.Frame(self, bg="#0f172a", padx=12, pady=8)
+        btn_frame.pack(fill="x")
+
+        self.run_btn = tk.Button(
+            btn_frame,
+            text="Run XML Compare",
+            command=self._on_run,
             bg="#10b981",
             fg="white",
             font=("Segoe UI", 10, "bold"),
             border=0,
-            padx=16,
+            padx=20,
             pady=8,
-            state=tk.DISABLED,
+            cursor="hand2",
         )
-        self.open_report_btn.pack(side="left", padx=(0, 10))
+        self.run_btn.pack(side="left", padx=(0, 8))
 
-        self.open_folder_btn = tk.Button(
-            button_frame,
-            text="📁 Open Folder",
-            command=self._open_folder,
-            bg="#6366f1",
+        self.open_report_btn = tk.Button(
+            btn_frame,
+            text="Open Report",
+            command=self._open_report,
+            bg="#3b82f6",
             fg="white",
-            font=("Segoe UI", 10, "bold"),
+            font=("Segoe UI", 10),
             border=0,
             padx=16,
             pady=8,
-            state=tk.DISABLED,
+            state="disabled",
+            cursor="hand2",
+        )
+        self.open_report_btn.pack(side="left", padx=(0, 8))
+
+        self.open_folder_btn = tk.Button(
+            btn_frame,
+            text="Open Folder",
+            command=self._open_folder,
+            bg="#475569",
+            fg="white",
+            font=("Segoe UI", 10),
+            border=0,
+            padx=16,
+            pady=8,
+            state="disabled",
+            cursor="hand2",
         )
         self.open_folder_btn.pack(side="left")
 
-    def _browse_xml_file(self, target_var: tk.StringVar, file_type: str) -> None:
-        """Open file dialog to select an XML file."""
-        selected = filedialog.askopenfilename(
-            title=f"Select {file_type.capitalize()} XML file",
-            filetypes=[("XML Files", "*.xml"), ("All Files", "*")],
+        # Status log
+        log_frame = tk.Frame(self, bg="#0f172a", padx=12, pady=8)
+        log_frame.pack(fill="both", expand=True)
+
+        tk.Label(
+            log_frame,
+            text="Status Log",
+            font=("Segoe UI", 9, "bold"),
+            fg="#94a3b8",
+            bg="#0f172a",
+        ).pack(anchor="w", pady=(0, 4))
+
+        self.log_text = scrolledtext.ScrolledText(
+            log_frame,
+            height=10,
+            wrap="word",
+            bg="#1e293b",
+            fg="#cbd5e1",
+            font=("Consolas", 9),
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground="#334155",
         )
-        if selected:
-            target_var.set(selected)
+        self.log_text.pack(fill="both", expand=True)
+
+        self._last_report_path: Path | None = None
+        self._compare_thread: threading.Thread | None = None
+
+    def _create_checkbutton(
+        self, parent: tk.Widget, text: str, variable: tk.BooleanVar
+    ) -> tk.Checkbutton:
+        """Create a themed checkbox."""
+        return tk.Checkbutton(
+            parent,
+            text=text,
+            variable=variable,
+            bg="#0f172a",
+            fg="#cbd5e1",
+            selectcolor="#1e293b",
+            activebackground="#0f172a",
+            activeforeground="#ffffff",
+            font=("Segoe UI", 9),
+        )
+
+    def _create_file_row(
+        self,
+        parent: tk.Widget,
+        label: str,
+        var: tk.StringVar,
+        row: int,
+        browse_cmd: Callable[[], None],
+    ) -> None:
+        """Create a file picker row."""
+        frame = tk.Frame(parent, bg="#0f172a")
+        frame.pack(fill="x", pady=4)
+
+        tk.Label(frame, text=label, bg="#0f172a", fg="#94a3b8", width=14, anchor="w").pack(
+            side="left"
+        )
+
+        entry = tk.Entry(
+            frame,
+            textvariable=var,
+            bg="#1e293b",
+            fg="white",
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground="#334155",
+            font=("Segoe UI", 9),
+        )
+        entry.pack(side="left", fill="x", expand=True, padx=(8, 8), ipady=4)
+
+        tk.Button(
+            frame,
+            text="Browse",
+            command=browse_cmd,
+            bg="#475569",
+            fg="white",
+            font=("Segoe UI", 9),
+            border=0,
+            padx=12,
+            pady=4,
+            cursor="hand2",
+        ).pack(side="left")
+
+    def _browse_original(self) -> None:
+        """Browse for original XML file."""
+        path = filedialog.askopenfilename(
+            title="Select Original XML",
+            filetypes=[("XML files", "*.xml"), ("All files", "*.*")],
+        )
+        if path:
+            self.original_path_var.set(path)
+
+    def _browse_revised(self) -> None:
+        """Browse for revised XML file."""
+        path = filedialog.askopenfilename(
+            title="Select Revised XML",
+            filetypes=[("XML files", "*.xml"), ("All files", "*.*")],
+        )
+        if path:
+            self.revised_path_var.set(path)
 
     def get_options(self) -> CompareOptions:
-        """
-        Get the current comparison options as a CompareOptions dataclass.
-        
+        """Get current comparison options from UI.
+
         Returns:
-            CompareOptions with current checkbox states
+            CompareOptions configured from checkbox states
         """
         return CompareOptions(
-            text_corrections=self.text_corrections_var.get(),
-            formatting_only=self.formatting_only_var.get(),
+            text_corrections=self.text_corr_var.get(),
+            formatting_only=self.format_only_var.get(),
             full_compare=self.full_compare_var.get(),
-            include_attributes=self.include_attributes_var.get(),
+            include_attributes=self.include_attr_var.get(),
             structure_changes=self.structure_changes_var.get(),
-            generate_statistics=self.generate_statistics_var.get(),
-            fast_match=False,  # Could add UI control for this if needed
+            generate_statistics=self.gen_stats_var.get(),
         )
 
-    def get_paths(self) -> tuple[str, str]:
-        """
-        Get the current original and revised file paths.
-        
-        Returns:
-            Tuple of (original_path, revised_path)
-        """
-        return self.first_path_var.get().strip(), self.second_path_var.get().strip()
+    def set_paths(self, original: str, revised: str) -> None:
+        """Set file paths programmatically.
 
-    def log(self, message: str, level: str = "info") -> None:
-        """
-        Add a message to the status log.
-        
         Args:
-            message: Message to display
-            level: Log level (info, success, error, warning)
+            original: Path to original XML file
+            revised: Path to revised XML file
         """
-        self.status_text.config(state=tk.NORMAL)
-        
-        # Add color prefix based on level
-        prefixes = {
-            "info": "ℹ️ ",
-            "success": "✅ ",
-            "error": "❌ ",
-            "warning": "⚠️ ",
-        }
-        prefix = prefixes.get(level, "ℹ️ ")
-        
-        self.status_text.insert(tk.END, f"{prefix}{message}\n")
-        self.status_text.see(tk.END)
-        self.status_text.config(state=tk.DISABLED)
+        self.original_path_var.set(original)
+        self.revised_path_var.set(revised)
 
-    def clear_log(self) -> None:
-        """Clear the status log."""
-        self.status_text.config(state=tk.NORMAL)
-        self.status_text.delete(1.0, tk.END)
-        self.status_text.config(state=tk.DISABLED)
+    def _log(self, message: str) -> None:
+        """Append message to status log."""
+        self.log_text.insert("end", f"{message}\n")
+        self.log_text.see("end")
+        self.update_idletasks()
 
-    def set_report_path(self, report_path: Path | None) -> None:
-        """
-        Set the path to the generated report and update button states.
-        
-        Args:
-            report_path: Path to the generated HTML report
-        """
-        self.last_report_path = report_path
-        if report_path:
-            self.last_output_dir = report_path.parent
-            self.open_report_btn.config(state=tk.NORMAL)
-            self.open_folder_btn.config(state=tk.NORMAL)
-        else:
-            self.open_report_btn.config(state=tk.DISABLED)
-            self.open_folder_btn.config(state=tk.DISABLED)
+    def _on_run(self) -> None:
+        """Run the comparison on a background thread."""
+        original = self.original_path_var.get().strip()
+        revised = self.revised_path_var.get().strip()
+
+        if not original:
+            messagebox.showerror("Error", "Please select an Original XML file.")
+            return
+        if not revised:
+            messagebox.showerror("Error", "Please select a Revised XML file.")
+            return
+
+        orig_path = Path(original)
+        rev_path = Path(revised)
+
+        if not orig_path.exists():
+            messagebox.showerror("Error", f"Original file not found:\n{original}")
+            return
+        if not rev_path.exists():
+            messagebox.showerror("Error", f"Revised file not found:\n{revised}")
+            return
+
+        self.run_btn.config(state="disabled", text="Comparing...")
+        self.open_report_btn.config(state="disabled")
+        self.open_folder_btn.config(state="disabled")
+        self._log("Starting comparison...")
+
+        def log_callback(msg: str) -> None:
+            self.after(0, lambda: self._log(msg))
+
+        def on_complete(report_path: Path) -> None:
+            self._last_report_path = report_path
+            self.after(0, self._on_compare_complete, report_path)
+
+        def on_error(err: Exception) -> None:
+            self.after(0, self._on_compare_error, err)
+
+        self._compare_thread = threading.Thread(
+            target=self._run_compare_thread,
+            args=(orig_path, rev_path, self.get_options(), log_callback, on_complete, on_error),
+            daemon=True,
+        )
+        self._compare_thread.start()
+
+    def _run_compare_thread(
+        self,
+        original: Path,
+        revised: Path,
+        options: CompareOptions,
+        log: Callable[[str], None],
+        on_complete: Callable[[Path], None],
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Background thread worker for comparison."""
+        try:
+            report_path = run_xml_compare(
+                original, revised, options, log_callback=log
+            )
+            on_complete(report_path)
+        except Exception as e:
+            on_error(e)
+
+    def _on_compare_complete(self, report_path: Path) -> None:
+        """Handle successful comparison completion."""
+        self._log(f"Report saved: {report_path}")
+        self.run_btn.config(state="normal", text="Run XML Compare")
+        self.open_report_btn.config(state="normal")
+        self.open_folder_btn.config(state="normal")
+        messagebox.showinfo(
+            "Success",
+            f"Comparison completed.\n\nReport saved:\n{report_path}",
+        )
+
+    def _on_compare_error(self, err: Exception) -> None:
+        """Handle comparison error."""
+        self._log(f"Error: {err}")
+        self.run_btn.config(state="normal", text="Run XML Compare")
+        messagebox.showerror("Comparison Failed", str(err))
 
     def _open_report(self) -> None:
-        """Open the generated report in the default browser."""
-        if self.last_report_path and self.last_report_path.exists():
-            import webbrowser
-            webbrowser.open(f"file:///{self.last_report_path.resolve()}")
+        """Open the last generated report in browser."""
+        if self._last_report_path and self._last_report_path.exists():
+            webbrowser.open(f"file://{self._last_report_path.absolute()}")
         else:
-            messagebox.showinfo("No Report", "Generate a report first.")
+            messagebox.showwarning("No Report", "No report available to open.")
 
     def _open_folder(self) -> None:
-        """Open the output folder in the file explorer."""
-        if self.last_output_dir and self.last_output_dir.exists():
+        """Open the folder containing the last report."""
+        if self._last_report_path and self._last_report_path.exists():
             import subprocess
-            import os
-            if os.name == 'nt':  # Windows
-                subprocess.run(['explorer', str(self.last_output_dir.resolve())])
-            elif os.name == 'posix':  # macOS or Linux
-                subprocess.run(['open' if os.uname().sysname == 'Darwin' else 'xdg-open', 
-                            str(self.last_output_dir.resolve())])
+            subprocess.run(["explorer", "/select,", str(self._last_report_path)])
         else:
-            messagebox.showinfo("No Folder", "Generate a report first.")
-
-    def validate_paths(self) -> tuple[Path, Path] | None:
-        """
-        Validate that both paths are set and are XML files.
-        
-        Returns:
-            Tuple of (original_path, revised_path) as Path objects if valid,
-            None if invalid (shows error message)
-        """
-        original_str, revised_str = self.get_paths()
-        
-        if not original_str or not revised_str:
-            messagebox.showerror("Error", "Please select both Original and Revised XML files.")
-            return None
-        
-        original_path = Path(original_str)
-        revised_path = Path(revised_str)
-        
-        if not original_path.exists():
-            messagebox.showerror("Error", f"Original file not found:\n{original_str}")
-            return None
-        
-        if not revised_path.exists():
-            messagebox.showerror("Error", f"Revised file not found:\n{revised_str}")
-            return None
-        
-        # Check file extensions
-        if original_path.suffix.lower() != '.xml':
-            messagebox.showerror("Error", f"Original file must be an XML file:\n{original_str}")
-            return None
-        
-        if revised_path.suffix.lower() != '.xml':
-            messagebox.showerror("Error", f"Revised file must be an XML file:\n{revised_str}")
-            return None
-        
-        return original_path, revised_path
+            messagebox.showwarning("No Report", "No report folder to open.")

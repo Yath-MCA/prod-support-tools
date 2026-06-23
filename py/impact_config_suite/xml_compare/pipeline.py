@@ -1,191 +1,197 @@
 """Pipeline module for orchestrating XML comparison.
 
-This module provides the main entry point for running XML comparisons,
-orchestrating parser_service, diff_engine, attribute_comparator,
-statistics, and html_renderer to produce comprehensive HTML reports.
+This module provides the main entry point for running XML comparisons
+with progress reporting and report generation.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Optional
-from datetime import datetime
+from typing import TYPE_CHECKING, Callable
 
+from .attribute_comparator import AttributeComparator
+from .diff_engine import DiffEngine
 from .models import CompareOptions, CompareResult
 from .parser_service import XMLParserService
-from .diff_engine import DiffEngine
-from .attribute_comparator import AttributeComparator
+from .report_builder import ReportBuilder
 from .statistics import StatisticsBuilder
-from .html_renderer import HtmlTemplateRenderer
+
+if TYPE_CHECKING:
+    pass
 
 
 def run_xml_compare(
-    original_path: Path,
-    revised_path: Path,
-    options: CompareOptions,
-    output_dir: Path,
-    log_callback: Optional[Callable[[str], None]] = None,
+    original: Path,
+    revised: Path,
+    options: CompareOptions | None = None,
+    output_dir: Path | None = None,
+    log_callback: Callable[[str], None] | None = None,
 ) -> Path:
-    """Run full comparison pipeline and return report path.
+    """Run XML comparison and generate HTML report.
 
-    Orchestrates the complete XML comparison workflow:
-    1. Parse both XML files with entity handling
-    2. Run diff_engine to classify changes (text, formatting, structure)
-    3. Run attribute_comparator if include_attributes is enabled
-    4. Generate statistics
-    5. Build HTML report using html_renderer
-
-    This function is thread-safe and makes no tk calls internally.
-    All UI updates should be done via the log_callback.
+    This is the main entry point for the comparison pipeline. It parses
+    both XML files, runs the diff engine, optionally compares attributes,
+    generates statistics, and produces a self-contained HTML report.
 
     Args:
-        original_path: Path to the original XML file
-        revised_path: Path to the revised XML file
-        options: Comparison options controlling what to compare
-        output_dir: Directory where the HTML report will be saved
-        log_callback: Optional callback for progress messages (thread-safe)
-
-    Returns:
-        Path to the generated HTML report file
-
-    Raises:
-        FileNotFoundError: If original or revised file does not exist
-        ValueError: If files are not valid XML
-        Exception: For other processing errors (message passed to log_callback)
-    """
-
-    def log(message: str) -> None:
-        """Helper to log messages via callback if provided."""
-        if log_callback:
-            log_callback(message)
-
-    log(f"Starting XML comparison pipeline")
-    log(f"Original file: {original_path}")
-    log(f"Revised file: {revised_path}")
-    log(f"Output directory: {output_dir}")
-
-    # Ensure output directory exists
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Generate output filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"{revised_path.stem}_compare_{timestamp}.html"
-    output_path = output_dir / output_filename
-
-    log(f"Report will be saved to: {output_filename}")
-
-    # Step 1: Parse both XML files
-    log("Parsing XML files...")
-    parser_service = XMLParserService()
-    left_tree, right_tree = parser_service.parse_both_files(
-        original_path, revised_path
-    )
-    log("XML parsing complete")
-
-    # Step 2: Run diff engine
-    log("Running diff engine to detect changes...")
-    diff_engine = DiffEngine()
-    result = diff_engine.diff(original_path, revised_path, options)
-    log(f"Diff engine found {result.statistics.total_differences} differences")
-
-    # Step 3: Run attribute comparator if enabled
-    if options.include_attributes:
-        log("Running attribute comparison (this may take longer)...")
-        attr_comparator = AttributeComparator()
-        attr_comparator.compare_and_update_result(left_tree, right_tree, result)
-        log(f"Attribute comparison found {len(result.attribute_diffs)} attribute changes")
-    else:
-        log("Attribute comparison skipped (disabled in options)")
-
-    # Step 4: Update statistics with final counts
-    log("Calculating final statistics...")
-    stats_builder = StatisticsBuilder()
-    stats_builder.update_result_statistics(result)
-    stats = result.statistics
-    log(f"Match percentage: {stats.match_percentage:.1f}%")
-    log(f"Total differences: {stats.total_differences}")
-    log(f"  - Text changes: {stats.text_changes}")
-    log(f"  - Formatting changes: {stats.formatting_changes}")
-    log(f"  - Attribute changes: {stats.attribute_changes}")
-    log(f"  - Structure changes: {stats.structure_changes}")
-
-    # Step 5: Generate HTML report
-    log("Generating HTML report...")
-    renderer = HtmlTemplateRenderer()
-    renderer.render_to_file(result, options, output_path)
-    log(f"Report generated successfully: {output_path}")
-
-    return output_path
-
-
-def run_xml_compare_with_result(
-    original_path: Path,
-    revised_path: Path,
-    options: Optional[CompareOptions] = None,
-    output_dir: Optional[Path] = None,
-    log_callback: Optional[Callable[[str], None]] = None,
-) -> CompareResult:
-    """Run comparison and return full result object with report path.
-
-    Similar to run_xml_compare but returns the full CompareResult
-    for programmatic access to the comparison data.
-
-    Args:
-        original_path: Path to the original XML file
-        revised_path: Path to the revised XML file
+        original: Path to the original XML file
+        revised: Path to the revised XML file
         options: Comparison options (uses defaults if None)
-        output_dir: Directory for output report (defaults to revised file's directory)
+        output_dir: Directory for output report (defaults to revised file's parent)
         log_callback: Optional callback for progress messages
 
     Returns:
-        CompareResult with all diff data and output_path set to the HTML report
+        Path to the generated HTML report
+
+    Raises:
+        FileNotFoundError: If original or revised file does not exist
+        ValueError: If files cannot be parsed as valid XML
+        RuntimeError: If comparison fails
     """
     if options is None:
         options = CompareOptions()
 
     if output_dir is None:
-        output_dir = revised_path.parent
+        output_dir = revised.parent
 
-    try:
-        output_path = run_xml_compare(
-            original_path=original_path,
-            revised_path=revised_path,
-            options=options,
-            output_dir=output_dir,
-            log_callback=log_callback,
+    if log_callback:
+        log_callback("Initializing comparison pipeline...")
+
+    # Initialize services
+    parser = XMLParserService()
+    diff_engine = DiffEngine(parser)
+    attr_comparator = AttributeComparator()
+    stats_builder = StatisticsBuilder()
+    report_builder = ReportBuilder(parser, diff_engine, attr_comparator, stats_builder)
+
+    # Determine output path
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_name = f"{revised.stem}_compare_{timestamp}.html"
+    output_path = output_dir / output_name
+
+    # Run the full pipeline with streaming
+    result = report_builder.build_report_streaming(
+        original_path=original,
+        revised_path=revised,
+        options=options,
+        output_path=output_path,
+        progress_callback=log_callback,
+    )
+
+    if not result.success:
+        raise RuntimeError(f"Comparison failed: {result.error_message}")
+
+    return output_path
+
+
+def run_xml_compare_simple(
+    original: Path,
+    revised: Path,
+    options: CompareOptions | None = None,
+) -> CompareResult:
+    """Run XML comparison and return result without generating report.
+
+    This is a lighter-weight entry point useful for programmatic
+    comparisons where you only need the result data.
+
+    Args:
+        original: Path to the original XML file
+        revised: Path to the revised XML file
+        options: Comparison options (uses defaults if None)
+
+    Returns:
+        CompareResult with all differences and statistics
+
+    Raises:
+        FileNotFoundError: If files don't exist
+        ValueError: If files are invalid XML
+    """
+    if options is None:
+        options = CompareOptions()
+
+    parser = XMLParserService()
+    diff_engine = DiffEngine(parser)
+    attr_comparator = AttributeComparator()
+    stats_builder = StatisticsBuilder()
+
+    # Run diff
+    result = diff_engine.diff(original, revised, options)
+
+    # Add attribute comparison if enabled
+    if options.include_attributes:
+        original_tree = parser.parse_xml_with_entity_handling(original)
+        revised_tree = parser.parse_xml_with_entity_handling(revised)
+        result.attribute_diffs = attr_comparator.compare(
+            original_tree, revised_tree, options
         )
-
-        # Parse both files to get the result
-        parser_service = XMLParserService()
-        left_tree, right_tree = parser_service.parse_both_files(
-            original_path, revised_path
-        )
-
-        # Run full pipeline to get result
-        diff_engine = DiffEngine()
-        result = diff_engine.diff(original_path, revised_path, options)
-
-        # Run attribute comparator if enabled
-        if options.include_attributes:
-            attr_comparator = AttributeComparator()
-            attr_comparator.compare_and_update_result(left_tree, right_tree, result)
-
-        # Update statistics
-        stats_builder = StatisticsBuilder()
         stats_builder.update_result_statistics(result)
 
-        # Set output path and success
-        result.output_path = output_path
-        result.success = True
+    return result
 
-        return result
 
-    except Exception as exc:
-        # Return failed result
-        return CompareResult(
-            original_path=original_path,
-            revised_path=revised_path,
-            output_path=None,
-            success=False,
-            error_message=str(exc),
-        )
+def run_xml_compare_with_result(
+    original: Path,
+    revised: Path,
+    options: CompareOptions | None = None,
+    output_dir: Path | None = None,
+    log_callback: Callable[[str], None] | None = None,
+) -> tuple[CompareResult, Path]:
+    """Run XML comparison and return both result data and report path.
+
+    This is the most complete entry point, returning both the full
+    comparison result data and the path to the generated HTML report.
+
+    Args:
+        original: Path to the original XML file
+        revised: Path to the revised XML file
+        options: Comparison options (uses defaults if None)
+        output_dir: Directory for output report (defaults to revised file's parent)
+        log_callback: Optional callback for progress messages
+
+    Returns:
+        Tuple of (CompareResult, Path) containing the comparison data
+        and the generated HTML report path
+
+    Raises:
+        FileNotFoundError: If original or revised file does not exist
+        ValueError: If files cannot be parsed as valid XML
+        RuntimeError: If comparison fails
+    """
+    if options is None:
+        options = CompareOptions()
+
+    if output_dir is None:
+        output_dir = revised.parent
+
+    if log_callback:
+        log_callback("Initializing comparison pipeline...")
+
+    # Initialize services
+    parser = XMLParserService()
+    diff_engine = DiffEngine(parser)
+    attr_comparator = AttributeComparator()
+    stats_builder = StatisticsBuilder()
+    report_builder = ReportBuilder(parser, diff_engine, attr_comparator, stats_builder)
+
+    # Determine output path
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_name = f"{revised.stem}_compare_{timestamp}.html"
+    output_path = output_dir / output_name
+
+    # Run the full pipeline with streaming
+    result = report_builder.build_report_streaming(
+        original_path=original,
+        revised_path=revised,
+        options=options,
+        output_path=output_path,
+        progress_callback=log_callback,
+    )
+
+    if not result.success:
+        raise RuntimeError(f"Comparison failed: {result.error_message}")
+
+    return result, output_path
