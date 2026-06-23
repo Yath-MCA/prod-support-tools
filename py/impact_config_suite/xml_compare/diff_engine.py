@@ -80,6 +80,9 @@ class DiffEngine:
             original_path, revised_path
         )
 
+        # Capture old text values BEFORE running diff (xmldiff mutates the tree)
+        old_text_cache = self._capture_text_cache(left_tree)
+
         # Determine if fast_match should be used for large files
         use_fast_match = options.fast_match or self._should_use_fast_match(
             original_path, revised_path
@@ -110,7 +113,8 @@ class DiffEngine:
             left_tree,
             right_tree,
             result,
-            options
+            options,
+            old_text_cache
         )
 
         # Calculate match percentage
@@ -171,6 +175,33 @@ class DiffEngine:
             )
         return main.diff_trees(left_tree, right_tree, formatter=None)
 
+    def _capture_text_cache(
+        self,
+        tree: etree.ElementTree
+    ) -> Dict[str, str]:
+        """
+        Capture all text content from tree before diff mutates it.
+        
+        xmldiff.diff_trees mutates the tree in place when applying
+        UpdateTextIn actions, so we must capture original text first.
+        
+        Args:
+            tree: XML tree to capture text from
+            
+        Returns:
+            Dict mapping XPath paths to text content
+        """
+        cache: Dict[str, str] = {}
+        root = tree.getroot()
+        
+        # Walk all elements and capture text at each path
+        for elem in root.iter():
+            path = tree.getpath(elem)
+            if elem.text:
+                cache[path] = str(elem.text)
+        
+        return cache
+
     def _process_actions(
         self,
         actions: List[Any],
@@ -178,20 +209,22 @@ class DiffEngine:
         right_tree: etree.ElementTree,
         result: CompareResult,
         options: CompareOptions,
+        old_text_cache: Dict[str, str]
     ) -> None:
         """
         Process and classify xmldiff actions into result categories.
         
         Args:
             actions: List of xmldiff action objects
-            left_tree: Original XML tree
+            left_tree: Original XML tree (may be mutated by xmldiff)
             right_tree: Revised XML tree
             result: CompareResult to populate
             options: Comparison options
+            old_text_cache: Mapping of XPaths to original text values
         """
         for action in actions:
             if isinstance(action, UpdateTextIn):
-                self._process_text_update(action, left_tree, right_tree, result, options)
+                self._process_text_update(action, left_tree, right_tree, result, options, old_text_cache)
             elif isinstance(action, (InsertNode, DeleteNode, MoveNode, RenameNode)):
                 if options.structure_changes:
                     self._process_structure_action(action, left_tree, right_tree, result)
@@ -226,28 +259,30 @@ class DiffEngine:
         right_tree: etree.ElementTree,
         result: CompareResult,
         options: CompareOptions,
+        old_text_cache: Dict[str, str]
     ) -> None:
         """
         Process UpdateTextIn action and classify as text or formatting.
-        
+
         Formatting detection: if normalized text is the same but wrapper
         tag changed (e.g., italic → bold, sup → sub), it's a formatting change.
-        
+
         Args:
             action: UpdateTextIn action from xmldiff
-            left_tree: Original XML tree
+            left_tree: Original XML tree (may be mutated by xmldiff)
             right_tree: Revised XML tree
             result: CompareResult to populate
             options: Comparison options
+            old_text_cache: Mapping of XPaths to original text values
         """
         path = self._normalize_xpath(action.node)
-        
+
         # Get new text from action
         new_text = str(action.text) if action.text is not None else ""
-        
-        # Get old text by looking up in left_tree
-        old_text = self._get_old_text_from_tree(path, left_tree)
-        
+
+        # Get old text from cache (tree has been mutated by xmldiff)
+        old_text = old_text_cache.get(path, "")
+
         # Check if this is a formatting-only change
         old_normalized = self._normalize_text(old_text)
         new_normalized = self._normalize_text(new_text)
@@ -374,22 +409,27 @@ class DiffEngine:
         path = path.replace("[1]", "[1]")  # Keep index notation consistent
         return path
 
-    def _normalize_text(self, text: Optional[str]) -> str:
+    def _normalize_text(self, text: Optional[Any]) -> str:
         """
         Normalize text for comparison.
         
         Collapses whitespace and strips leading/trailing whitespace.
+        Forces coercion to string to handle lxml/xmldiff cython objects.
         
         Args:
-            text: Raw text content
+            text: Raw text content (may be lxml cython object)
             
         Returns:
             Normalized text string
         """
-        if not text:
+        if text is None:
+            return ""
+        # Force to plain Python string - handles lxml cython objects
+        text_str = str(text)
+        if not text_str:
             return ""
         # Collapse all whitespace to single spaces
-        return " ".join(text.split()).strip()
+        return " ".join(text_str.split()).strip()
 
     def _is_formatting_tag_change(
         self,

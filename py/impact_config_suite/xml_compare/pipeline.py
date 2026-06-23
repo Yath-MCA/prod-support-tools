@@ -82,7 +82,7 @@ def run_xml_compare(
         if log_callback:
             log_callback("Comparing attributes...")
         result.attribute_diffs = attr_comparator.compare_attributes(
-            original_tree, revised_tree
+            original_tree, revised_tree, options
         )
         # Recalculate statistics with attributes
         stats_builder.update_result_statistics(result)
