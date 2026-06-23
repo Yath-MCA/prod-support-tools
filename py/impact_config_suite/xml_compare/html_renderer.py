@@ -859,21 +859,25 @@ class HtmlTemplateRenderer:
         if not new_text:
             return f'<span class="diff-delete">{escape(old_text)}</span>'
         
+        # Force to plain Python strings to handle lxml Cython objects
+        old_text = str(old_text)
+        new_text = str(new_text)
+        
         sm = SequenceMatcher(None, old_text, new_text)
         result = []
         
         for tag, i1, i2, j1, j2 in sm.get_opcodes():
             if tag == 'equal':
-                result.append(escape(old_text[i1:i2]))
+                result.append(escape(str(old_text[i1:i2])))
             elif tag == 'delete':
-                result.append(f'<span class="diff-delete">{escape(old_text[i1:i2])}</span>')
+                result.append(f'<span class="diff-delete">{escape(str(old_text[i1:i2]))}</span>')
             elif tag == 'insert':
-                result.append(f'<span class="diff-insert">{escape(new_text[j1:j2])}</span>')
+                result.append(f'<span class="diff-insert">{escape(str(new_text[j1:j2]))}</span>')
             elif tag == 'replace':
-                result.append(f'<span class="diff-delete">{escape(old_text[i1:i2])}</span>')
-                result.append(f'<span class="diff-insert">{escape(new_text[j1:j2])}</span>')
+                result.append(f'<span class="diff-delete">{escape(str(old_text[i1:i2]))}</span>')
+                result.append(f'<span class="diff-insert">{escape(str(new_text[j1:j2]))}</span>')
         
-        return ''.join(result)
+        return ''.join(str(item) for item in result)
     
     def _render_overview_tab(self, result: CompareResult) -> str:
         """Render the Overview tab content."""

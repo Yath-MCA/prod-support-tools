@@ -286,11 +286,13 @@ class DiffEngine:
         """
         path = self._normalize_xpath(action.node)
 
-        # Get new text from action
+        # Get new text from action - ensure it's a proper Python string
         new_text = str(action.text) if action.text is not None else ""
+        new_text = str(new_text)  # Ensure plain Python string, not Cython object
 
-        # Get old text from cache (tree has been mutated by xmldiff)
+        # Get old text from cache (tree has been mutated by xmldiff) - ensure proper string
         old_text = old_text_cache.get(path, "")
+        old_text = str(old_text)  # Ensure plain Python string, not Cython object
 
         # Check if this is a formatting-only change
         old_normalized = self._normalize_text(old_text)
@@ -342,7 +344,7 @@ class DiffEngine:
         """
         if isinstance(action, InsertNode):
             path = self._normalize_xpath(action.target)
-            tag = str(action.tag)
+            tag = str(action.tag) if action.tag is not None else "unknown"
             preview = f"<{tag}>...</{tag}>"
             structure_diff = StructureDiff(
                 path=path,
@@ -382,8 +384,8 @@ class DiffEngine:
             
         elif isinstance(action, RenameNode):
             path = self._normalize_xpath(action.node)
-            old_tag = str(action.oldtag)
-            new_tag = str(action.tag)
+            old_tag = str(action.oldtag) if action.oldtag is not None else "unknown"
+            new_tag = str(action.tag) if action.tag is not None else "unknown"
             # Rename is both structural and formatting
             # Add as structure change
             element = self._get_element_by_path(left_tree, action.node)
@@ -409,6 +411,9 @@ class DiffEngine:
         Returns:
             Normalized XPath string
         """
+        # Force to plain Python string to handle xmldiff/lxml Cython objects
+        path = str(path) if path is not None else ""
+        
         if not path:
             return "/"
         # Ensure path starts with /
@@ -437,8 +442,8 @@ class DiffEngine:
         text_str = str(text)
         if not text_str:
             return ""
-        # Collapse all whitespace to single spaces
-        return " ".join(text_str.split()).strip()
+        # Collapse all whitespace to single spaces - ensure all parts are strings
+        return " ".join(str(part) for part in text_str.split()).strip()
 
     def _is_formatting_tag_change(
         self,
@@ -597,25 +602,29 @@ class DiffEngine:
         if not old_text and not new_text:
             return ""
         
+        # Force to plain Python strings to handle lxml Cython objects
+        old_text = str(old_text)
+        new_text = str(new_text)
+        
         matcher = difflib.SequenceMatcher(None, old_text, new_text)
         result = []
         
         for opcode, old_start, old_end, new_start, new_end in matcher.get_opcodes():
             if opcode == "equal":
-                result.append(old_text[old_start:old_end])
+                result.append(str(old_text[old_start:old_end]))
             elif opcode == "delete":
-                deleted = old_text[old_start:old_end]
+                deleted = str(old_text[old_start:old_end])
                 result.append(f'<span class="diff-delete">{deleted}</span>')
             elif opcode == "insert":
-                inserted = new_text[new_start:new_end]
+                inserted = str(new_text[new_start:new_end])
                 result.append(f'<span class="diff-insert">{inserted}</span>')
             elif opcode == "replace":
-                deleted = old_text[old_start:old_end]
-                inserted = new_text[new_start:new_end]
+                deleted = str(old_text[old_start:old_end])
+                inserted = str(new_text[new_start:new_end])
                 result.append(f'<span class="diff-delete">{deleted}</span>')
                 result.append(f'<span class="diff-insert">{inserted}</span>')
         
-        return "".join(result)
+        return "".join(str(item) for item in result)
 
     def _calculate_match_percentage(self, stats: Any) -> float:
         """

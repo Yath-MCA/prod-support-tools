@@ -156,7 +156,8 @@ class XMLParserService:
         """
         if element is None:
             return ""
-        text = etree.tostring(element, method="text", encoding="unicode")
-        # Normalize whitespace
-        text = " ".join(text.split())
+        # Force to plain Python string to handle lxml Cython objects
+        text = str(etree.tostring(element, method="text", encoding="unicode"))
+        # Normalize whitespace - ensure all items in split() are strings
+        text = " ".join(str(part) for part in text.split())
         return text.strip()

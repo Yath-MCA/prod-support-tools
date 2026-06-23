@@ -285,12 +285,13 @@ class AttributeComparator:
             tag = "unknown"
 
         # Get all attribute names from both elements
-        left_attrs = dict(left_elem.attrib)
-        right_attrs = dict(right_elem.attrib)
+        left_attrs = {str(k): str(v) if v is not None else "" for k, v in left_elem.attrib.items()}
+        right_attrs = {str(k): str(v) if v is not None else "" for k, v in right_elem.attrib.items()}
 
         all_attr_names = set(left_attrs.keys()) | set(right_attrs.keys())
 
         for attr_name in all_attr_names:
+            attr_name = str(attr_name)  # Ensure string
             left_val = left_attrs.get(attr_name)
             right_val = right_attrs.get(attr_name)
 
@@ -322,6 +323,9 @@ class AttributeComparator:
         Returns:
             Normalized XPath
         """
+        # Force to plain Python string to handle xmldiff/lxml Cython objects
+        path = str(path) if path is not None else ""
+        
         if not path:
             return "/"
         

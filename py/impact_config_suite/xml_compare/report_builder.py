@@ -47,7 +47,7 @@ the report to disk using streaming writes to minimize memory usage.
         """
         # Ensure statistics are calculated
         if result.statistics.total_nodes == 0:
-            result.statistics = self._stats_builder.calculate(result)
+            result.statistics = self._stats_builder.build(result)
         
         # Generate output filename
         output_file = self._generate_filename(result, output_path)
