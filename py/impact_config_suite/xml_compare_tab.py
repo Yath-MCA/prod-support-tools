@@ -34,37 +34,11 @@ class XMLCompareTab(ttk.Frame):
     def _build_ui(self) -> None:
         """Build the complete tab UI."""
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(0, weight=1)
 
-        # Title section
-        title_frame = tk.Frame(self, bg="#1e293b", padx=20, pady=16)
-        title_frame.grid(row=0, column=0, sticky="ew")
-        tk.Label(
-            title_frame,
-            text="XML TO XML COMPARISON",
-            font=("Segoe UI", 16, "bold"),
-            fg="#38bdf8",
-            bg="#1e293b",
-        ).pack(anchor="w")
-        tk.Label(
-            title_frame,
-            text="Compare two XML files and generate a detailed HTML report with categorized differences (text, formatting, attributes, structure).",
-            font=("Segoe UI", 10),
-            fg="#94a3b8",
-            bg="#1e293b",
-            wraplength=800,
-            justify="left",
-        ).pack(anchor="w", pady=(8, 0))
-
-        # Main content frame
-        content_frame = tk.Frame(self, bg="#0f172a", padx=16, pady=12)
-        content_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=8)
-        content_frame.columnconfigure(0, weight=1)
-        content_frame.rowconfigure(0, weight=1)
-
-        # Use the existing XmlComparePanel
-        self.xml_panel = XmlComparePanel(content_frame)
-        self.xml_panel.grid(row=0, column=0, sticky="nsew")
+        # Use the existing XmlComparePanel which has its own title
+        self.xml_panel = XmlComparePanel(self)
+        self.xml_panel.grid(row=0, column=0, sticky="nsew", padx=12, pady=8)
 
     def get_tab_name(self) -> str:
         """Return the display name for this tab."""

@@ -81,24 +81,17 @@ def run_xml_compare(
     if options.include_attributes:
         if log_callback:
             log_callback("Comparing attributes...")
-        result.attribute_diffs = attr_comparator.compare(
-            original_tree, revised_tree, options
+        result.attribute_diffs = attr_comparator.compare_attributes(
+            original_tree, revised_tree
         )
         # Recalculate statistics with attributes
         stats_builder.update_result_statistics(result)
 
-    # Determine output path
-    from datetime import datetime
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_name = f"{revised.stem}_compare_{timestamp}.html"
-    output_path = output_dir / output_name
-
     if log_callback:
         log_callback("Generating HTML report...")
 
-    # Build the report
-    report_builder.build_report(result, output_path, use_streaming=True)
+    # Build the report - ReportBuilder generates its own filename with timestamp
+    output_path = report_builder.build_report(result, output_dir, use_streaming=True)
 
     result.output_path = output_path
     result.success = True
@@ -148,8 +141,8 @@ def run_xml_compare_simple(
 
     # Add attribute comparison if enabled
     if options.include_attributes:
-        result.attribute_diffs = attr_comparator.compare(
-            original_tree, revised_tree, options
+        result.attribute_diffs = attr_comparator.compare_attributes(
+            original_tree, revised_tree
         )
         stats_builder.update_result_statistics(result)
 

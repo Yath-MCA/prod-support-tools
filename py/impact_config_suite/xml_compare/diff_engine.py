@@ -242,9 +242,11 @@ class DiffEngine:
         """
         path = self._normalize_xpath(action.node)
         
-        # Get old and new text
-        old_text = action.oldtext or ""
-        new_text = action.text or ""
+        # Get new text from action
+        new_text = str(action.text) if action.text is not None else ""
+        
+        # Get old text by looking up in left_tree
+        old_text = self._get_old_text_from_tree(path, left_tree)
         
         # Check if this is a formatting-only change
         old_normalized = self._normalize_text(old_text)
@@ -479,6 +481,29 @@ class DiffEngine:
             pass
         
         return None
+
+    def _get_old_text_from_tree(
+        self,
+        path: str,
+        tree: etree.ElementTree
+    ) -> str:
+        """Get text content from an element in the tree by XPath.
+        
+        Args:
+            path: XPath to the element
+            tree: Element tree to search
+            
+        Returns:
+            Text content of the element, or empty string if not found
+        """
+        try:
+            elements = tree.xpath(path)
+            if elements and len(elements) > 0:
+                elem = elements[0]
+                return str(elem.text) if elem.text is not None else ""
+        except (etree.XPathError, AttributeError):
+            pass
+        return ""
 
     def _get_element_preview(self, element: Optional[etree.Element]) -> str:
         """
