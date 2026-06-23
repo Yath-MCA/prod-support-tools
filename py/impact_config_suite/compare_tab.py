@@ -544,7 +544,7 @@ class HTMLCompareTab(ttk.Frame):
         self.status_filter_cb.grid(row=4, column=1, sticky="w", padx=(10, 0), pady=(10, 0))
         self.status_filter_cb.bind("<<ComboboxSelected>>", lambda _e: self._apply_filter())
 
-        tk.Label(filter_frame, text="Parent Status:", bg="#0f172a", fg="#94a3b8",
+        tk.Label(self.filter_frame, text="Parent Status:", bg="#0f172a", fg="#94a3b8",
                  font=("Segoe UI", 10)).grid(row=4, column=2, sticky="w",
                                              padx=(16, 0), pady=(10, 0))
         self.parent_filter_var = tk.StringVar(value="")

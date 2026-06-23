@@ -395,3 +395,46 @@ class XmlComparePanel(ttk.Frame):
             subprocess.run(["explorer", "/select,", str(self._last_report_path)])
         else:
             messagebox.showwarning("No Report", "No report folder to open.")
+
+    def validate_paths(self) -> tuple[Path, Path] | None:
+        """Validate and return the selected file paths.
+
+        Returns:
+            Tuple of (original_path, revised_path) if valid, None otherwise.
+            Shows error messageboxes for invalid inputs.
+        """
+        original = self.original_path_var.get().strip()
+        revised = self.revised_path_var.get().strip()
+
+        if not original:
+            messagebox.showerror("Error", "Please select an Original XML file.")
+            return None
+        if not revised:
+            messagebox.showerror("Error", "Please select a Revised XML file.")
+            return None
+
+        orig_path = Path(original)
+        rev_path = Path(revised)
+
+        if not orig_path.exists():
+            messagebox.showerror("Error", f"Original file not found:\n{original}")
+            return None
+        if not rev_path.exists():
+            messagebox.showerror("Error", f"Revised file not found:\n{revised}")
+            return None
+
+        # Validate file extensions
+        if orig_path.suffix.lower() not in (".xml", ".xhtml"):
+            messagebox.showwarning(
+                "File Warning", f"Original file may not be XML: {orig_path.suffix}\nProceeding anyway."
+            )
+        if rev_path.suffix.lower() not in (".xml", ".xhtml"):
+            messagebox.showwarning(
+                "File Warning", f"Revised file may not be XML: {rev_path.suffix}\nProceeding anyway."
+            )
+
+        return orig_path, rev_path
+
+    def clear_log(self) -> None:
+        """Clear the status log text area."""
+        self.log_text.delete("1.0", "end")

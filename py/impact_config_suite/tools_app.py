@@ -20,6 +20,7 @@ from id_pattern_extractor_tab import IDPatternExtractorTab
 from new_config_tab import NewConfigTab
 from compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from element_extractor_tab import ElementExtractorTab
+from xml_compare_tab import XMLCompareTab
 from core.run_history import RunHistoryStore
 
 
@@ -38,6 +39,7 @@ class CommonToolsApp:
         "id_pattern_extractor": IDPatternExtractorTab,
         "compare_html": HTMLCompareTab,
         "compare_replace": HTMLCompareReplaceTab,
+        "compare_xml": XMLCompareTab,
         "new_journal_config": NewConfigTab,
         "element_extractor": ElementExtractorTab,
     }

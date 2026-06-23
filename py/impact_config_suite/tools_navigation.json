@@ -33,7 +33,8 @@
       "name": "HTML/XML Comparison",
       "tools": [
         { "id": "compare_html", "label": "Compare HTML" },
-        { "id": "compare_replace", "label": "Compare & Replace" }
+        { "id": "compare_replace", "label": "Compare & Replace" },
+        { "id": "compare_xml", "label": "Compare XML" }
       ]
     },
     {
