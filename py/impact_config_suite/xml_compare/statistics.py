@@ -32,35 +32,39 @@ class StatisticsBuilder:
         """
         stats = CompareStatistics()
 
-        if original_tree is not None:
-            stats.total_nodes_original = len(original_tree.xpath("//*"))
-        if revised_tree is not None:
-            stats.total_nodes_revised = len(revised_tree.xpath("//*"))
+        # Calculate total nodes if trees are provided, otherwise use result's value
+        if original_tree is not None and revised_tree is not None:
+            total_original = len(original_tree.xpath("//*"))
+            total_revised = len(revised_tree.xpath("//*"))
+            stats.total_nodes = (total_original + total_revised) // 2
+        elif result.statistics and result.statistics.total_nodes > 0:
+            stats.total_nodes = result.statistics.total_nodes
 
         stats.text_changes = len(result.text_diffs)
-        stats.formatting_changes = len(result.format_diffs)
+        stats.format_changes = len(result.format_diffs)
         stats.attribute_changes = len(result.attribute_diffs)
         stats.structure_changes = len(result.structure_diffs)
 
         for sd in result.structure_diffs:
-            if sd.change_type == "insert":
-                stats.nodes_added += 1
-            elif sd.change_type == "delete":
-                stats.nodes_deleted += 1
-            elif sd.change_type == "move":
-                stats.nodes_moved += 1
+            if sd.change_type == "added":
+                stats.added_nodes += 1
+            elif sd.change_type == "deleted":
+                stats.deleted_nodes += 1
+            elif sd.change_type == "moved":
+                stats.moved_nodes += 1
 
         total_diffs = (
             stats.text_changes
-            + stats.formatting_changes
+            + stats.format_changes
             + stats.structure_changes
             + stats.attribute_changes
         )
         stats.total_differences = total_diffs
 
-        if stats.total_nodes_original > 0:
-            unchanged = max(0, stats.total_nodes_original - total_diffs)
-            stats.match_percentage = (unchanged / stats.total_nodes_original) * 100
+        # Calculate match percentage
+        if stats.total_nodes > 0:
+            unchanged = max(0, stats.total_nodes - total_diffs)
+            stats.match_percentage = (unchanged / stats.total_nodes) * 100
         else:
             stats.match_percentage = 100.0
 
@@ -71,23 +75,33 @@ class StatisticsBuilder:
         stats = CompareStatistics()
 
         stats.text_changes = len(result.text_diffs)
-        stats.formatting_changes = len(result.format_diffs)
+        stats.format_changes = len(result.format_diffs)
         stats.attribute_changes = len(result.attribute_diffs)
         stats.structure_changes = len(result.structure_diffs)
 
         for sd in result.structure_diffs:
-            if sd.change_type == "insert":
-                stats.nodes_added += 1
-            elif sd.change_type == "delete":
-                stats.nodes_deleted += 1
-            elif sd.change_type == "move":
-                stats.nodes_moved += 1
+            if sd.change_type == "added":
+                stats.added_nodes += 1
+            elif sd.change_type == "deleted":
+                stats.deleted_nodes += 1
+            elif sd.change_type == "moved":
+                stats.moved_nodes += 1
 
         stats.total_differences = (
             stats.text_changes
-            + stats.formatting_changes
+            + stats.format_changes
             + stats.structure_changes
             + stats.attribute_changes
         )
+
+        # Preserve total_nodes from existing statistics if available
+        if result.statistics and result.statistics.total_nodes > 0:
+            stats.total_nodes = result.statistics.total_nodes
+            
+            # Calculate match percentage
+            unchanged = max(0, stats.total_nodes - stats.total_differences)
+            stats.match_percentage = (unchanged / stats.total_nodes) * 100
+        else:
+            stats.match_percentage = 100.0
 
         result.statistics = stats

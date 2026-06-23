@@ -1,0 +1,2250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE commblock PUBLIC "-//WKAP//DTD Commentary block//EN" "commblock.dtd" [
+]>
+<commblock number="10-222" type="case_finder" slelemid="SLWMS100003357">
+	<title>Testing Newgen Table 2 Commentary Regression 18-APR</title>
+	<para>Table 3</para>
+	<table colsep="1" frame="all" rowsep="1">
+		<tgroup cols="4">
+			<colspec colname="c1" colnum="1" colwidth="16.03*"/>
+			<colspec colname="c2" colnum="2" colwidth="10.19*"/>
+			<colspec colname="c3" colnum="3" colwidth="32.95*"/>
+			<colspec colname="c4" colnum="4" colwidth="40.83*"/>
+			<thead>
+				<row>
+					<entry align="right" colname="c1">
+						<emphasis type="bold">Clause No.</emphasis>
+					</entry>
+					<entry align="right" colname="c2">
+						<emphasis type="bold">test</emphasis>
+					</entry>
+					<entry align="right" colname="c3">
+						<emphasis type="bold">Contract A</emphasis>
+					</entry>
+					<entry align="right" colname="c4" colsep="1">
+						<emphasis type="bold">Contract B</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row>
+					<entry align="center" colname="c1">1.1</entry>
+					<entry align="center" colname="c2">2.2</entry>
+					<entry align="center" colname="c3">
+						<emphasis type="bold">Confidentiality:</emphasis> All parties shall maintain strict confidentiality of proprietary information. testing
+                    
+					</entry>
+					<entry align="center" colname="c4">
+						<emphasis type="italics">Confidentiality:</emphasis> Confidential information may be shared with affiliates under NDA.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colname="c1">1.1</entry>
+					<entry align="left" colname="c2">2.2</entry>
+					<entry align="left" colname="c3">3.3</entry>
+					<entry align="left" colname="c4" colsep="1">4.4</entry>
+				</row>
+				<row>
+					<entry align="right" colname="c1">1.1</entry>
+					<entry align="center" colname="c2">2.2</entry>
+					<entry align="left" colname="c3">
+						<emphasis type="italics_bold">Termination:</emphasis> This agreement may be terminated by either party with 30 days&rsquo; notice. sample
+                    
+					</entry>
+					<entry align="right" colname="c4">
+						<emphasis type="italics">Termination:</emphasis> Termination requires a 60-day notice and mutual consen
+                    
+					</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>Table 2</para>
+	<table cellcont="continued" colsep="1" contype="desc" frame="all" id="legalClauseTable" label="Table1" orient="port" pgwide="1" revchg="1" rowsep="1" SLVE="slveitem" slveref="table_reference" tabstyle="legal" titleoutput="print" verdate="2025-05-07" verrem="Initial draft for legal comparison">
+		<tgroup cols="3">
+			<colspec align="left" colname="c1" colnum="1" colsep="1" rowsep="1" colwidth="15*"/>
+			<colspec align="left" colname="c2" colnum="2" colsep="1" rowsep="1" colwidth="39*"/>
+			<colspec colname="c3" colnum="3" colwidth="46*"/>
+			<thead valign="bottom">
+				<row>
+					<entry colname="c1" valign="middle">
+						<emphasis type="bold">Clause No.</emphasis>
+					</entry>
+					<entry colname="c2" valign="middle">
+						<emphasis type="bold">Contract A</emphasis>
+					</entry>
+					<entry align="left" colname="c3" valign="middle">
+						<emphasis type="bold">Contract B</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row rowsep="1">
+					<entry align="center" colname="c1">1.1</entry>
+					<entry align="right" colname="c2">
+						<emphasis type="bold">Confidentiality:</emphasis> All parties shall maintain strict confidentiality of proprietary information. testing
+                    
+					</entry>
+					<entry align="right" colname="c3">
+						<emphasis type="italics">123Confidentiality:</emphasis> Confidential information may be shared with affiliates under NDA.
+                    
+					</entry>
+				</row>
+				<row rowsep="1">
+					<entry align="center" colname="c1">2.3</entry>
+					<entry align="center" colname="c2">
+						<emphasis type="italics_bold">Termination:</emphasis> This agreement may be terminated by either party with 30 days&rsquo; notice. sample
+                    
+					</entry>
+					<entry align="right" colname="c3">
+						<emphasis type="bold">123Termination:</emphasis> Termination requires a 60-day notice and mutual consent.
+                    
+					</entry>
+				</row>
+				<row rowsep="1">
+					<entry align="center" colname="c1">3.0</entry>
+					<entry align="center" nameend="c3" namest="c2">
+						<emphasis type="italics">General Clause:</emphasis> This clause applies equally to both contracts.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry align="center" colname="c1">4</entry>
+					<entry align="center" nameend="c3" namest="c2">test</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>Table from Master sample 2 inserted below</para>
+	<table colsep="0" frame="topbot" rowsep="0">
+		<tgroup cols="2">
+			<colspec align="center" colname="c1" colnum="1" colwidth="50*"/>
+			<colspec align="center" colname="c2" colnum="2" colwidth="50*"/>
+			<?coldef_mod colnum='1' mod='p.3,s.3'?>
+			<?coldef_mod colnum='2' mod='t.3,u.3,r.3'?>
+			<tbody>
+				<row rowsep="1">
+					<entry colname="c1">
+						<emphasis type="italics">Likely duration of journey</emphasis>
+					</entry>
+					<entry colname="c2">
+						<emphasis type="bold">Specified period</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">Less than 96 hours</entry>
+					<entry colname="c2">72 hours</entry>
+				</row>
+				<row>
+					<entry colname="c1">Less than 72 hours</entry>
+					<entry colname="c2">48 hours</entry>
+				</row>
+				<row>
+					<entry colname="c1">Less than 48 hours</entry>
+					<entry colname="c2">24 hours</entry>
+				</row>
+				<row>
+					<entry colname="c1">Less than 24 hours</entry>
+					<entry colname="c2">12 hours</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>Table from Master sample 2 inserted below</para>
+	<table colsep="1" frame="all" rowsep="1">
+		<tgroup cols="4">
+			<colspec align="left" colname="c1" colnum="1" colwidth="25*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="25*"/>
+			<colspec align="left" colname="c3" colnum="3" colwidth="25*"/>
+			<colspec align="left" colname="c4" colnum="4" colwidth="25*"/>
+			<?coldef_mod colnum='1' mod='p.3,s.3'?>
+			<thead>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1"/>
+					<entry colname="c2" colsep="1" rowsep="1">
+						<emphasis type="bold">Example</emphasis>
+					</entry>
+					<entry colname="c3" colsep="1" rowsep="1">
+						<emphasis type="bold">IP that can/not protect it</emphasis>
+					</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<emphasis type="bold">Links</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Algorithm (with no means of putting it into effect)</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">NOT patentable</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093829081" targetID="IO131855.SL3026088">
+							<xref>47-300</xref>
+						</commref>; 
+						<commref slelemid="SLWMS100003357.2026041816481093884704" targetID="IO131856.SL3026122">
+							<xref>47-400</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Book</entry>
+					<entry colname="c2" colsep="1" rowsep="1">Fiction novel</entry>
+					<entry colname="c3" colsep="1" rowsep="1">Copyright</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093877315" targetID="IO131159.SL3012953">
+							<xref>1-680</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Box</entry>
+					<entry colname="c2" colsep="1" rowsep="1">Strawberry punnet box</entry>
+					<entry colname="c3" colsep="1" rowsep="1">Design</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<caseref citation="(2013) AIPC 92-462" slelemid="SLWMS100003357.2026041816481093861954" targetID="IO2282406.SL449876670">
+							<party type="left">Multisteps</party> v 
+							<party type="right">Source and Sell</party>
+							<citation>(2013) AIPC &para;92-462</citation>; 
+							<citation>[2013] FCA 743</citation>
+						</caseref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Business method</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">NOT patentable</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093824723" targetID="IO131856.SL3026122">
+							<xref>47-400</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Colour</entry>
+					<entry colname="c2" colsep="1" rowsep="1">
+						<urlref href="https://tinyurl.com/2p94buwf">Cadbury purple: 1120615</urlref>; 
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/780743?s=5371beb7-1603-41c4-84b4-64a63cd96de6">Surf Life Saving red and yellow flag: 780743</urlref>
+					</entry>
+					<entry colname="c3" colsep="1" rowsep="1">Trade mark</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093858511" targetID="IO132272.SL3032985">
+							<xref>68-880</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Compilation/table</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">Copyright</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093895686" targetID="IO131168.SL3013173">
+							<xref>1-900</xref>
+						</commref>, 
+						<commref slelemid="SLWMS100003357.2026041816481093890131" targetID="IO131152.SL3012890">
+							<xref>1-550</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Computer program</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">Copyright</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093825033" targetID="IO131168.SL3013173">
+							<xref>1-900</xref>
+						</commref>, 
+						<commref slelemid="SLWMS100003357.2026041816481093887109" targetID="IO131152.SL3012890">
+							<xref>1-550</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Computer-related inventions</entry>
+					<entry colname="c2" colsep="1" rowsep="1">Computer processing apparatus for assembling text in Chinese language characters</entry>
+					<entry colname="c3" colsep="1" rowsep="1">May be patentable</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093867047" targetID="IO131856.SL3026122">
+							<xref>47-400</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">DNA/genes</entry>
+					<entry colname="c2" colsep="1" rowsep="1">Isolated DNA; cDNA</entry>
+					<entry colname="c3" colsep="1" rowsep="1">NOT patentable</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093854934" targetID="IO2804245.SL807588683">
+							<xref>47-670</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Idea</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">NOT patentable</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093896395" targetID="IO131855.SL3026088">
+							<xref>47-300</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">Moving image</entry>
+					<entry colname="c2">Toyota Jump: 1500012 Salt
+                        
+						<break/> Bae: the act of putting salt onto meat: 1840549
+                    
+					</entry>
+					<entry colname="c3">Trade mark</entry>
+					<entry colname="c4">
+						<commref slelemid="SLWMS100003357.2026041816481093865776" targetID="IO132261.SL3032838">
+							<xref>68-750</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">non-English trade marks</entry>
+					<entry colname="c2">&ldquo;Volkswagen&rdquo;: 
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/118525?q=volkswagen">118525</urlref>
+						<break/> for Gong Cha tea: 
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/1592767?q=gong&plus;cha">1592767</urlref>
+					</entry>
+					<entry colname="c3">Trade mark</entry>
+					<entry colname="c4">
+						<commref slelemid="SLWMS100003357.2026041816481093814271" targetID="IO132187.SL3031775">
+							<xref>67-410</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Pharmaceutical drug</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">Patent</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093842998" targetID="IO131858.SL3026164">
+							<xref>47-550</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Scientific theory</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">NOT patentable</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093891672" targetID="IO131855.SL3026088">
+							<xref>47-300</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Script/screenplay for films and TV shows</entry>
+					<entry colname="c2" colsep="1" rowsep="1"/>
+					<entry colname="c3" colsep="1" rowsep="1">Copyright</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093865558" targetID="IO131174.SL3013402">
+							<xref>2-080</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Shape</entry>
+					<entry colname="c2" colsep="1" rowsep="1">
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/2093276?q=toblerone">Coca Cola bottle: 172526;</urlref>
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/2093276?q=toblerone">Toblerone chocolate: 2093276</urlref>; 
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/2312596?s=80c226e5-8771-4d3b-ac71-7522ea0c69b6">Rubiks cube: 2312596</urlref>
+					</entry>
+					<entry colname="c3" colsep="1" rowsep="1">Trade mark</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093886963" targetID="IO132267.SL3032909">
+							<xref>68-840</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Smell/Scent</entry>
+					<entry colname="c2" colsep="1" rowsep="1">
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/1241420?s=25fa6e39-ae0f-4780-af61-e54a556c472d">Eucalyptus Radiata scent for golf tees: 1241420</urlref>; 
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/1858042?s=25fa6e39-ae0f-4780-af61-e54a556c472d">Cinammon scent for furniture: 1858042</urlref>
+					</entry>
+					<entry colname="c3" colsep="1" rowsep="1">Trade mark</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093877351" targetID="IO132275.SL3033041">
+							<xref>68-910</xref>
+						</commref>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Sound/jingle</entry>
+					<entry colname="c2" colsep="1" rowsep="1">
+						<urlref href="https://search.ipaustralia.gov.au/trademarks/search/view/1051140?s=89ae91fb-57fa-4341-9cb4-310977a17cba">Vocal harmonisation &mdash; &ldquo;O, O&rsquo;BRIEN&rdquo;: 1051140</urlref>
+					</entry>
+					<entry colname="c3" colsep="1" rowsep="1">Trade mark</entry>
+					<entry colname="c4" colsep="1" rowsep="1">
+						<commref slelemid="SLWMS100003357.2026041816481093865979" targetID="IO132281.SL3033099">
+							<xref>68-970</xref>
+						</commref>
+					</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<table colsep="1" frame="all" rowsep="1">
+		<tgroup cols="4">
+			<colspec align="left" colname="c1" colnum="1" colwidth="24*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="4*"/>
+			<colspec align="left" colname="c3" colnum="3" colwidth="4*"/>
+			<colspec align="left" colname="c4" colnum="4" colwidth="68*"/>
+			<spanspec nameend="c4" namest="c2" spanname="c24"/>
+			<spanspec nameend="c4" namest="c3" spanname="c34"/>
+			<?coldef_mod colnum='1' mod='p.3,s.3'?>
+			<thead>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Term</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Meaning</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Act</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">The 
+						<emphasis type="bold">Act</emphasis> means the 
+						<emphasis type="italics">Copyright Act 1968</emphasis> (Cth).
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="7">
+						<emphasis type="bold">Adaptation</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">The 
+						<emphasis type="bold">adaptation right</emphasis> is one of the 
+						<emphasis type="bold">exclusive rights</emphasis> comprising the 
+						<emphasis type="bold">copyright</emphasis> in 
+						<emphasis type="bold">works</emphasis>, excluding 
+						<emphasis type="bold">artistic works</emphasis>, under ss 
+						<lawref legid="ca1" number="pr 31 spr 1" slelemid="SLWMS100003357.2026041816481093818649" targetID="IO144501.SL3445012">31(1)(iv)</lawref> and 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093815607" targetID="IO144471.SL3444677">10(1)</lawref> of the Act. 
+						<emphasis type="bold">Adaptation</emphasis> means:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">in relation to a 
+						<emphasis type="bold">literary work</emphasis> in a non-dramatic form &mdash; a version of the work (whether in its original language or in a different language) in a dramatic form;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">in relation to a 
+						<emphasis type="bold">literary work</emphasis> in a dramatic form &mdash; a version of the work (whether in its original language or in a different language) in a non-dramatic form;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ba)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">in relation to a 
+						<emphasis type="bold">literary work</emphasis> being a 
+						<emphasis type="bold">computer program</emphasis> &mdash; a version of the work (whether or not in the language, code or notation in which the work was originally expressed) not being a reproduction of the work;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(c)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">in relation to a 
+						<emphasis type="bold">literary work</emphasis> (whether in a non-dramatic form or in a dramatic form):
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">a translation of the work; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">a version of the work in which a story or action is conveyed solely or principally by means of pictures; and</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0">(d)</entry>
+					<entry align="left" colsep="1" spanname="c34">in relation to a 
+						<emphasis type="bold">musical work</emphasis> &mdash; an arrangement or transcription of the work.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="3">
+						<emphasis type="bold">Artistic work</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">An 
+						<emphasis type="bold">artistic work</emphasis> under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093878329" targetID="IO144471.SL3444677">10(1)</lawref> of the Act means
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">a painting, sculpture, drawing, engraving or photograph, whether the work is of artistic quality or not;</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">a building or a model of a building, whether the building or model is of artistic quality or not;</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(c)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">a work of 
+						<emphasis type="bold">artistic</emphasis>
+						<emphasis type="bold">craftmanship</emphasis> that is not mentioned under (a) or (b) above.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Artistic craftsmanship</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">A work of 
+						<emphasis type="bold">artistic craftmanship</emphasis> is not defined in the Act. It has been interpreted to mean a crafted item displaying a degree of manual skill on the part of the maker, which is judged to be of &ldquo;artistic quality&rdquo;.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="3">
+						<emphasis type="bold">Authorisation</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">The 
+						<emphasis type="bold">authorisation</emphasis> of an infringement of copyright in a work is a separate act of infringement under s 
+						<lawref legid="ca1" number="pr 36 spr 1" slelemid="SLWMS100003357.2026041816481093847950" targetID="IO144507.SL3445077">36(1)</lawref> of the Act. In determining 
+						<emphasis type="bold">authorisation</emphasis>, the matters to be taken into account include, under s 
+						<lawref legid="ca1" number="pr 36 spr 1A" slelemid="SLWMS100003357.2026041816481093812841" targetID="IO144507.SL3445078">36(1A)</lawref> of the Act:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the extent (if any) of the person&rsquo;s power to prevent the doing of the act concerned;</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the nature of any relationship existing between the person and the person who did the act concerned; and</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(c)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">whether the person took any reasonable steps to prevent or avoid the doing of the act, including whether the person complied with any industry code.</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Author</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">The 
+						<emphasis type="bold">author</emphasis> is the human creator of an original work. In relation to photographs, s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093833446" targetID="IO144471.SL3444677">10(1)</lawref> of the Act provides that the 
+						<emphasis type="bold">author</emphasis> is the person who took the photograph. It is not otherwise defined in the Act. There is no authorship of sound recordings, cinematograph films, television broadcasts, sound broadcasts, and published editions of works.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Broadcast</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">A 
+						<emphasis type="bold">broadcast</emphasis> is a communication to the public delivered by a &ldquo;broadcasting service&rdquo; within the meaning of the 
+						<emphasis type="italics">Broadcasting Services Act 1992</emphasis> (Cth). Under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093824201" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, a 
+						<emphasis type="bold">broadcast</emphasis> includes a television broadcast and a sound broadcast.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="3">
+						<emphasis type="bold">Cinematograph film</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">A 
+						<emphasis type="bold">cinematograph film</emphasis> is the aggregate of the visual images embodied in an article or thing so as to be capable by the use of that article or thing:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">of being shown as a moving picture; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">of being embodied in another article or thing by the use of which it can be so shown;</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" spanname="c24">and includes the aggregate of the sounds embodied in a sound-track associated with such visual images.</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Communication to the public</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Communication to the public</emphasis> is one of the exclusive rights comprising the copyright in works under s 
+						<lawref legid="ca1" number="pr 31 spr 1" slelemid="SLWMS100003357.2026041816481093849897" targetID="IO144501.SL3445012">31(1)</lawref> of the Act, and in sound recordings, cinematograph films, television broadcasts, sound broadcasts, and published editions of works, under ss 
+						<lawref legid="ca1" number="pr 85" slelemid="SLWMS100003357.2026041816481093887572" targetID="IO144598.SL3445832">85</lawref>&ndash;
+						<lawref legid="ca1" number="pr 88" slelemid="SLWMS100003357.2026041816481093890893" targetID="IO144601.SL3445852">88</lawref> of the Act. To 
+						<emphasis type="bold">communicate</emphasis>, under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093818813" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, is to make copyright material available to the public online, or electronically transmit, whether over a path, or a combination of paths provided by a material substance or otherwise.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Computer program</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">A 
+						<emphasis type="bold">computer program</emphasis> is a set of statements or instructions to be used directly or indirectly in a computer in order to bring about a certain result. 
+						<emphasis type="bold">Computer programs</emphasis> are literary works under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093821487" targetID="IO144471.SL3444677">10(1)</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Compulsory licences</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Compulsory licences</emphasis> under Pt 
+						<lawref legid="ca1" number="pt IVA" slelemid="SLWMS100003357.2026041816481093863640" targetID="IO2935393.SL910005763">IVA</lawref> the Act allow certain copyright materials to used, without infringement, but conditional upon the payment of &ldquo;equitable remuneration&rdquo; to the owner.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="6">
+						<emphasis type="bold">Copy</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093887194" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, a 
+						<emphasis type="bold">copy:</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">of a work &mdash; means a reproduction; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">of a sound recording &mdash; means a record embodying the sound recording, or a substantial part of the sound recording, derived directly or indirectly from a record produced on the making of the sound recording; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(c)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">of a cinematograph film &mdash; means any article or thing in which the visual images or sounds comprising the film are embodied; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(d)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">of a broadcast &mdash; includes:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">a record embodying a sound recording of the whole or a part of the broadcast; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1"/>
+					<entry colname="c3" colsep="0" rowsep="1">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="1">a copy of a cinematograph film of the whole or a part of the broadcast.</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Copyright</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Copyright</emphasis> is the 
+						<emphasis type="bold">exclusive right</emphasis> of the 
+						<emphasis type="bold">owner</emphasis> to do, and 
+						<emphasis type="bold">authorise</emphasis> others to do, certain acts in relation to 
+						<emphasis type="bold">original works</emphasis> and 
+						<emphasis type="bold">subject matter other than works</emphasis> for a limited 
+						<emphasis type="bold">term. Copyright</emphasis> is intangible personal property under s 
+						<lawref legid="ca1" number="pr 196 spr 1" slelemid="SLWMS100003357.2026041816481093810298" targetID="IO145014.SL3449432">196(1)</lawref> of the Act. 
+						<emphasis type="bold">Copyright</emphasis> only subsists under the Act.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="2">
+						<emphasis type="bold">Copying</emphasis>
+					</entry>
+					<entry align="left" rowsep="0" spanname="c24">
+						<emphasis type="bold">Copying</emphasis> is to make a copy of an original work. 
+						<emphasis type="bold">Copying</emphasis> provides the element of causation in the infringing reproduction of works. The original work must be the source from which the infringing work is derived, although it need not be the direct source.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="0" spanname="c24">In the absence of 
+						<emphasis type="bold">copying,</emphasis> the independent creation of a new work does not infringe copyright in a subsisting original work. A separate copyright subsists in the independently created work, as a separate original work in its own right.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="1" spanname="c24">In Pt 
+						<lawref legid="ca1" number="pt IV" slelemid="SLWMS100003357.2026041816481093841917" targetID="IO144594.SL3446234">IV</lawref> of the Act, the exclusive right to &ldquo;
+						<emphasis type="bold">make a copy</emphasis>&rdquo; comprises part of the copyright in sound recordings, cinematograph films, television broadcasts, sound broadcasts, and published editions of works, under ss 
+						<lawref legid="ca1" number="pr 85" slelemid="SLWMS100003357.2026041816481093857235" targetID="IO144598.SL3445832">85</lawref>&ndash;
+						<lawref legid="ca1" number="pr 88" slelemid="SLWMS100003357.2026041816481093816970" targetID="IO144601.SL3445852">88</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Copyright material</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Copyright material</emphasis> is anything in which copyright subsists under the Act.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Crown copyright</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Crown copyright</emphasis> is the copyright subsisting in works and subject matter other than works which are made &ldquo;by or at the direction&rdquo; of the Commonwealth, or a State or Territory of Australia under Pt 
+						<lawref legid="ca1" number="pt VII" slelemid="SLWMS100003357.2026041816481093824667" targetID="IO144918.SL3448723">VII</lawref> of the Act.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="2">
+						<emphasis type="bold">Dramatic work</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">A 
+						<emphasis type="bold">dramatic work</emphasis> is a work or an adaptation of a work to be performed or represented, rather than narrated. A 
+						<emphasis type="bold">dramatic work</emphasis> includes
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">a choreographic show or other dumb show; and</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(b)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">a scenario or script for a film; under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093872513" targetID="IO144471.SL3444677">10(1)</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Exclusive licence</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">An 
+						<emphasis type="bold">exclusive licence</emphasis> of copyright, as defined in s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093817996" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, means a licence in writing, signed by or on behalf of the owner of copyright, authorising the licensee, to the exclusion of all other persons, to do an act that the owner of the copyright would, but for the licence, have the exclusive right to do.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="6">
+						<emphasis type="bold">Exclusive rights in works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">Copyright, in literary, dramatic, musical and artistic works, comprises the following 
+						<emphasis type="bold">exclusive rights</emphasis> of the owner, under s 
+						<lawref legid="ca1" number="pr 31 spr 1" slelemid="SLWMS100003357.2026041816481093827389" targetID="IO144501.SL3445012">31(1)</lawref> of the Act:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to 
+						<emphasis type="bold">reproduce</emphasis> the work in a 
+						<emphasis type="bold">material form</emphasis>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to 
+						<emphasis type="bold">publish</emphasis> the work;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to 
+						<emphasis type="bold">perform</emphasis> the work 
+						<emphasis type="bold">in public,</emphasis> (excluding artistic works);
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iv)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to 
+						<emphasis type="bold">communicate</emphasis> the work to the public;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(v)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to make an 
+						<emphasis type="bold">adaptation</emphasis> of the work (excluding artistic works).
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" spanname="c24">In the case of a literary work (other than a computer program) or a musical or dramatic work, to enter into a commercial rental arrangement in respect of the work reproduced in a sound recording. In the case of a computer program, to enter into a commercial rental arrangement in respect of the program.</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="14">
+						<emphasis type="bold">Exclusive rights in subject matter other than works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">Copyright in 
+						<emphasis type="bold">subject matter other than works</emphasis> comprises the following 
+						<emphasis type="bold">exclusive rights</emphasis> of the owner:
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">
+						<emphasis type="bold">Sound recordings:</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to make a copy of the sound recording: s 
+						<lawref legid="ca1" number="pr 85 spr 1" slelemid="SLWMS100003357.2026041816481093876187" targetID="IO144598.SL3445833">85(1)(a)</lawref>; or
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to cause the recording to be heard in public: s 
+						<lawref legid="ca1" number="pr 85 spr 1" slelemid="SLWMS100003357.2026041816481093849621" targetID="IO144598.SL3445833">85(1)(b)</lawref>; or
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to communicate the recording to be heard in public: s 
+						<lawref legid="ca1" number="pr 85 spr 1" slelemid="SLWMS100003357.2026041816481093887924" targetID="IO144598.SL3445833">85(1)(c)</lawref>; or
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iv)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to enter into a commercial rental arrangement: s 
+						<lawref legid="ca1" number="pr 85 spr 1" slelemid="SLWMS100003357.2026041816481093848026" targetID="IO144598.SL3445833">85(1)(d)</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="0" spanname="c24">
+						<emphasis type="bold">Cinematograph films:</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to make a copy of the film: s 
+						<lawref legid="ca1" number="pr 86" slelemid="SLWMS100003357.2026041816481093849967" targetID="IO144599.SL3445840">86(a)</lawref>; or
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to cause the film in so far as consists of images, to be seen in public or, in so far as it consists of sound, to be heard in public: s 
+						<lawref legid="ca1" number="pr 86" slelemid="SLWMS100003357.2026041816481093810108" targetID="IO144599.SL3445840">86(b)</lawref>; or
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to communicate the film to the public: s 
+						<lawref legid="ca1" number="pr 86" slelemid="SLWMS100003357.2026041816481093864653" targetID="IO144599.SL3445840">86(c)</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">
+						<emphasis type="bold">Television broadcasts and sound broadcasts:</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to make a copy of the television broadcast or sound broadcast: s 
+						<lawref legid="ca1" number="pr 87" slelemid="SLWMS100003357.2026041816481093824603" targetID="IO144600.SL3445846">87(a)</lawref> and 
+						<lawref legid="ca1" number="pr 87" slelemid="SLWMS100003357.2026041816481093869004" targetID="IO144600.SL3445846">(b)</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">to re-broadcast or otherwise communicate to the public a television broadcast or a sound broadcast: s 
+						<lawref legid="ca1" number="pr 87" slelemid="SLWMS100003357.2026041816481093822634" targetID="IO144600.SL3445846">87(c)</lawref>
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">
+						<emphasis type="bold">Published editions of works:</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(i)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">to make a &ldquo;facsimile copy&rdquo; of the published edition: s 
+						<lawref legid="ca1" number="pr 88" slelemid="SLWMS100003357.2026041816481093827128" targetID="IO144601.SL3445852">88</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="6">
+						<emphasis type="bold">Fair dealing</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">A 
+						<emphasis type="bold">fair dealing</emphasis> is not defined in the Act. It is the basis for a series of statutory defences or exceptions to infringement of copyright in works, according to the purpose of the 
+						<emphasis type="bold">fair dealing.</emphasis> There is no general defence of 
+						<emphasis type="bold">fair dealing</emphasis>. The Act only allows 
+						<emphasis type="bold">fair dealings</emphasis> for the purposes of:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">research or study (s 
+						<lawref legid="ca1" number="pr 40" slelemid="SLWMS100003357.2026041816481093861936" targetID="IO144514.SL3445129">40</lawref>);
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">criticism or review (s 
+						<lawref legid="ca1" number="pr 41" slelemid="SLWMS100003357.2026041816481093840268" targetID="IO144515.SL3445141">41</lawref>);
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">parody or satire (s 
+						<lawref legid="ca1" number="pr 41A" slelemid="SLWMS100003357.2026041816481093836136" targetID="IO930085.SL53164111">41A</lawref>);
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iv)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">reporting news (s 
+						<lawref legid="ca1" number="pr 42" slelemid="SLWMS100003357.2026041816481093873061" targetID="IO144516.SL3445147">42</lawref>);
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(v)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">judicial proceedings or professional advice (s 
+						<lawref legid="ca1" number="pr 43" slelemid="SLWMS100003357.2026041816481093882826" targetID="IO144517.SL3445156">43</lawref>); and
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(vi)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">access by persons with a disability (s 
+						<lawref legid="ca1" number="pr 113E" slelemid="SLWMS100003357.2026041816481093844139" targetID="IO2941457.SL910005774">113E</lawref>).
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Idea/expression dichotomy</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Copyright protection only applies to the form in which ideas are 
+						<emphasis type="bold">expressed</emphasis>, not to the ideas themselves.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Infringement of copyright</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 36 spr 1" slelemid="SLWMS100003357.2026041816481093861108" targetID="IO144507.SL3445077">36(1)</lawref> of the Act, the copyright in works is 
+						<emphasis type="bold">directly infringed</emphasis> by a person who, not being the owner of the copyright, and without the licence of the copyright owner, does in Australia, or 
+						<emphasis type="bold">authorises</emphasis> the doing in Australia of, any act comprised in the copyright in the work.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="2">
+						<emphasis type="bold">Indirect infringement of copyright</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">
+						<emphasis type="bold">Indirect infringement</emphasis> of copyright refers to acts done in relation to infringing goods or articles without the licence of the copyright owner. These acts of indirect infringement are:
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">importation into Australia for sale or hire (s 
+						<lawref legid="ca1" number="pr 102" slelemid="SLWMS100003357.2026041816481093842062" targetID="IO144621.SL3446000">102</lawref>); and
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(b)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">sold, hired out, or otherwise made the subject of trade in Australia (s 
+						<lawref legid="ca1" number="pr 103" slelemid="SLWMS100003357.2026041816481093825089" targetID="IO144622.SL3446008">103</lawref>)
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Joint authorship</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">A 
+						<emphasis type="bold">work of joint authorship</emphasis> means a work that has been produced by the collaboration of 2 or more authors in which the contribution of each author is not separate from the contribution of the other author or the contributions of the other authors, under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093820303" targetID="IO144471.SL3444677">10(1)</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Licence</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">A 
+						<emphasis type="bold">licence</emphasis> of copyright is a permission from the owner to use copyright material in a way that would otherwise be an infringement of the copyright. See 
+						<emphasis type="bold">Exclusive Licensee</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Literary work</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Literary works</emphasis> are not exhaustively defined in the Act. 
+						<emphasis type="bold">Literary works</emphasis> are any combination of words, numbers or symbols that express meaning or information. No literary merit is required. Examples of literary works include: books, novels, poems, song lyrics, letters, newspaper articles, brochures, advertising catalogues, telephone directories, and blank business, accounting and betting forms. Under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093871816" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, 
+						<emphasis type="bold">literary works</emphasis> include (a) tables and compilations expressed in words, numbers or symbols, and (b) computer programs or compilations of computer programs.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="29">
+						<emphasis type="bold">Making public</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 29A spr 1" slelemid="SLWMS100003357.2026041816481093833828" targetID="IO3081527.SL1029592570">29A(1)</lawref> of the Act, a work is 
+						<emphasis type="bold">made public</emphasis> when:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the work, or an adaptation of the work, is:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">published, performed in public, broadcast or otherwise communicated to the public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">if the work is an artistic work &mdash; exhibited in public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">if the work is an artistic work included in a cinematograph film &mdash; the film is seen in public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(c)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">if the work is a building &mdash; the building has been constructed; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(d)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">records of the work, or of an adaptation of the work, are:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">offered to the public (whether or not for sale); or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">exposed for sale to the public.</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">Copyright material other than a work is 
+						<emphasis type="bold">made public</emphasis> when:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the work, or an adaptation of the work, is:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">published, performed in public, broadcast or otherwise communicated to the public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">if the work is an artistic work &mdash; exhibited in public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">if the work is an artistic work included in a cinematograph film &mdash; the film is seen in public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(c)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">if the work is a building &mdash; the building has been constructed; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(d)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">records of the work, or of an adaptation of the work, are:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">offered to the public (whether or not for sale); or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">exposed for sale to the public.</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 29A spr 2" slelemid="SLWMS100003357.2026041816481093878846" targetID="IO3081527.SL1029592571">29A(2)</lawref> of the Act, other copyright material is 
+						<emphasis type="bold">made public</emphasis> when:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">it is published; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">if the material is a sound recording &mdash; it is:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">heard in public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">communicated to the public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(c)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">if the material is a cinematograph film &mdash; it is:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">seen in public (to the extent it consists of visual images); or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">heard in public (to the extent it consists of sounds); or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(iii)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">communicated to the public; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(d)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">copies of the material are:</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colname="c3" colsep="0" rowsep="0">(i)</entry>
+					<entry colname="c4" colsep="1" rowsep="0">offered to the public (whether or not for sale); or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1"/>
+					<entry colname="c3" colsep="0" rowsep="1">(ii)</entry>
+					<entry colname="c4" colsep="1" rowsep="1">exposed for sale to the public.</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Material form</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Material form</emphasis>, in relation to a work or an adaptation of a work, includes under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093847599" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, any form (whether visible or not) of storage of the work or adaptation, or a substantial part of the work or adaptation, whether or not the work or adaptation, or a substantial part of the work or adaptation, can be reproduced.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="4">
+						<emphasis type="bold">Moral rights</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">
+						<emphasis type="bold">Moral rights</emphasis> of authors comprise 3 rights in relation to original works:
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the author&rsquo;s right of attribution of authorship of works: s 
+						<lawref legid="ca1" number="pr 193 spr 1" slelemid="SLWMS100003357.2026041816481093834430" targetID="IO144954.SL3448865">193(1)</lawref>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the author&rsquo;s right not to have authorship falsely attributed: s 
+						<lawref legid="ca1" number="pr 195AC spr 1" slelemid="SLWMS100003357.2026041816481093852947" targetID="IO144960.SL3448931">195AC(1)</lawref>; and
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the author&rsquo;s right of integrity of authorship of works: s 
+						<lawref legid="ca1" number="pr 195A1 spr 1" slelemid="SLWMS100003357.2026041816481093828378">195A1(1)</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Moral rights</emphasis> of performers are set out in Pt 
+						<lawref legid="ca1" number="pt IX" slelemid="SLWMS100003357.2026041816481093812946" targetID="IO144946.SL3449393">IX</lawref> of the Act, which comprise 3 similar rights of attribution of performership, no false attribution of performership, and integrity of performership.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Musical works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Musical works</emphasis> are no longer defined in the Act. 
+						<emphasis type="bold">Musical works</emphasis> include songs, tunes, orchestral works and musicals, once the work is fixed in material form. Melody or harmony are no longer required under the Act. Song lyrics are separate literary works.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Original works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Original works</emphasis> are not defined in the Act. 
+						<emphasis type="bold">Original works</emphasis> are works that are not copied from other works.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Orphan works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">
+						<emphasis type="bold">Orphan works</emphasis> are works where the author is not generally known.
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="5">
+						<emphasis type="bold">Ownership of copyright</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">The general rule is that the author is the 
+						<emphasis type="bold">owner</emphasis> of copyright in works under s 
+						<lawref legid="ca1" number="pr 35 spr 2" slelemid="SLWMS100003357.2026041816481093817581" targetID="IO144505.SL3445056">35(2)</lawref> of the Act. The exceptions are:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">works produced by an employee in the course of employment: s 
+						<lawref legid="ca1" number="pr 35 spr 6" slelemid="SLWMS100003357.2026041816481093829953" targetID="IO144505.SL3445060">35(6)</lawref>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">the work of journalists: s 
+						<lawref legid="ca1" number="pr 35 spr 4" slelemid="SLWMS100003357.2026041816481093895850" targetID="IO144505.SL3445058">35(4)</lawref>; and
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">commissions for making certain artistic works: s 
+						<lawref legid="ca1" number="pr 35 spr 5" slelemid="SLWMS100003357.2026041816481093842814" targetID="IO144505.SL3445059">35(5)</lawref>
+					</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="0" spanname="c24">These rules can be excluded or modified by contract: s 
+						<lawref legid="ca1" number="pr 35 spr 3" slelemid="SLWMS100003357.2026041816481093881483" targetID="IO144505.SL3445057">35(3)</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="1" spanname="c24">The 
+						<emphasis type="bold">maker</emphasis> of a sound recording, cinematograph film, television or sound broadcast is the 
+						<emphasis type="bold">owner</emphasis> of copyright under ss 
+						<lawref legid="ca1" number="pr 97 spr 2" slelemid="SLWMS100003357.2026041816481093827037" targetID="IO144614.SL3445947">97(2)</lawref>, 
+						<lawref legid="ca1" number="pr 98 spr 2" slelemid="SLWMS100003357.2026041816481093818195" targetID="IO144615.SL3445956">98(2)</lawref>, 
+						<lawref legid="ca1" number="pr 99" slelemid="SLWMS100003357.2026041816481093825067" targetID="IO144616.SL3445963">99</lawref> and 
+						<lawref legid="ca1" number="pr 100" slelemid="SLWMS100003357.2026041816481093881078" targetID="IO144617.SL3445969">100</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="4">
+						<emphasis type="bold">Perform in public</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">To 
+						<emphasis type="bold">perform in public</emphasis> is one 
+						<emphasis type="bold">of the exclusive rights</emphasis> comprising the copyright in works, under s 
+						<lawref legid="ca1" number="pr 32 spr 1" slelemid="SLWMS100003357.2026041816481093822036" targetID="IO144502.SL3445025">32(1)</lawref> of the Act. Under s 
+						<lawref legid="ca1" number="pr 27 spr 1" slelemid="SLWMS100003357.2026041816481093841071" targetID="IO144493.SL3444947">27(1)</lawref> of the Act, a reference in the Act to 
+						<emphasis type="bold">performance</emphasis> shall &mdash;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">be read as including a reference to any mode of visual or aural presentation, whether the presentation is by the use of reception equipment, by the exhibition of a cinematograph film, by the use of a record or by any other means; and</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">in relation to a lecture, address, speech or sermon &mdash; be read as including a reference to delivery.</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="0" spanname="c24">Whether the performance is 
+						<emphasis type="bold">in public</emphasis> is not defined in the Act. If the performance is an adjunct to a commercial activity, it is likely to be 
+						<emphasis type="bold">in public</emphasis>. This is contrasted with a &ldquo;private and domestic&rdquo; audience.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" rowsep="1" spanname="c24">Certain performances at premises where people reside or sleep are not 
+						<emphasis type="bold">in public</emphasis> under s 
+						<lawref legid="ca1" number="pr 46" slelemid="SLWMS100003357.2026041816481093885788" targetID="IO144528.SL3445249">46</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="3">
+						<emphasis type="bold">Performers&rsquo; protection</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">
+						<emphasis type="bold">Performers&rsquo; protection</emphasis> is a separate regime of rights of performers under Div 
+						<lawref legid="ca1" number="div XIA" slelemid="SLWMS100003357.2026041816481093861293">XIA</lawref> of the Act. 
+						<emphasis type="bold">Performers&rsquo; protection</emphasis> is protection against the &ldquo;unauthorised use&rdquo; of performances, without the consent of the performer. Under s 
+						<lawref legid="ca1" number="pr 248G" slelemid="SLWMS100003357.2026041816481093817357" targetID="IO145097.SL3450093">248G</lawref> of the Act, unauthorised uses are
+                    
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(a)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">making a direct or indirect recording of the performance; or</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(b)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">communicating the performance to the public, either directly from the live performance or from an unauthorised recording of it.</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" spanname="c24">There is no copyright in performances. Performers&rsquo; rights under Div 
+						<lawref legid="ca1" number="div XIA" slelemid="SLWMS100003357.2026041816481093859904">XIA</lawref> of the Act are separate and distinct from the moral rights of performers.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Publish</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">To 
+						<emphasis type="bold">publish</emphasis> a work is one of the exclusive rights comprising copyright in works. Under s 
+						<lawref legid="ca1" number="pr 29 spr 1" slelemid="SLWMS100003357.2026041816481093821716" targetID="IO144495.SL3444968">29(1)(a)</lawref> of the Act, a work is only published if reproductions of it have been supplied to the public, whether by sale or otherwise.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="9">
+						<emphasis type="bold">Reproduce in material form</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">To 
+						<emphasis type="bold">reproduce in material form</emphasis> is one of the exclusive rights comprising copyright in works. Infringement of copyright in works by 
+						<emphasis type="bold">reproduction in material form</emphasis> involves 2 elements:
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">objective similarity between the original work, or a substantial part of the original work, and the infringing work; and</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">causal connection between the original work, or a substantial part of the original work, and the infringing work by 
+						<emphasis type="bold">copying</emphasis>.
+					</entry>
+				</row>
+				<row>
+					<entry align="left" colsep="1" rowsep="0" spanname="c24">The following acts are deemed by s 
+						<lawref legid="ca1" number="pr 21" slelemid="SLWMS100003357.2026041816481093871145" targetID="IO144487.SL3444890">21</lawref> of the Act to constitute 
+						<emphasis type="bold">reproduction in material form:</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(i)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">making a sound recording or cinematograph film of a work: s 
+						<lawref legid="ca1" number="pr 21 spr 1" slelemid="SLWMS100003357.2026041816481093872577" targetID="IO144487.SL3444891">21(1)</lawref>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(ii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">embodying a work into an article by converting the work into or from a digital or other electronic or machine-readable form: s 
+						<lawref legid="ca1" number="pr 21 spr 1A" slelemid="SLWMS100003357.2026041816481093875779" targetID="IO144487.SL3444892">21(1A)</lawref>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iii)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">producing in a 3-dimensional form a version of a 2-dimensional artistic work: s 
+						<lawref legid="ca1" number="pr 21 spr 3" slelemid="SLWMS100003357.2026041816481093886843" targetID="IO144487.SL3444894">21(3)(a)</lawref>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(iv)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">producing in a 2-dimensional form a version of a 3-dimensional artistic work: s 
+						<lawref legid="ca1" number="pr 21 spr 3" slelemid="SLWMS100003357.2026041816481093855509" targetID="IO144487.SL3444894">21(3)(b)</lawref>;
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="0">(v)</entry>
+					<entry align="left" colsep="1" rowsep="0" spanname="c34">producing an object code version from a source code version of a computer program, and vice versa: s 
+						<lawref legid="ca1" number="pr 21 spr 5" slelemid="SLWMS100003357.2026041816481093833686" targetID="IO144487.SL3444896">21(5)</lawref>; and
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" colsep="0" rowsep="1">(vi)</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c34">converting a sound recording or cinematograph film into or out of a digital or other electronic machine-readable form: s 
+						<lawref legid="ca1" number="pr 21 spr 6" slelemid="SLWMS100003357.2026041816481093886305" targetID="IO144487.SL3444897">21(6)</lawref>.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Sound recording</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093885573" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, a 
+						<emphasis type="bold">sound recording</emphasis> means the aggregate of the sounds embodied in a record.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Sound broadcast</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093852501" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, a 
+						<emphasis type="bold">sound broadcast</emphasis> means sounds broadcast otherwise than as part of a television broadcast. It refers to radio broadcasts.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Subject matter other than works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">The 
+						<emphasis type="bold">subject matter of copyright other than works</emphasis> are sound recordings, cinematograph films, television broadcasts, sound broadcasts, and published editions of works, under ss 
+						<lawref legid="ca1" number="pr 85" slelemid="SLWMS100003357.2026041816481093823862" targetID="IO144598.SL3445832">85</lawref>, 
+						<lawref legid="ca1" number="pr 86" slelemid="SLWMS100003357.2026041816481093820592" targetID="IO144599.SL3445840">86</lawref>, 
+						<lawref legid="ca1" number="pr 87" slelemid="SLWMS100003357.2026041816481093812517" targetID="IO144600.SL3445846">87</lawref> and 
+						<lawref legid="ca1" number="pr 88" slelemid="SLWMS100003357.2026041816481093876513" targetID="IO144601.SL3445852">88</lawref> of the Act.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Substantial part of works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 14 spr 1" slelemid="SLWMS100003357.2026041816481093826131" targetID="IO144480.SL3444845">14(1)(b)</lawref> of the Act, a reproduction, adaptation or copy of a work includes a 
+						<emphasis type="bold">substantial part of the work,</emphasis> if not the whole work. A 
+						<emphasis type="bold">substantial part</emphasis> is qualitative, not necessarily quantitative.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Television broadcast</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 10 spr 1" slelemid="SLWMS100003357.2026041816481093823521" targetID="IO144471.SL3444677">10(1)</lawref> of the Act, a 
+						<emphasis type="bold">television broadcast</emphasis> means visual images broadcast by way of television, together with any sounds broadcast for reception along with those images.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1">
+						<emphasis type="bold">Term of copyright</emphasis>
+					</entry>
+					<entry align="left" colsep="1" spanname="c24">Under s 
+						<lawref legid="ca1" number="pr 33" slelemid="SLWMS100003357.2026041816481093892582" targetID="IO144503.SL3445034">33</lawref> of the Act, the 
+						<emphasis type="bold">term</emphasis> of copyright in works is generally the lifetime of the author and 70 years after. The 
+						<emphasis type="bold">term</emphasis> of copyright in sound recordings and cinematograph films is generally 70 years after being made public. The 
+						<emphasis type="bold">term</emphasis> of copyright in broadcasts is generally 50 years after the broadcast was made. For published editions the 
+						<emphasis type="bold">term</emphasis> is 25 years after publication of the edition.
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" rowsep="1">
+						<emphasis type="bold">Works</emphasis>
+					</entry>
+					<entry align="left" colsep="1" rowsep="1" spanname="c24">
+						<emphasis type="bold">Works</emphasis> are literary, dramatic, musical and artistic works.
+                    
+					</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>ATAG 1 - Client impact statement: Refreshed tax guidance released on short-term rental income and deductions</para>
+	<table colsep="0" frame="none" rowsep="0">
+		<tgroup cols="4">
+			<colspec colname="c1" colnum="1" colwidth="37*"/>
+			<colspec colname="c2" colnum="2" colwidth="3*"/>
+			<colspec align="center" colname="c3" colnum="3" colwidth="40*"/>
+			<colspec colname="c4" colnum="4" colwidth="20*"/>
+			<tbody>
+				<row>
+					<entry align="right" morerows="1" colname="c1" colsep="0">Deductible portion</entry>
+					<entry colname="c2" colsep="0" morerows="1">&equals;</entry>
+					<entry colname="c3" colsep="0">Days rented (or genuinely available for rent)</entry>
+					<entry align="center" morerows="1" colname="c4" rowsep="0"/>
+				</row>
+				<row>
+					<entry colname="c3" colsep="0">Total days in year</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>ATAG 2 - Client impact statement: Refreshed tax guidance released on short-term rental income and deductions</para>
+	<table colsep="0" frame="none" rowsep="0">
+		<tgroup cols="7">
+			<colspec colname="c1" colnum="1" colwidth="25*"/>
+			<colspec colname="c2" colnum="2" colwidth="3*"/>
+			<colspec align="center" colname="c3" colnum="3" colwidth="13*"/>
+			<colspec colname="c4" colnum="4" colwidth="3*"/>
+			<colspec align="center" colname="c5" colnum="5" colwidth="8*"/>
+			<colspec colname="c6" colnum="6" colwidth="3*"/>
+			<colspec colname="c7" colnum="7" colwidth="45*"/>
+			<tbody>
+				<row>
+					<entry align="right" morerows="1" colname="c1" colsep="0">Deductible portion</entry>
+					<entry align="center" morerows="1" colname="c2" colsep="0">&equals;</entry>
+					<entry colname="c3" colsep="0">45 &plus; (35 &divide; 2)</entry>
+					<entry colname="c4" colsep="0" morerows="1">&times;</entry>
+					<entry colname="c5" colsep="0">100</entry>
+					<entry align="center" morerows="1" colname="c6" colsep="0">&equals;</entry>
+					<entry colname="c7" morerows="1">46.3%</entry>
+				</row>
+				<row>
+					<entry colname="c3" colsep="0">135</entry>
+					<entry colname="c5" colsep="0">1</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NPTH - 340-000 Procedure: QCs and LTCs</para>
+	<table colsep="0" frame="all" rowsep="0">
+		<tgroup cols="8">
+			<colspec align="left" colname="c1" colnum="1" colwidth="10*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="5*"/>
+			<colspec colname="c3" colnum="3" colwidth="6*"/>
+			<colspec colname="c4" colnum="4" colwidth="2*"/>
+			<colspec colname="c5" colnum="5" colwidth="60*"/>
+			<colspec align="left" colname="c6" colnum="6" colwidth="6*"/>
+			<colspec align="left" colname="c7" colnum="7" colwidth="5*"/>
+			<colspec align="left" colname="c8" colnum="8" colwidth="7*"/>
+			<?coldef_mod colnum='1' mod='p.6,s.6'?>
+			<?coldef_mod colnum='8' mod='t.6,u.6,r.6'?>
+			<thead>
+				<row rowsep="1" valign="middle">
+					<entry nameend="c8" namest="c1">
+						<emphasis type="bold">Questions typically asked by clients</emphasis>
+					</entry>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c5" namest="c2">
+						<emphasis type="bold">Action</emphasis>
+					</entry>
+					<entry align="center" colname="c6">
+						<emphasis type="bold">Done</emphasis>
+					</entry>
+					<entry align="center" colname="c7">
+						<emphasis type="bold">NA</emphasis>
+					</entry>
+					<entry align="center" colname="c8">
+						<emphasis type="bold">Ref</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 1.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Typically, this will arise from a phone call from the client (or prospective client) where they ask:</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry colname="c8"/>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1" rowsep="0"/>
+					<entry align="center" colname="c2" rowsep="0">&bull;</entry>
+					<entry nameend="c5" namest="c3" rowsep="0">&ldquo;You&rsquo;ve recommended our new Company be an LTC (or stay a QC). Why is this?&rdquo;</entry>
+					<entry colname="c6" rowsep="0"/>
+					<entry colname="c7" rowsep="0"/>
+					<entry colname="c8" rowsep="0"/>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1" rowsep="1">
+						<emphasis type="bold">Step 2.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2" rowsep="1">Use the script (
+						<commref slelemid="SLWMS100003357.2026041816481093873051" targetID="IO2850916.SL840753008">
+							<xref>340-005</xref>
+						</commref>) for answer.
+					</entry>
+					<entry align="center" colname="c6" rowsep="1">&box;</entry>
+					<entry align="center" colname="c7" rowsep="1">&box;</entry>
+					<entry colname="c8" rowsep="1"/>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NPTH - 340-000 Procedure: QCs and LTCs</para>
+	<table colsep="0" frame="all" rowsep="0">
+		<tgroup cols="8">
+			<colspec align="left" colname="c1" colnum="1" colwidth="10*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="5*"/>
+			<colspec colname="c3" colnum="3" colwidth="6*"/>
+			<colspec colname="c4" colnum="4" colwidth="2*"/>
+			<colspec colname="c5" colnum="5" colwidth="60*"/>
+			<colspec align="left" colname="c6" colnum="6" colwidth="6*"/>
+			<colspec align="left" colname="c7" colnum="7" colwidth="5*"/>
+			<colspec align="left" colname="c8" colnum="8" colwidth="7*"/>
+			<?coldef_mod colnum='1' mod='p.6,s.6'?>
+			<?coldef_mod colnum='8' mod='t.6,u.6,r.6'?>
+			<thead>
+				<row rowsep="1" valign="middle">
+					<entry nameend="c8" namest="c1">
+						<emphasis type="bold">Action to take because of the enquiry</emphasis>
+					</entry>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c5" namest="c2">
+						<emphasis type="bold">Action</emphasis>
+					</entry>
+					<entry align="center" colname="c6">
+						<emphasis type="bold">Done</emphasis>
+					</entry>
+					<entry align="center" colname="c7">
+						<emphasis type="bold">NA</emphasis>
+					</entry>
+					<entry align="center" colname="c8">
+						<emphasis type="bold">Ref</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 3.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Send the &ldquo;QC and LTC&rdquo; fact sheet (
+						<commref slelemid="SLWMS100003357.2026041816481093830239" targetID="IO2850917.SL945712611">
+							<xref>340-010</xref>
+						</commref>) to the client with a covering letter (
+						<commref slelemid="SLWMS100003357.2026041816481093822105" targetID="IO2850734.SL840752570">
+							<xref>300-025</xref>
+						</commref>).
+					</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 4.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Personalise the fact sheet as much as possible. Update the conclusion specifically for the client.</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 5.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Consider adding a general disclaimer if the advice is very general in nature. Encourage the client to come and see you for more specific advice if needed.</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 6.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Have the fact sheet reviewed at the appropriate level before sending.</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NPTH - 340-000 Procedure: QCs and LTCs</para>
+	<table colsep="0" frame="all" rowsep="0">
+		<tgroup cols="8">
+			<colspec align="left" colname="c1" colnum="1" colwidth="12.50*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="12.50*"/>
+			<colspec colname="c3" colnum="3" colwidth="12.50*"/>
+			<colspec colname="c4" colnum="4" colwidth="12.50*"/>
+			<colspec colname="c5" colnum="5" colwidth="12.50*"/>
+			<colspec align="left" colname="c6" colnum="6" colwidth="12.50*"/>
+			<colspec align="left" colname="c7" colnum="7" colwidth="12.50*"/>
+			<colspec align="left" colname="c8" colnum="8" colwidth="12.50*"/>
+			<?coldef_mod colnum='1' mod='p.6,s.6'?>
+			<?coldef_mod colnum='8' mod='t.6,u.6,r.6'?>
+			<thead>
+				<row rowsep="1" valign="middle">
+					<entry nameend="c8" namest="c1">
+						<emphasis type="bold">Further action</emphasis>
+					</entry>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c5" namest="c2">
+						<emphasis type="bold">Action</emphasis>
+					</entry>
+					<entry align="center" colname="c6">
+						<emphasis type="bold">Done</emphasis>
+					</entry>
+					<entry align="center" colname="c7">
+						<emphasis type="bold">NA</emphasis>
+					</entry>
+					<entry align="center" colname="c8">
+						<emphasis type="bold">Ref</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 7.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">If the client comes back to you for further advice, refer to the guides:</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1"/>
+					<entry align="center" colname="c2">&bull;</entry>
+					<entry nameend="c5" namest="c3">Internal training guide (
+						<commref slelemid="SLWMS100003357.2026041816481093885039" targetID="IO2847494.SL838616932">
+							<xref>69-005</xref>
+						</commref>)
+					</entry>
+					<entry align="center" colname="c6"/>
+					<entry align="center" colname="c7"/>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1"/>
+					<entry align="center" colname="c2">&bull;</entry>
+					<entry nameend="c5" namest="c3">Inland Revenue 
+						<urlref href="http://www.ird.govt.nz/forms-guides/number/forms-400-499/ir435-guide-qualifying-companies.html">guide</urlref>
+						<releaseref release_number="IR435" slelemid="SLWMS100003357.2026041816481093825048">IR435</releaseref> on QCs
+                    
+					</entry>
+					<entry align="center" colname="c6"/>
+					<entry align="center" colname="c7"/>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1"/>
+					<entry align="center" colname="c2">&bull;</entry>
+					<entry nameend="c5" namest="c3">Inland Revenue 
+						<urlref href="http://www.ird.govt.nz/forms-guides/number/forms-800-899/ir879-look-thru-companies.html">guide</urlref>
+						<releaseref release_number="IR879" slelemid="SLWMS100003357.2026041816481093829162">IR879</releaseref> on LTCs
+                    
+					</entry>
+					<entry align="center" colname="c6"/>
+					<entry align="center" colname="c7"/>
+					<entry align="center" colname="c8"/>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NPTH - 344-000 Procedure: Shareholder remuneration</para>
+	<table colsep="0" frame="all" rowsep="0">
+		<tgroup cols="8">
+			<colspec align="left" colname="c1" colnum="1" colwidth="10*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="5*"/>
+			<colspec colname="c3" colnum="3" colwidth="6*"/>
+			<colspec colname="c4" colnum="4" colwidth="2*"/>
+			<colspec colname="c5" colnum="5" colwidth="60*"/>
+			<colspec align="left" colname="c6" colnum="6" colwidth="6*"/>
+			<colspec align="left" colname="c7" colnum="7" colwidth="5*"/>
+			<colspec align="left" colname="c8" colnum="8" colwidth="7*"/>
+			<?coldef_mod colnum='1' mod='p.6,s.6'?>
+			<?coldef_mod colnum='8' mod='t.6,u.6,r.6'?>
+			<thead>
+				<row>
+					<entry nameend="c6" namest="c1" rowsep="1" valign="middle">
+						<emphasis type="bold">Questions typically asked by clients</emphasis>
+					</entry>
+					<entry align="center" colname="c7" rowsep="1" valign="middle"/>
+					<entry align="center" colname="c8" rowsep="1" valign="middle"/>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c5" namest="c2">
+						<emphasis type="bold">Action</emphasis>
+					</entry>
+					<entry align="center" colname="c6">
+						<emphasis type="bold">Done</emphasis>
+					</entry>
+					<entry align="center" colname="c7">
+						<emphasis type="bold">NA</emphasis>
+					</entry>
+					<entry align="center" colname="c8">
+						<emphasis type="bold">Ref</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c8" namest="c2">Typically this will arise from a phone call from the client (or prospective client) where they ask:</entry>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1" rowsep="0"/>
+					<entry align="center" colname="c2" rowsep="0">&bull;</entry>
+					<entry nameend="c5" namest="c3" rowsep="0">&ldquo;I&rsquo;ve heard about the Penny &amp; Hooper decision and I don&rsquo;t know whether it changes things for the way our business is structured. Can you advise me please?&rdquo;</entry>
+					<entry colname="c6" rowsep="0"/>
+					<entry colname="c7" rowsep="0"/>
+					<entry colname="c8" rowsep="0"/>
+				</row>
+				<row>
+					<entry colname="c1" rowsep="1"/>
+					<entry align="center" colname="c2" rowsep="1">&bull;</entry>
+					<entry nameend="c5" namest="c3" rowsep="1">&ldquo;I&rsquo;m thinking of restructuring my business. Can you advise me?&rdquo;</entry>
+					<entry colname="c6" rowsep="1"/>
+					<entry colname="c7" rowsep="1"/>
+					<entry colname="c8" rowsep="1"/>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c8" namest="c2">Use the script (
+						<commref slelemid="SLWMS100003357.2026041816481093860802" targetID="IO2850933.SL840753063">
+							<xref>344-005</xref>
+						</commref>) for answer.
+					</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NPTH - 344-000 Procedure: Shareholder remuneration</para>
+	<table colsep="0" frame="all" rowsep="0">
+		<tgroup cols="8">
+			<colspec align="left" colname="c1" colnum="1" colwidth="10*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="5*"/>
+			<colspec colname="c3" colnum="3" colwidth="6*"/>
+			<colspec colname="c4" colnum="4" colwidth="2*"/>
+			<colspec colname="c5" colnum="5" colwidth="60*"/>
+			<colspec align="left" colname="c6" colnum="6" colwidth="6*"/>
+			<colspec align="left" colname="c7" colnum="7" colwidth="5*"/>
+			<colspec align="left" colname="c8" colnum="8" colwidth="7*"/>
+			<?coldef_mod colnum='1' mod='p.6,s.6'?>
+			<?coldef_mod colnum='8' mod='t.6,u.6,r.6'?>
+			<thead>
+				<row rowsep="1" valign="middle">
+					<entry nameend="c8" namest="c1">
+						<emphasis type="bold">Action to take as a result of the enquiry</emphasis>
+					</entry>
+				</row>
+				<row rowsep="1" valign="middle">
+					<entry colname="c1"/>
+					<entry nameend="c5" namest="c2">
+						<emphasis type="bold">Action</emphasis>
+					</entry>
+					<entry align="center" colname="c6">
+						<emphasis type="bold">Done</emphasis>
+					</entry>
+					<entry align="center" colname="c7">
+						<emphasis type="bold">NA</emphasis>
+					</entry>
+					<entry align="center" colname="c8">
+						<emphasis type="bold">Ref</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 1.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Send the &lsquo;Shareholder Remuneration&rsquo; fact sheet (
+						<commref slelemid="SLWMS100003357.2026041816481093819097" targetID="IO2850934.SL945713397">
+							<xref>344-010</xref>
+						</commref>) to the client with a covering letter (
+						<commref slelemid="SLWMS100003357.2026041816481093890538" targetID="IO2850734.SL840752570">
+							<xref>300-025</xref>
+						</commref>).
+					</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 2.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Personalise the fact sheet as much as possible. Remember to update the conclusion specifically for the client.</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 3.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Consider adding a general disclaimer if the advice is very general in nature. Encourage the client to come and see you for more specific advice if needed.</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 4.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">Have the fact sheet reviewed at the appropriate level before sending.</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+				<row valign="middle">
+					<entry colname="c1">
+						<emphasis type="bold">Step 5.</emphasis>
+					</entry>
+					<entry nameend="c5" namest="c2">If the client comes back to you for further advice, use the Shareholder Remuneration Review procedure (
+						<commref slelemid="SLWMS100003357.2026041816481093827012" targetID="IO2853480.SL841907997">
+							<xref>143-000</xref>
+						</commref>) to assist them.
+					</entry>
+					<entry align="center" colname="c6">&box;</entry>
+					<entry align="center" colname="c7">&box;</entry>
+					<entry align="center" colname="c8"/>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NGINC-5974</para>
+	<para>NPTH - 23-210 Guide: Have funds been lent at favourable interest rates to a person associated with an employee?</para>
+	<table colsep="1" frame="all" rowsep="0">
+		<tgroup cols="3">
+			<colspec align="left" colname="c1" colnum="1" colwidth="20*"/>
+			<colspec align="left" colname="c2" colnum="2" colwidth="40*"/>
+			<colspec align="left" colname="c3" colnum="3" colwidth="40*"/>
+			<tbody>
+				<row rowsep="1">
+					<entry colname="c1">
+						<emphasis type="bold">Parties involved</emphasis>
+					</entry>
+					<entry colname="c2">
+						<emphasis type="bold">Test of association</emphasis>
+					</entry>
+					<entry colname="c3">
+						<emphasis type="bold">Example(s)</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="1">Two companies</entry>
+					<entry colname="c2">Where a group of people together own 50% or more of the shares in both companies.</entry>
+					<entry colname="c3">Russell and his wife Janine hold 50% each of the shares in Co A. They also hold 50% each of the shares in Co B.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c2">Where a group of people control both companies by any other means.</entry>
+					<entry colname="c3">Co A and Co B are associated because a group of people (Russell and Janine) together own 50% or more of the shares in both companies.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">A company and a person other than a company</entry>
+					<entry colname="c2">Where the person holds at least 25% of the shares in the company.</entry>
+					<entry colname="c3">Rose holds 30% of the shares in Co X. Rose is associated to Co X because she holds at least 25% of the shares in Co X.</entry>
+				</row>
+				<row>
+					<entry colname="c1" morerows="2">Two relatives</entry>
+					<entry colname="c2">If they are within 2 degrees of blood relationship.</entry>
+					<entry colname="c3">1. Matthew and Anna are siblings. They are associated to each other as they are within 2 degrees of blood relationship to each other.</entry>
+				</row>
+				<row>
+					<entry colname="c2">If they are married, in a civil union or in a de facto relationship.</entry>
+					<entry colname="c3">2. Mr and Mrs Davies are associated to each other as they are married.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c2">If one person is within 2 degrees of blood relationship to the other person's spouse, civil union partner or de facto partner.</entry>
+					<entry colname="c3">3. Denise is Mr Davies' sister. Denise is associated to Mrs Davies as she is within 2 degrees of blood relationship to Mr Davies.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">Person and a trust for the person's relative</entry>
+					<entry colname="c2">A person (&ldquo;X&rdquo;) and a trust under which X's associated relative (see row above) is a beneficiary.</entry>
+					<entry colname="c3">Rona is a beneficiary of a trust. Rona has a sister Marge. Marge is associated to the trust because her sister (within 2 degrees of blood relationship) is a beneficiary of the trust. This is despite the fact that Marge is not a beneficiary of the trust.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">Trust and beneficiary</entry>
+					<entry colname="c2">A trust and a beneficiary of that trust are associated.</entry>
+					<entry colname="c3">In the example directly above, Rona is associated to the trust because she is a beneficiary.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">Two trusts with common settlor</entry>
+					<entry colname="c2">Two trusts are associated where each trust has a common settlor.</entry>
+					<entry colname="c3">Ronald settles two trusts, Trust X and Trust Y. The two trusts are associated to each other because they have a common settlor, Ronald.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">Trust and settlor</entry>
+					<entry colname="c2">A trust and the settlor of the trust.</entry>
+					<entry colname="c3">In the example directly above, Ronald will be associated to Trust X and Trust Y because he has settled each trust.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">Settlor and beneficiary</entry>
+					<entry colname="c2">A settlor of a trust and the beneficiaries of that same trust.</entry>
+					<entry colname="c3">Nelson is the settlor of the Nelson Trust. One of the beneficiaries of the Nelson Trust is Nelson's best friend, Marty. Nelson will be associated to Marty because Marty is a beneficiary of a trust that Nelson has settled.</entry>
+				</row>
+				<row rowsep="1">
+					<entry colname="c1">Partnership and partner</entry>
+					<entry colname="c2">A partnership and a partner of the partnership are associated. Note other rules apply to limited partnerships.</entry>
+					<entry colname="c3">Ruth is a partner in a partnership. Ruth is associated to the partnership.</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+	<para>NGINC-6060</para>
+	<para>NPTH - 361-010 Fact sheet: Working for families</para>
+	<table colsep="0" frame="all" rowsep="0">
+		<tgroup cols="7">
+			<colspec align="left" colname="c1" colnum="1" colwidth="20*"/>
+			<colspec colname="c2" colnum="2" colwidth="1*"/>
+			<colspec align="left" colname="c3" colnum="3" colwidth="15*"/>
+			<colspec align="left" colname="c4" colnum="4" colwidth="16*"/>
+			<colspec align="left" colname="c5" colnum="5" colwidth="16*"/>
+			<colspec align="left" colname="c6" colnum="6" colwidth="16*"/>
+			<colspec align="left" colname="c7" colnum="7" colwidth="16*"/>
+			<?coldef_mod colnum='1' mod='p.6,s.6'?>
+			<?coldef_mod colnum='6' mod='t.6,u.6,r.6'?>
+			<thead>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">
+						<emphasis type="bold">Income</emphasis>
+					</entry>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">
+						<emphasis type="bold">Examples</emphasis>
+					</entry>
+				</row>
+			</thead>
+			<tbody>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="0">Attributable fringe benefits</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Jack and Diane are married with three children. Together they have a 100% voting interest in a plumbing company and are both employed by the business. They each receive a salary of $35,000. The company provides each of them with a work vehicle which they can also use for private use. The value of the private use of the vehicle plus the FBT payable by the company is $8,000 for Jack and $6,000 for Diane for the tax year.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3" rowsep="0">Jack has a student loan and he and Diane receive WfFTC.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1"/>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3" rowsep="0">Jack will need to include $8,000 for the calculation of WfFTC and his student loan.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1"/>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Diane will need to include $6,000 as income for the calculation of her WfFTC entitlement.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Non-locked-in PIE income</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">George receives an inheritance of $400,000 and invests it in a cash PIE that is not a superannuation fund or retirement savings scheme. He receives an annual income of $20,000 on that investment. George has used the correct prescribed investor rate (PIR) so he has not included the PIE income in his IR3.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">George will have to include the PIE income of $20,000 as part of his income for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" rowsep="1">Passive income of children</entry>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Curtis is a child in the care of his mother Kim. Kim receives WfFTC for him. Curtis is gifted $15,000 from his grandmother in April. This money is invested in term deposits. At the end of the tax year Curtis receives a letter from the bank showing he earned $600 interest. As the total interest earned by him is over $500, Kim will need to include the amount over $500 (i.e., $100) as part of the family income for WfFTC purposes.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Income of non-resident spouse or partner</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Christine lives in New Zealand with her children and receives WfFTC. Her de facto partner Al works overseas. Al is not a tax resident in New Zealand. For the tax year he receives an income which is equal to NZ $80,000.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Christine will need to include Al&rsquo;s income, of NZ $80,000 as family income for WfFTC.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Tax exempt salary or wages</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Joseph is a New Zealand tax resident and works for the Organisation for Economic Co-operation and Development (OECD).</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Although Joseph&rsquo;s income is exempt from income tax, he will need to include his salary as part of his income for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Pensions and annuities</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Before David retired, he had been paying into a private superannuation plan run by his employer. Now that he has retired he receives weekly pension payments which total $20,000 each year.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">David will have to include 50% of the annual value of these payments ($10,000) as part of his income for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Other income</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Olivia&rsquo;s parents give her $100 a week which she puts towards the mortgage payments. The total amount she received over the year is $5,200.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Olivia will need to include the total amount of $5,200 as part of her income for WfFTC purposes because it is more than $5,000.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Income equalisation scheme deposits</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Sarah and Kevin receive WfFTC payments for their two children and Kevin has a student loan. Kevin makes a deposit of $50,000 into the income equalisation scheme on 1 June 2023. He can claim a deduction in his income tax return for the period 1 April 2023 to 31 March 2024 of the amount of the deposit. For the 2024 tax year Kevin earns $80,000.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">His deduction from the income equalisation deposit of $50,000 makes his taxable income $30,000. Kevin is required to add back into his income the $50,000 for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="3" rowsep="1">Salary exchanged for private use of an employer-provided motor vehicle</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">When Erin started work, her employer offered her a:</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&bull; $50,000 salary and the private use of the work car, or</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&bull; $58,000 salary without private use of the work car</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Erin decided to use the employer-provided car instead of the $8,000 in additional salary. Erin must include the $8,000 as income for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Vouchers and other short-term charge facilities</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">George is employed by a local clothes shop as a store assistant. The shop often pays their staff with grocery vouchers. In addition to his pay of $200 George is given a $25 grocery voucher each week. This gives George an annual wage of $10,400 and vouchers worth $1,300.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">The threshold that applies to George is 5% of his wages, which is $520 ($10,400 &times; 5%). As the value of the vouchers is more than $520, George will need to include the value ($1,300) plus any FBT his employer has paid on the vouchers, in his income for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Distributions from retirement savings schemes</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Te R&umacr;nanga o Ng&amacr;i Tahu makes contributions to John&rsquo;s retirement savings scheme account of $1,200 (before deducting RSCT) for the year. Te R&umacr;nanga makes a distribution to John of $1,200. John has not yet retired or become eligible for NZ Super.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">John needs to include the $1,200 as part of his income for WfFTC and student loans.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Distributions from superannuation schemes</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Over the year Denise&rsquo;s employer contributes $10,000 to Denise&rsquo;s superannuation scheme. Denise herself contributes $15,000 to the scheme. In that same year, Denise receives a distribution from her scheme of the $25,000 that she and her employer contributed in that year, which earned $250 in interest. Denise still works for the same employer.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Denise needs to include the $10,000 contributed by her employer and the $250 in interest as part of her income for WfFTC and student loans. She doesn&rsquo;t need to include the $15,000 which she had contributed toward the distribution.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="1" rowsep="1">Tax-exempt overseas pensions</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Cory receives a $10,000 UK pension that is like NZ Super. He doesn&rsquo;t pay his UK pension to Work and Income. The full entitlement to NZ Super is $14,000 (example only). He receives $4,000 NZ Super less tax and keeps his $10,000 UK pension. To ensure Cory receives the same net amount as a person on full NZ Super, Cory&rsquo;s UK pension is tax exempt.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Cory needs to include the $10,000 overseas pension as part of his income for WfFTC and student loans. The $4,000 he receives in NZ Super will be automatically included.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="2" rowsep="1">Losses</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Frank has self-employed income from two unrelated businesses, a plastering business, and a shoe shop. The plastering business made a profit of $30,000, while the shoe shop made a loss of $10,000. Frank puts the profit of $20,000 in the self-employed income box in his IR3.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">
+						<emphasis type="bold">Note that losses from other businesses/investments/rental properties no longer reduce income for the purposes of working out the Working for Families tax credits entitlement.</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry nameend="c7" namest="c3" rowsep="1">Frank&rsquo;s student loan repayment obligation and WfFTC entitlement will be based on $30,000 of income from the plastering business.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="6" rowsep="1">Major shareholder in a close company attributed income</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Jasmine is receiving WfFTC for her two children and holds 60,000 of the 100,000 voting interests in the company. Her two children hold the other 40,000. The company made a profit of $90,000 and didn&rsquo;t pay any dividends.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Jasmine&rsquo;s attributed income calculation for her shares</entry>
+				</row>
+				<row>
+					<entry align="center" colname="c2" rowsep="0"/>
+					<entry align="center" colname="c3" rowsep="1">60,000</entry>
+					<entry align="center" colname="c4">&times;</entry>
+					<entry colname="c5">($90,000 &minus; $0)</entry>
+					<entry colname="c6">&equals;</entry>
+					<entry colname="c7">$54,000</entry>
+				</row>
+				<row>
+					<entry align="center" colname="c2"/>
+					<entry align="center" colname="c3">100,000</entry>
+					<entry colname="c4"/>
+					<entry colname="c5"/>
+					<entry colname="c6"/>
+					<entry colname="c7"/>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Jasmine&rsquo;s attributed income calculation for her dependent children&rsquo;s shares</entry>
+				</row>
+				<row>
+					<entry align="center" colname="c2" rowsep="0"/>
+					<entry align="center" colname="c3" rowsep="1">40,000</entry>
+					<entry align="center" colname="c4">&times;</entry>
+					<entry colname="c5">($90,000 &minus; $0)</entry>
+					<entry colname="c6">&equals;</entry>
+					<entry colname="c7">$36,000</entry>
+				</row>
+				<row>
+					<entry align="center" colname="c2" rowsep="1"/>
+					<entry align="center" colname="c3" rowsep="1">100,000</entry>
+					<entry colname="c4" rowsep="1"/>
+					<entry colname="c5" rowsep="1"/>
+					<entry colname="c6" rowsep="1"/>
+					<entry colname="c7" rowsep="1"/>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="2" rowsep="1">Distributions from a trust that are not beneficiary income</entry>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colsep="1" nameend="c7" namest="c3" rowsep="0">Matt is the beneficiary of a family trust that has a cash PIE investment. The income was taxed at the 28% notified prescribed investor rate (PIR). This means that when the trust pays this income on to Matt, he does not need to include it in his tax return.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="0"/>
+					<entry colsep="1" nameend="c7" namest="c3" rowsep="0">The trust does not have any other taxable income so any distributions it makes to Matt are not treated as beneficiary income.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry colsep="1" nameend="c7" namest="c3" rowsep="1">The trust distributes $2,000 income from the PIE investment to Matt. He does not include the income in his tax return, but the distribution is part of his income for Working for Families and student loans and he needs to let Inland Revenue know how much he received.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="2" rowsep="1">Non-resident borrower&rsquo;s overseas income</entry>
+					<entry colname="c2" colsep="0" rowsep="0"/>
+					<entry colsep="1" nameend="c7" namest="c3" rowsep="0">Sarah has a $50,000 student loan and is working overseas under a voluntary service abroad approved program with a salary of $27,000 (in NZ dollars) for the year. Inland Revenue have approved her application to be treated as physically present in New Zealand.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="0"/>
+					<entry colsep="1" nameend="c7" namest="c3" rowsep="0">Sarah has no other income so will only need to tell Inland Revenue about her overseas salary of $27,000.</entry>
+				</row>
+				<row>
+					<entry colname="c2" rowsep="1"/>
+					<entry colsep="1" nameend="c7" namest="c3" rowsep="1">Inland Revenue will apply the student loan repayment threshold of $22,828 (applicable for the 2024 income tax year) when assessing her student loan repayment.</entry>
+				</row>
+				<row>
+					<entry colname="c1" colsep="1" morerows="9">Settlor&rsquo;s attributable trustee income (for 2015 tax year onwards)</entry>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Gavin and Stacey receive Working for Families payments for their 3 children and Gavin has a student loan.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">They are also the only settlors of the &ldquo;A Family Trust&rdquo; trust. The trust has a voting interest of 67% in a building company. Both Gavin and Stacey work for the company.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">The building company has net income of $200,000 and paid dividends of $40,000. The trust also received $4,500 interest that was treated as trustee income.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">
+						<emphasis type="bold">Calculation</emphasis>
+					</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;Trustee income is $4,500</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;Company income is:</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;(6,700 &divide; 10,000) &times; ($200,000 &minus; $40,000) &equals; $107,200</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;($4,500 &plus; $107,200) &equals; $111,700 &divide; 2</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;Attributed trustee income is $55,850.</entry>
+				</row>
+				<row>
+					<entry colname="c2"/>
+					<entry nameend="c7" namest="c3">Gavin and Stacey will have to include attributable trustee income of a total of $111,700 ($55,850 each) as part of their family income for Working for Families Tax Credits. Gavin&rsquo;s $55,850 will also be included as income for calculating his student loan repayment obligation.</entry>
+				</row>
+			</tbody>
+		</tgroup>
+	</table>
+</commblock>

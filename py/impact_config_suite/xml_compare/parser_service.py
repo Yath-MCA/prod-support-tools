@@ -57,7 +57,41 @@ class XMLParserService:
         
         parser = etree.XMLParser(recover=True, remove_blank_text=False)
         root = etree.fromstring(raw.encode("utf-8"), parser=parser)
-        return etree.ElementTree(root)
+        tree = etree.ElementTree(root)
+        
+        # Clean tree to remove comments and processing instructions that cause issues
+        XMLParserService._clean_tree(tree)
+        
+        return tree
+    
+    @staticmethod
+    def _clean_tree(tree: etree.ElementTree) -> None:
+        """
+        Clean XML tree by removing comments and processing instructions.
+        
+        xmldiff struggles when text nodes contain comments or PIs.
+        This method removes them to ensure safe processing.
+        
+        Args:
+            tree: ElementTree to clean (modified in place)
+        """
+        root = tree.getroot()
+        
+        # Remove comments and processing instructions
+        for element in root.iter():
+            # Remove comment and processing instruction children
+            children_to_remove = [
+                child for child in element
+                if isinstance(child, (etree._Comment, etree._ProcessingInstruction))
+            ]
+            for child in children_to_remove:
+                element.remove(child)
+            
+            # Also clean up tail and text to ensure they're proper strings
+            if element.text is not None:
+                element.text = str(element.text)
+            if element.tail is not None:
+                element.tail = str(element.tail)
 
     @staticmethod
     def get_file_size_mb(xml_path: Path) -> float:

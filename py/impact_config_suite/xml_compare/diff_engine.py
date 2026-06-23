@@ -384,8 +384,22 @@ class DiffEngine:
             
         elif isinstance(action, RenameNode):
             path = self._normalize_xpath(action.node)
-            old_tag = str(action.oldtag) if action.oldtag is not None else "unknown"
+            # Get new tag from action
             new_tag = str(action.tag) if action.tag is not None else "unknown"
+            # Try to get old tag from action, or extract from element in tree
+            old_tag = getattr(action, 'oldtag', None) or getattr(action, 'old_tag', None)
+            
+            # If not in action, get from element in left tree
+            if old_tag is None:
+                element = self._get_element_by_path(left_tree, action.node)
+                if element is not None:
+                    old_tag = str(element.tag)
+                    old_tag = old_tag.split("}")[-1] if "}" in old_tag else old_tag
+                else:
+                    old_tag = "unknown"
+            else:
+                old_tag = str(old_tag)
+            
             # Rename is both structural and formatting
             # Add as structure change
             element = self._get_element_by_path(left_tree, action.node)
