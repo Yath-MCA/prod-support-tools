@@ -81,21 +81,21 @@ class CompareManager:
             # Get file paths
             doc_folder = project_path / docid
             
-            # Check if already has report
-            report_path = doc_folder / config.TARGET_NAMES["compare_report"]
-            if report_path.exists() and skip_existing:
+            # Check if already has report (look for any HTML report file)
+            report_files = list(doc_folder.glob("*_compare_*.html")) + list(doc_folder.glob("*report*.html"))
+            if report_files and skip_existing:
+                report_path = report_files[0]  # Use first found report
                 self.db.update_document(docid, {
                     "process.compared": True,
                     "files.compare_report": str(report_path.relative_to(project_path)),
                 })
                 skipped += 1
-                self.logger.info(f"Skipped {docid} (report exists)")
+                self.logger.info(f"Skipped {docid} (report exists: {report_path.name})")
                 continue
             
             # Get input files
             original_xml = doc["files"].get("original_xml")
             updated_html = doc["files"].get("updated_html")
-            config_xml = doc["files"].get("config_xml")
             
             if not original_xml or not updated_html:
                 self.db.mark_error(docid, "compare", "Missing required files for comparison")
@@ -107,9 +107,29 @@ class CompareManager:
             orig_path = project_path / original_xml
             upd_path = project_path / updated_html
             
-            # For comparison, we use original XML vs updated HTML
-            # The comparison logic handles the conversion
-            success, report_path, error = self._compare_single(
+            # Verify original is XML (required for pipeline)
+            if orig_path.suffix.lower() not in ('.xml', '.xhtml'):
+                self.db.mark_error(docid, "compare", f"Original file must be XML, got: {orig_path.suffix}")
+                failed += 1
+                self.logger.error(f"Invalid original file type for {docid}: {orig_path.suffix}")
+                continue
+            
+            # For comparison, we need both files to be XML
+            # If updated is HTML, we need to handle it differently
+            if upd_path.suffix.lower() == '.html':
+                # HTML files need conversion or special handling
+                # For now, skip HTML comparisons as the XML pipeline doesn't support HTML
+                self.db.mark_error(docid, "compare", "HTML comparison not supported - requires XML conversion")
+                failed += 1
+                self.logger.error(f"Cannot compare HTML for {docid} - pipeline requires XML")
+                continue
+            
+            # Generate report path with timestamp pattern that pipeline uses
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_path = doc_folder / f"{docid}_compare_{timestamp}.html"
+            
+            success, result_report_path, error = self._compare_single(
                 docid, orig_path, upd_path, report_path, options
             )
             

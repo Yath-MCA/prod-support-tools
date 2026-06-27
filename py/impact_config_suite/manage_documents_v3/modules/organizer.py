@@ -108,12 +108,14 @@ class FolderOrganizer:
                 else:
                     errors.append(f"Updated HTML: {error}")
             
-            # Update status
-            if errors and moved_count == 0:
+            # Update status - only mark as organized if ALL files moved successfully
+            if errors:
+                # Partial or complete failure - mark as error
                 self.db.mark_error(docid, "organize", "; ".join(errors))
                 failed += 1
                 self.logger.error(f"Failed to organize {docid}: {'; '.join(errors)}")
             else:
+                # All files moved successfully
                 self.db.update_document(docid, {"process.organized": True})
                 self.db.clear_error(docid)
                 successful += 1

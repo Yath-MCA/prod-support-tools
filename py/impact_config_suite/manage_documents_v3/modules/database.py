@@ -140,3 +140,11 @@ class DocumentDatabase:
     def document_exists(self, docid: str) -> bool:
         """Check if document exists in database."""
         return docid in self._data
+    
+    def get_scan_stats(self) -> dict:
+        """Get scanning statistics."""
+        total_in_db = len([d for d in self._data.keys() if not d.startswith("_")])
+        return {
+            "total_scanned": total_in_db,
+            "last_scan_time": self._data.get("_meta", {}).get("last_scan_time"),
+        }

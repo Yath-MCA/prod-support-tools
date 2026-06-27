@@ -2,7 +2,7 @@
 from pathlib import Path
 
 # API Configuration
-BASE_URL = "https://backend.company.co/IMPACT"
+BASE_URL = "https://impactonlinebackend.newgen.co/IMPACT"
 HTTP_TIMEOUT = 30
 DOWNLOAD_DELAY = 2.0  # seconds between downloads
 MAX_RETRIES = 3
@@ -51,3 +51,6 @@ RETRY_CONFIG = {
     "backoff_factor": 2.0,
     "max_delay": 60.0,
 }
+
+# Batch scanning configuration
+SCAN_BATCH_SIZE = 499  # Max files to scan per operation

@@ -26,6 +26,10 @@ class Logger:
         self.logger = logging.getLogger("docmanager")
         self.logger.setLevel(logging.INFO)
         
+        # Remove existing handlers to prevent accumulation
+        for handler in self.logger.handlers[:]:
+            self.logger.removeHandler(handler)
+        
         # File handler
         handler = logging.FileHandler(self.log_file, mode='a')
         handler.setLevel(logging.INFO)

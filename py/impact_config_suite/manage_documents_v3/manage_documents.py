@@ -25,6 +25,7 @@ from manage_documents_v3.modules.organizer import FolderOrganizer
 from manage_documents_v3.modules.downloader import ConfigDownloader
 from manage_documents_v3.modules.comparer import CompareManager
 from manage_documents_v3.modules.reporter import ReportManager
+from manage_documents_v3 import config
 
 # Import CompareOptions for comparison mode
 try:
@@ -41,16 +42,22 @@ def banner():
     print("=" * 60)
 
 
-def scan_command(project_path: Path) -> int:
+def scan_command(project_path: Path, batch_size: int) -> int:
     """Execute scan command."""
     print(f"\nScanning project: {project_path}")
     
     db = DocumentDatabase(project_path)
     scanner = DocumentScanner(db, log_callback=print)
-    count = scanner.scan()
+    processed, remaining = scanner.scan(batch_size=batch_size)
     
-    print(f"\nScan complete. Found {count} documents.")
-    return 0 if count > 0 else 1
+    print(f"\nScan complete.")
+    print(f"  Processed: {processed}")
+    print(f"  Remaining: {remaining}")
+    
+    if remaining > 0:
+        print(f"\nRun again to process next {batch_size} files.")
+    
+    return 0 if processed > 0 else 1
 
 
 def folder_command(project_path: Path) -> int:
@@ -125,11 +132,18 @@ def complete_command(project_path: Path) -> int:
     
     db = DocumentDatabase(project_path)
     
-    # Step 1: Scan
+    # Step 1: Scan (loop until all files are scanned)
     print("\n[1/5] Scanning...")
     scanner = DocumentScanner(db, log_callback=print)
-    scan_count = scanner.scan()
-    print(f"Found {scan_count} documents")
+    total_scanned = 0
+    while True:
+        scan_processed, scan_remaining = scanner.scan()
+        total_scanned += scan_processed
+        print(f"  Batch: Processed {scan_processed}, Remaining {scan_remaining}")
+        if scan_remaining == 0:
+            break
+        print(f"  Continuing scan... ({scan_remaining} files remaining)")
+    print(f"Scan complete. Total processed: {total_scanned}")
     
     # Step 2: Organize
     print("\n[2/5] Organizing...")
@@ -201,6 +215,12 @@ Examples:
         choices=["scan", "folder", "download", "compare", "report", "complete"],
         help="Operation mode",
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=config.SCAN_BATCH_SIZE,
+        help=f"Number of files to process per batch (default: {config.SCAN_BATCH_SIZE})",
+    )
     
     args = parser.parse_args()
     
@@ -216,7 +236,7 @@ Examples:
     
     # Execute command
     commands = {
-        "scan": scan_command,
+        "scan": lambda p: scan_command(p, args.batch_size),
         "folder": folder_command,
         "download": download_command,
         "compare": compare_command,

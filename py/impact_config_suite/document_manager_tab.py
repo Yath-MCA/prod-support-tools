@@ -129,6 +129,27 @@ class DocumentManagerTab(ttk.Frame):
             cursor="hand2",
         )
         self.load_btn.pack(side="left", padx=(8, 0))
+        
+        # Batch size input
+        tk.Label(
+            project_frame,
+            text="Batch Size:",
+            bg="#0f172a",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).pack(side="left", padx=(20, 5))
+        
+        self.batch_size_var = tk.IntVar(value=499)
+        tk.Spinbox(
+            project_frame,
+            from_=1,
+            to=9999,
+            textvariable=self.batch_size_var,
+            width=6,
+            bg="#1e293b",
+            fg="white",
+            font=("Segoe UI", 9),
+        ).pack(side="left")
     
     def _build_buttons_section(self) -> None:
         """Build action buttons row."""
@@ -298,7 +319,14 @@ class DocumentManagerTab(ttk.Frame):
             return
         
         stats = self._db.get_statistics()
-        text = f"Total: {stats['total']} | Organized: {stats['steps']['organized']} | Downloaded: {stats['steps']['config_downloaded']} | Compared: {stats['steps']['compared']} | Errors: {stats['with_errors']}"
+        scan_stats = self._db.get_scan_stats()
+        text = (
+            f"Files in database: {scan_stats['total_scanned']} | "
+            f"Organized: {stats['steps']['organized']} | "
+            f"Downloaded: {stats['steps']['config_downloaded']} | "
+            f"Compared: {stats['steps']['compared']} | "
+            f"Errors: {stats['with_errors']}"
+        )
         self.stats_text.set(text)
     
     def _update_button_states(self) -> None:
@@ -339,14 +367,28 @@ class DocumentManagerTab(ttk.Frame):
         self._log("Starting scan...")
         
         def do_scan():
-            scanner = DocumentScanner(self._db, self._log)
-            return scanner.scan()
+            batch_size = self.batch_size_var.get()
+            # Marshal log callback to main thread
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            scanner = DocumentScanner(self._db, safe_log)
+            return scanner.scan(batch_size=batch_size)
         
-        def on_complete(count):
+        def on_complete(result):
+            processed, remaining = result
             self._set_buttons_busy(False)
-            self._log(f"Scan complete. Found {count} documents.")
             self._update_stats()
-            messagebox.showinfo("Scan Complete", f"Found {count} documents.")
+            
+            if remaining > 0:
+                message = f"Batch complete. Processed: {processed}, Remaining: {remaining}.\nClick Scan again to continue."
+                self.scan_btn.config(text="Continue Scan")
+                self._log(f"Batch complete. Processed: {processed}, Remaining: {remaining}")
+            else:
+                message = f"Scan complete. All {processed} files processed."
+                self.scan_btn.config(text="Scan")
+                self._log(f"Scan complete. All {processed} files processed.")
+            
+            messagebox.showinfo("Scan Complete", message)
         
         def on_error(e):
             self._set_buttons_busy(False)
@@ -364,10 +406,15 @@ class DocumentManagerTab(ttk.Frame):
         self._log("Starting organization...")
         
         def do_organize():
+            # Marshal callbacks to main thread
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            def safe_progress(current, total):
+                self.after(0, lambda: self._update_progress(current, total))
             organizer = FolderOrganizer(
                 self._db,
-                log_callback=self._log,
-                progress_callback=self._update_progress,
+                log_callback=safe_log,
+                progress_callback=safe_progress,
             )
             return organizer.organize()
         
@@ -394,10 +441,15 @@ class DocumentManagerTab(ttk.Frame):
         self._log("Starting config downloads...")
         
         def do_download():
+            # Marshal callbacks to main thread
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            def safe_progress(current, total):
+                self.after(0, lambda: self._update_progress(current, total))
             downloader = ConfigDownloader(
                 self._db,
-                log_callback=self._log,
-                progress_callback=self._update_progress,
+                log_callback=safe_log,
+                progress_callback=safe_progress,
             )
             return downloader.download_all()
         
@@ -424,10 +476,15 @@ class DocumentManagerTab(ttk.Frame):
         self._log("Starting comparisons...")
         
         def do_compare():
+            # Marshal callbacks to main thread
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            def safe_progress(current, total):
+                self.after(0, lambda: self._update_progress(current, total))
             comparer = CompareManager(
                 self._db,
-                log_callback=self._log,
-                progress_callback=self._update_progress,
+                log_callback=safe_log,
+                progress_callback=safe_progress,
             )
             options = CompareOptions()
             return comparer.compare_all(options=options)
@@ -455,7 +512,10 @@ class DocumentManagerTab(ttk.Frame):
         self._log("Generating reports...")
         
         def do_report():
-            reporter = ReportManager(self._db, self._log)
+            # Marshal callback to main thread
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            reporter = ReportManager(self._db, safe_log)
             html_path = reporter.generate_html_summary()
             csv_path = reporter.generate_csv()
             return html_path, csv_path
@@ -467,7 +527,8 @@ class DocumentManagerTab(ttk.Frame):
             self._update_stats()
             
             if messagebox.askyesno("Reports Generated", "Open HTML report?"):
-                webbrowser.open(f"file://{html_path.absolute()}")
+                # Use as_uri() for proper file URL format on all platforms
+                webbrowser.open(html_path.as_uri())
         
         def on_error(e):
             self._set_buttons_busy(False)
@@ -493,30 +554,42 @@ class DocumentManagerTab(ttk.Frame):
         def do_complete():
             results = {}
             
-            # Scan
-            self._log("Step 1/5: Scanning...")
-            scanner = DocumentScanner(self._db, self._log)
-            results['scan'] = scanner.scan()
+            # Marshal callbacks to main thread
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            def safe_progress(current, total):
+                self.after(0, lambda: self._update_progress(current, total))
+            
+            # Scan (loop until all files scanned)
+            safe_log("Step 1/5: Scanning...")
+            scanner = DocumentScanner(self._db, safe_log)
+            total_scanned = 0
+            while True:
+                processed, remaining = scanner.scan()
+                total_scanned += processed
+                if remaining == 0:
+                    break
+            results['scan'] = (total_scanned, 0)
             
             # Organize
-            self._log("Step 2/5: Organizing...")
-            organizer = FolderOrganizer(self._db, self._log, self._update_progress)
+            safe_log("Step 2/5: Organizing...")
+            organizer = FolderOrganizer(self._db, safe_log, safe_progress)
             results['organize'] = organizer.organize()
             
             # Download
-            self._log("Step 3/5: Downloading configs...")
-            downloader = ConfigDownloader(self._db, self._log, self._update_progress)
+            safe_log("Step 3/5: Downloading configs...")
+            downloader = ConfigDownloader(self._db, safe_log, safe_progress)
             results['download'] = downloader.download_all()
             
             # Compare
-            self._log("Step 4/5: Comparing...")
-            comparer = CompareManager(self._db, self._log, self._update_progress)
+            safe_log("Step 4/5: Comparing...")
+            comparer = CompareManager(self._db, safe_log, safe_progress)
             options = CompareOptions()
             results['compare'] = comparer.compare_all(options=options)
             
             # Report
-            self._log("Step 5/5: Generating reports...")
-            reporter = ReportManager(self._db, self._log)
+            safe_log("Step 5/5: Generating reports...")
+            reporter = ReportManager(self._db, safe_log)
             results['report'] = (
                 reporter.generate_html_summary(),
                 reporter.generate_csv(),
@@ -528,9 +601,10 @@ class DocumentManagerTab(ttk.Frame):
             self._set_buttons_busy(False)
             self._log("=== Workflow Complete ===")
             self._update_stats()
+            scan_processed, scan_remaining = results['scan']
             messagebox.showinfo(
                 "Workflow Complete",
-                f"Scan: {results['scan']} docs\n"
+                f"Scan: {scan_processed} docs processed, {scan_remaining} remaining\n"
                 f"Organize: {results['organize'][0]} success\n"
                 f"Download: {results['download'][0]} success\n"
                 f"Compare: {results['compare'][0]} success\n"
