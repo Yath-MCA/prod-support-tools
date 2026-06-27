@@ -19,7 +19,8 @@
     {
       "name": "Auto Download",
       "tools": [
-        { "id": "data_transfer", "label": "Data Transfer" }
+        { "id": "data_transfer", "label": "Data Transfer" },
+        { "id": "document_manager", "label": "Document Manager" }
       ]
     },
     {

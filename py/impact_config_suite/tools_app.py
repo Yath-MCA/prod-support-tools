@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tkinter as tk
 import webbrowser
@@ -21,6 +22,7 @@ from new_config_tab import NewConfigTab
 from compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from element_extractor_tab import ElementExtractorTab
 from xml_compare_tab import XMLCompareTab
+from document_manager_tab import DocumentManagerTab
 from core.run_history import RunHistoryStore
 
 
@@ -42,6 +44,7 @@ class CommonToolsApp:
         "compare_xml": XMLCompareTab,
         "new_journal_config": NewConfigTab,
         "element_extractor": ElementExtractorTab,
+        "document_manager": DocumentManagerTab,
     }
     DEFAULT_NAVIGATION = {
         "default_category": "Analysis",
@@ -258,8 +261,12 @@ class CommonToolsApp:
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Help", menu=help_menu)
         about_text = f"{self.app_metadata['display_name']}\nVersion {self.app_metadata['version']}\n© 2026 IMPACT Team"
-        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", about_text))
+        help_menu.add_command(label="Refresh Application", command=self._refresh_application)
         help_menu.add_command(label="Reload Navigation", command=self.reload_navigation)
+        help_menu.add_separator()
+        help_menu.add_command(label="Restart Application", command=self._restart_application)
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", about_text))
 
     def _setup_header(self) -> None:
         self.header_frame = tk.Frame(self.root, bg="#ffffff", pady=10)
@@ -706,6 +713,7 @@ class CommonToolsApp:
         self._schedule_navigation_watch()
 
     def reload_navigation(self) -> None:
+        """Reload navigation configuration and rebuild UI."""
         preserve = self._current_selection()
         old_search_tab = getattr(self, "search_tab", None)
         if old_search_tab is not None:
@@ -717,6 +725,60 @@ class CommonToolsApp:
         self.navigation_config_mtime = self._config_mtime(self.navigation_config_path)
         self._setup_menu()
         self._build_navigation(preserve=preserve)
+
+    def _refresh_application(self) -> None:
+        """Refresh the entire application - reload configs and rebuild UI."""
+        try:
+            # Reload app metadata
+            self.app_metadata = self._load_app_metadata()
+            
+            # Reload navigation (this rebuilds the UI)
+            self.reload_navigation()
+            
+            # Update window title with new metadata
+            version = self.app_metadata.get('version', '')
+            title_text = f"Developer Supporting Framework  v{version}" if version else "Developer Supporting Framework"
+            self.header_title.config(text=title_text)
+            
+            messagebox.showinfo("Refresh Complete", "Application refreshed successfully.")
+        except Exception as e:
+            messagebox.showerror("Refresh Failed", f"Failed to refresh application:\n{str(e)}")
+
+    def _restart_application(self) -> None:
+        """Restart the entire application."""
+        if messagebox.askyesno(
+            "Restart Application",
+            "This will close and reopen the application.\n\nContinue?"
+        ):
+            try:
+                # Get the current Python executable and script path
+                import os
+                import subprocess
+                
+                # Clean shutdown
+                self._nav_watch_active = False
+                if self.search_tab is not None:
+                    self.search_tab.shutdown(wait=True)
+                
+                # Destroy current window
+                self.root.destroy()
+                
+                # Restart the application
+                python = sys.executable
+                script = Path(__file__).resolve()
+                
+                # Use subprocess to start a new instance
+                if getattr(sys, 'frozen', False):
+                    # Running as compiled executable
+                    subprocess.Popen([str(script.parent / script.stem)],
+                                   creationflags=subprocess.DETACHED_PROCESS)
+                else:
+                    # Running as Python script
+                    subprocess.Popen([python, str(script)],
+                                   creationflags=subprocess.DETACHED_PROCESS)
+                
+            except Exception as e:
+                messagebox.showerror("Restart Failed", f"Failed to restart:\n{str(e)}")
 
     def _on_close(self) -> None:
         self._nav_watch_active = False
