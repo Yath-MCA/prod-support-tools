@@ -303,6 +303,7 @@ class DocumentManagerTab(ttk.Frame):
     
     def _update_button_states(self) -> None:
         """Enable/disable buttons based on project state."""
+        self._log(f"Calling _update_button_states")
         has_project = self._db is not None
         state = "normal" if has_project else "disabled"
         
