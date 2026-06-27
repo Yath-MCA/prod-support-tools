@@ -297,9 +297,14 @@ class DocumentManagerTab(ttk.Frame):
     
     def _log(self, message: str) -> None:
         """Append message to log."""
-        self.log_text.insert("end", f"{message}\n")
-        self.log_text.see("end")
-        self.update_idletasks()
+        # Check if log_text widget exists (may not during early init or from threads)
+        if hasattr(self, 'log_text') and self.log_text.winfo_exists():
+            self.log_text.insert("end", f"{message}\n")
+            self.log_text.see("end")
+            self.update_idletasks()
+        else:
+            # Fallback to print if widget not ready
+            print(message)
     
     def _update_progress(self, current: int, total: int) -> None:
         """Update progress bar."""
