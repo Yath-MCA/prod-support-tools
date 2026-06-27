@@ -186,7 +186,7 @@ class DocumentManagerTab(ttk.Frame):
     ) -> tk.Button:
         """Create a themed action button."""
         font = ("Segoe UI", 9, "bold") if is_primary else ("Segoe UI", 9)
-        return tk.Button(
+        btn = tk.Button(
             parent,
             text=text,
             command=command,
@@ -198,6 +198,8 @@ class DocumentManagerTab(ttk.Frame):
             pady=8,
             cursor="hand2",
         )
+        btn.pack(side="left", padx=(0, 8))
+        return btn
     
     def _build_progress_section(self) -> None:
         """Build progress bar."""
@@ -289,11 +291,93 @@ class DocumentManagerTab(ttk.Frame):
             messagebox.showerror("Error", f"Folder not found: {path}")
             return
         
-        self._project_path = path
-        self._db = DocumentDatabase(path)
-        self._log(f"Loaded project: {path}")
-        self._update_stats()
-        self._update_button_states()
+        try:
+            self._project_path = path
+            self._db = DocumentDatabase(path)
+            self._log(f"Loaded project: {path}")
+            
+            # Count source files
+            source_counts = self._count_source_files(path)
+            self._log(f"Source files available:")
+            self._log(f"  HTML files (originalhtml): {source_counts['html']}")
+            self._log(f"  XML files (originalxml): {source_counts['xml']}")
+            self._log(f"  Updated HTML (updatedhtmlfiles): {source_counts['updated_html']}")
+            
+            # Count documents and completion status
+            doc_stats = self._count_document_status(path)
+            self._log(f"\nDocument status:")
+            self._log(f"  Total documents in database: {doc_stats['total']}")
+            self._log(f"  Completed (all steps): {doc_stats['completed']}")
+            self._log(f"  With config XML downloaded: {doc_stats['with_config']}")
+            self._log(f"  Organized: {doc_stats['organized']}")
+            self._log(f"  Compared: {doc_stats['compared']}")
+            
+            self._update_stats()
+            self._update_button_states()
+            self._log("\nProject loaded successfully - buttons enabled")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load project: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _count_source_files(self, project_path: Path) -> dict:
+        """Count available source files in the project folders."""
+        counts = {"html": 0, "xml": 0, "updated_html": 0, "impact_config": 0}
+        
+        # Count HTML files in originalhtml folder
+        html_folder = project_path / "originalhtml"
+        if html_folder.exists():
+            counts["html"] = len([f for f in html_folder.iterdir() 
+                                  if f.is_file() and f.suffix.lower() == ".html"])
+        
+        # Count XML files in originalxml folder
+        xml_folder = project_path / "originalxml"
+        if xml_folder.exists():
+            counts["xml"] = len([f for f in xml_folder.iterdir() 
+                                 if f.is_file() and f.suffix.lower() == ".xml"])
+        
+        # Count updated HTML files
+        updated_folder = project_path / "updatedhtmlfiles"
+        if updated_folder.exists():
+            counts["updated_html"] = len([f for f in updated_folder.iterdir() 
+                                          if f.is_file() and f.suffix.lower() == ".html"])
+        
+        # Count impact_config.xml files in document folders
+        for item in project_path.iterdir():
+            if item.is_dir() and not item.name.startswith("."):
+                config_file = item / "impact_config.xml"
+                if config_file.exists():
+                    counts["impact_config"] += 1
+        
+        return counts
+    
+    def _count_document_status(self, project_path: Path) -> dict:
+        """Count document completion status from database."""
+        if not self._db:
+            return {"total": 0, "completed": 0, "organized": 0, "with_config": 0, "compared": 0}
+        
+        all_docs = self._db.get_all()
+        stats = {"total": len(all_docs), "completed": 0, "organized": 0, "with_config": 0, "compared": 0}
+        
+        for docid, doc in all_docs.items():
+            if docid.startswith("_"):
+                continue
+            
+            process = doc.get("process", {})
+            if process.get("organized", False):
+                stats["organized"] += 1
+            if process.get("config_downloaded", False):
+                stats["with_config"] += 1
+            if process.get("compared", False):
+                stats["compared"] += 1
+            # Completed = all steps done
+            if (process.get("organized", False) and 
+                process.get("config_downloaded", False) and 
+                process.get("compared", False) and 
+                process.get("report_generated", False)):
+                stats["completed"] += 1
+        
+        return stats
     
     def _log(self, message: str) -> None:
         """Append message to log."""
@@ -340,9 +424,24 @@ class DocumentManagerTab(ttk.Frame):
         has_project = self._db is not None
         state = "normal" if has_project else "disabled"
         
-        for btn in [self.scan_btn, self.organize_btn, self.download_btn, 
-                    self.compare_btn, self.report_btn, self.complete_btn]:
-            btn.config(state=state)
+        # Check if buttons exist before configuring
+        buttons = [
+            ("scan_btn", getattr(self, 'scan_btn', None)),
+            ("organize_btn", getattr(self, 'organize_btn', None)),
+            ("download_btn", getattr(self, 'download_btn', None)),
+            ("compare_btn", getattr(self, 'compare_btn', None)),
+            ("report_btn", getattr(self, 'report_btn', None)),
+            ("complete_btn", getattr(self, 'complete_btn', None)),
+        ]
+        
+        for name, btn in buttons:
+            if btn is not None and hasattr(btn, 'config'):
+                try:
+                    btn.config(state=state)
+                except Exception as e:
+                    self._log(f"Warning: Could not update {name}: {e}")
+            else:
+                self._log(f"Warning: Button {name} not found")
     
     def _run_in_thread(
         self,
