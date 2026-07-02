@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from .routes.search_routes import router as search_router
+from .routes.extractor_routes import router as extractor_router
 
 # Get the app directory path
 APP_DIR = Path(__file__).parent
@@ -25,6 +26,7 @@ def create_app():
 
     # Include Routes
     app.include_router(search_router)
+    app.include_router(extractor_router)
 
     return app
 

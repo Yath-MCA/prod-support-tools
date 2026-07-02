@@ -9,20 +9,20 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 
-from analyses_tab import AnalysesTab
-from patterns_tab import PatternsTab
-from search_tab import SearchTab
+from tabs.analyses_tab import AnalysesTab
+from tabs.patterns_tab import PatternsTab
+from tabs.search_tab import SearchTab
 from cjk_checker.gui import CJKIntegrityTab
-from data_transfer_tab import DataTransferTab
-from impact_to_ceg_tab import ImpactToCEGTab
-from pgm_processor_tab import PGMProcessorTab
-from word_extractor_tab import WordExtractorTab
-from id_pattern_extractor_tab import IDPatternExtractorTab
-from new_config_tab import NewConfigTab
-from compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
-from element_extractor_tab import ElementExtractorTab
-from xml_compare_tab import XMLCompareTab
-from document_manager_tab import DocumentManagerTab
+from tabs.data_transfer_tab import DataTransferTab
+from tabs.impact_to_ceg_tab import ImpactToCEGTab
+from tabs.pgm_processor_tab import PGMProcessorTab
+from tabs.word_extractor_tab import WordExtractorTab
+from tabs.id_pattern_extractor_tab import IDPatternExtractorTab
+from tabs.new_config_tab import NewConfigTab
+from tabs.compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
+from tabs.element_extractor_tab import ElementExtractorTab
+from tabs.xml_compare_tab import XMLCompareTab
+from tabs.document_manager_tab import DocumentManagerTab
 from core.run_history import RunHistoryStore
 
 
@@ -113,18 +113,22 @@ class CommonToolsApp:
     @classmethod
     def _config_paths(cls) -> list[Path]:
         paths = []
+        paths.append(cls._resource_base_dir() / "config" / cls.NAVIGATION_CONFIG_NAME)
         paths.append(cls._resource_base_dir() / cls.NAVIGATION_CONFIG_NAME)
         if getattr(sys, "frozen", False):
             paths.append(Path(sys.executable).resolve().with_name(cls.NAVIGATION_CONFIG_NAME))
+        paths.append(Path.cwd() / "config" / cls.NAVIGATION_CONFIG_NAME)
         paths.append(Path.cwd() / cls.NAVIGATION_CONFIG_NAME)
         return paths
 
     @classmethod
     def _app_metadata_paths(cls) -> list[Path]:
         paths = []
+        paths.append(cls._resource_base_dir() / "config" / cls.APP_METADATA_NAME)
         paths.append(cls._resource_base_dir() / cls.APP_METADATA_NAME)
         if getattr(sys, "frozen", False):
             paths.append(Path(sys.executable).resolve().with_name(cls.APP_METADATA_NAME))
+        paths.append(Path.cwd() / "config" / cls.APP_METADATA_NAME)
         paths.append(Path.cwd() / cls.APP_METADATA_NAME)
         return paths
 
@@ -796,3 +800,7 @@ def launch_tools_app() -> None:
 
 if __name__ == "__main__":
     launch_tools_app()
+
+
+
+

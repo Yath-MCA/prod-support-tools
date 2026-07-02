@@ -1,6 +1,6 @@
 # IMPACT Config Suite: XML/HTML Element Extractor
 
-**Document Version:** 2.0  
+**Document Version:** 2.6  
 **Last Updated:** June 2026  
 **Tool Status:** Production Ready
 
@@ -34,7 +34,8 @@ The Element Extractor is a production-grade tool for analyzing HTML/XML files an
 | Single File Mode | Analyze one HTML/XML file at a time |
 | Folder Scan Mode | Recursively scan entire directories with filters |
 | Multi-Selector Support | Run multiple queries in a single operation (comma-separated) |
-| Filter Options | Filename filters, DTD filters, Client filters |
+| Filter Options | Filename filters, DTD filters, Client filters, Month filter |
+| Batch Processing | Process large directories in configurable folder batches |
 | Report Generation | Three report types: Detailed HTML, Summary Dashboard, CSV Export |
 | Copy Matched Files | Optional: Copy source files with matches to timestamped folder |
 
@@ -125,6 +126,43 @@ Optional feature to copy all source files that had matches to a separate folder 
 - Original files are **never modified**
 - Only **copies** are created in the output folder
 - Original file timestamps remain unchanged
+
+### 2.6 Batch Folder Processing (NEW)
+
+Process large directories in manageable batches to avoid UI lockups and memory issues.
+
+**How it Works:**
+- Scan only a limited number of folders (batch) per run
+- Configurable batch size: 10, 25, 50, 100, 200, or 500 folders
+- "Skip" (offset) allows resuming from where you left off
+- "Next Batch" button automatically continues from the previous offset
+- Status shows batch progress and whether more batches remain
+
+**Use Cases:**
+- Large directories with thousands of subdirectories
+- Preventing UI freezes during long scans
+- Memory-constrained environments
+- Incremental processing of data repositories
+- Scheduled batch jobs with resume capability
+
+**Configuration:**
+```
+Batch Processing:
+[X] Limit scan to batch [50▼] folders  Skip: [0   ]
+```
+
+**Workflow:**
+1. Enable "Limit scan to batch" checkbox
+2. Select desired batch size (default: 50 folders)
+3. Set "Skip" to 0 for first run
+4. Run extraction
+5. When complete, click "Next Batch" to continue
+6. Repeat until status shows "All batches complete"
+
+**Resume Capability:**
+- Batch offset is saved to run history
+- "Next Batch" button is enabled when more folders exist
+- History entries preserve batch settings for re-runs
 
 ---
 
@@ -257,15 +295,17 @@ All extraction outputs are organized into a single **timestamped run folder**:
 
 ### 4.3 Folder Scan Options
 
-When using Folder Scan mode, additional filters are available:
+When using Folder Scan mode, additional filters and processing options are available:
 
-| Filter | Description |
+| Option | Description |
 |--------|-------------|
 | **Recursive Search** | Include subdirectories |
 | **Extensions** | File types to scan (default: .xml, .html, .htm, .xhtml) |
 | **Filename Filter** | Match specific filename patterns |
 | **DTD Filter** | Filter by DTD type (requires impact_config.xml) |
 | **Client Filter** | Filter by client (requires impact_config.xml) |
+| **Month Filter** | Filter by file modification date (All Time, This Month, Last Month, Custom) |
+| **Batch Processing** | Limit scan to N folders at a time with resume capability |
 
 ---
 
@@ -397,6 +437,8 @@ For technical issues or feature requests, contact the development team.
 | 2.2 | June 2026 | Doc-title reading from impact_config.xml with caching |
 | 2.3 | June 2026 | DTD-based title display (BITS=project-title, JATS=doc-title) in report headers |
 | 2.4 | June 2026 | Full metadata display (type, client, link-info, ISBN) in report headers |
+| 2.5 | June 2026 | Month filter (This Month, Last Month, Custom) for date-based file selection |
+| 2.6 | June 2026 | Batch folder processing with configurable batch size and resume capability |
 
 ---
 

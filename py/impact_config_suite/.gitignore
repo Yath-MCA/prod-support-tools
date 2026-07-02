@@ -1,0 +1,47 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+dist/
+*.spec.bak
+
+# Logs
+*.log
+patterns/logs/
+analyses/logs/
+
+# Generated reports and artifacts
+*.html
+*.xlsx
+*.xls
+!cjk_checker/templates/report_template.html
+!search_service/app/templates/*.html
+
+# Cache files
+*_cache.json
+analyses/analyzer_cache.json
+
+# Environment
+.env
+.venv/
+venv/
+ENV/
+
+# Archive (preserved but not tracked)
+_archive/

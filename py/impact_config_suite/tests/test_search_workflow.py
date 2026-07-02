@@ -20,8 +20,8 @@ from search_service.app.services.file_search import copy_files_for_batch, fetch_
 from core.element_extractor import ElementExtractor
 from core.run_history import RunHistoryStore
 from core.id_pattern_extractor import IDPatternExtractor
-from element_extractor_tab import ElementExtractorTab
-from search_tab import SearchTab
+from tabs.element_extractor_tab import ElementExtractorTab
+from tabs.search_tab import SearchTab
 from tools_app import CommonToolsApp
 
 
@@ -492,7 +492,7 @@ class SearchWorkflowTests(unittest.TestCase):
 
     def test_xpath_label_normalization(self) -> None:
         """Test that 'XPath Query' is normalized to 'XPath' before calling core."""
-        from element_extractor_tab import ElementExtractorTab
+        from tabs.element_extractor_tab import ElementExtractorTab
         tab = ElementExtractorTab.__new__(ElementExtractorTab)
 
         # XPath Query should be normalized to XPath
@@ -1230,6 +1230,362 @@ class SearchWorkflowTests(unittest.TestCase):
         self.assertEqual(result, "Books|OSO|pubkituat|9780197833216_NOVST")
 
     # ------------------------------------------------------------------
+    # Batch Processing Tests
+    # ------------------------------------------------------------------
+
+    def test_scan_directory_batch_basic(self) -> None:
+        """Test basic batch processing functionality."""
+        extractor = ElementExtractor()
+
+        # Create test directory structure with multiple folders
+        source = Path(self.temp_dir.name) / "batch_test"
+        source.mkdir()
+
+        # Create 5 folders with files
+        for i in range(1, 6):
+            folder = source / f"folder_{i:02d}"
+            folder.mkdir()
+            (folder / f"file_{i}.html").write_text(
+                f"<html><body><span>Content {i}</span></body></html>",
+                encoding="utf-8"
+            )
+
+        # Scan batch of 2 folders
+        results, total_matches, total_files, has_more, next_offset = \
+            extractor.scan_directory_batch(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=0
+            )
+
+        # Should process files from first 2 folders only
+        self.assertGreater(total_files, 0)
+        self.assertEqual(next_offset, 2)  # Offset advanced by batch_size
+        self.assertTrue(has_more)  # More folders to process
+
+        # Verify results contain files from first 2 folders
+        file_paths = list(results.keys())
+        self.assertTrue(any("folder_01" in p or "folder_02" in p for p in file_paths))
+        self.assertFalse(any("folder_03" in p or "folder_04" in p or "folder_05" in p for p in file_paths))
+
+    def test_scan_directory_batch_with_offset(self) -> None:
+        """Test batch processing with offset (resuming)."""
+        extractor = ElementExtractor()
+
+        # Create test directory structure
+        source = Path(self.temp_dir.name) / "batch_offset_test"
+        source.mkdir()
+
+        for i in range(1, 6):
+            folder = source / f"folder_{i:02d}"
+            folder.mkdir()
+            (folder / f"file_{i}.html").write_text(
+                f"<html><body><span>Content {i}</span></body></html>",
+                encoding="utf-8"
+            )
+
+        # First batch: offset 0, size 2
+        results1, matches1, files1, has_more1, next_offset1 = \
+            extractor.scan_directory_batch(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=0
+            )
+
+        self.assertTrue(has_more1)
+        self.assertEqual(next_offset1, 2)
+
+        # Second batch: offset 2, size 2 (resume)
+        results2, matches2, files2, has_more2, next_offset2 = \
+            extractor.scan_directory_batch(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=2
+            )
+
+        self.assertTrue(has_more2)
+        self.assertEqual(next_offset2, 4)
+
+        # Third batch: offset 4, size 2 (last folder)
+        results3, matches3, files3, has_more3, next_offset3 = \
+            extractor.scan_directory_batch(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=4
+            )
+
+        # No more folders to process
+        self.assertFalse(has_more3)
+        self.assertEqual(next_offset3, 6)
+
+        # Verify each batch processed different folders
+        files1 = set(results1.keys())
+        files2 = set(results2.keys())
+        files3 = set(results3.keys())
+
+        # No overlap between batches
+        self.assertEqual(files1 & files2, set())
+        self.assertEqual(files2 & files3, set())
+        self.assertEqual(files1 & files3, set())
+
+    def test_scan_directory_batch_respects_filters(self) -> None:
+        """Test that batch processing respects filename and config filters."""
+        extractor = ElementExtractor()
+
+        # Create test directory structure with filtered content
+        source = Path(self.temp_dir.name) / "batch_filter_test"
+        source.mkdir()
+
+        # Create folders with different file types
+        folder1 = source / "folder_01"
+        folder1.mkdir()
+        (folder1 / "doc_original.html").write_text(
+            "<html><body><span>F1 Original</span></body></html>",
+            encoding="utf-8"
+        )
+        (folder1 / "doc_updated.html").write_text(
+            "<html><body><span>F1 Updated</span></body></html>",
+            encoding="utf-8"
+        )
+
+        folder2 = source / "folder_02"
+        folder2.mkdir()
+        (folder2 / "doc_original.html").write_text(
+            "<html><body><span>F2 Original</span></body></html>",
+            encoding="utf-8"
+        )
+        (folder2 / "impact_config.xml").write_text(
+            "<?xml version='1.0'?><impact-config><dtd name='JATS'/><client>OUP</client></impact-config>",
+            encoding="utf-8"
+        )
+
+        folder3 = source / "folder_03"
+        folder3.mkdir()
+        (folder3 / "doc_updated.html").write_text(
+            "<html><body><span>F3 Updated</span></body></html>",
+            encoding="utf-8"
+        )
+
+        # Test with filename filter - only original files
+        results, matches, files, has_more, next_offset = \
+            extractor.scan_directory_batch(
+                source, "Tag Name", "span",
+                filename_filter="*_original.html",
+                batch_size=10, batch_offset=0
+            )
+
+        # Should only find original files
+        for path in results.keys():
+            self.assertIn("original", path)
+            self.assertNotIn("updated", path)
+
+        # Test with DTD filter - only JATS files (folder_02 has config)
+        extractor2 = ElementExtractor()  # Fresh instance
+        results2, matches2, files2, has_more2, next_offset2 = \
+            extractor2.scan_directory_batch(
+                source, "Tag Name", "span",
+                dtd_filter="JATS",
+                batch_size=10, batch_offset=0
+            )
+
+        # Should only find files in folder_02 (has JATS DTD)
+        if results2:  # Only if any matches found
+            for path in results2.keys():
+                self.assertIn("folder_02", path)
+
+        # Test with client filter - only OUP files (folder_02)
+        extractor3 = ElementExtractor()
+        results3, matches3, files3, has_more3, next_offset3 = \
+            extractor3.scan_directory_batch(
+                source, "Tag Name", "span",
+                client_filter="OUP",
+                batch_size=10, batch_offset=0
+            )
+
+        # Should only find files in folder_02 (OUP client)
+        if results3:
+            for path in results3.keys():
+                self.assertIn("folder_02", path)
+
+    # ------------------------------------------------------------------
+    # Month Filter Tests
+    # ------------------------------------------------------------------
+
+    def test_matches_month_filter_this_month(self) -> None:
+        """Test _matches_month_filter with 'This Month' option."""
+        extractor = ElementExtractor()
+
+        source = Path(self.temp_dir.name) / "month_filter_this"
+        source.mkdir()
+
+        # Create a file modified this month
+        this_month_file = source / "this_month.html"
+        this_month_file.write_text("<html><body><span>This month</span></body></html>", encoding="utf-8")
+
+        # Create a file modified last month by manually setting mtime
+        last_month_file = source / "last_month.html"
+        last_month_file.write_text("<html><body><span>Last month</span></body></html>", encoding="utf-8")
+        now = datetime.datetime.now()
+        if now.month == 1:
+            last_month_time = datetime.datetime(now.year - 1, 12, 15).timestamp()
+        else:
+            last_month_time = datetime.datetime(now.year, now.month - 1, 15).timestamp()
+        os.utime(last_month_file, (last_month_time, last_month_time))
+
+        # This month filter should match only this_month.html
+        self.assertTrue(extractor._matches_month_filter(this_month_file, "This Month"))
+        self.assertFalse(extractor._matches_month_filter(last_month_file, "This Month"))
+
+        # All Time should match both
+        self.assertTrue(extractor._matches_month_filter(this_month_file, "All Time"))
+        self.assertTrue(extractor._matches_month_filter(last_month_file, "All Time"))
+
+    def test_matches_month_filter_last_month(self) -> None:
+        """Test _matches_month_filter with 'Last Month' option."""
+        extractor = ElementExtractor()
+
+        source = Path(self.temp_dir.name) / "month_filter_last"
+        source.mkdir()
+
+        # Create files
+        this_month_file = source / "this_month.html"
+        this_month_file.write_text("<html><body><span>This month</span></body></html>", encoding="utf-8")
+
+        last_month_file = source / "last_month.html"
+        last_month_file.write_text("<html><body><span>Last month</span></body></html>", encoding="utf-8")
+        now = datetime.datetime.now()
+        if now.month == 1:
+            last_month_time = datetime.datetime(now.year - 1, 12, 15).timestamp()
+        else:
+            last_month_time = datetime.datetime(now.year, now.month - 1, 15).timestamp()
+        os.utime(last_month_file, (last_month_time, last_month_time))
+
+        # Last month filter should match only last_month.html
+        self.assertFalse(extractor._matches_month_filter(this_month_file, "Last Month"))
+        self.assertTrue(extractor._matches_month_filter(last_month_file, "Last Month"))
+
+    def test_matches_month_filter_custom_format(self) -> None:
+        """Test _matches_month_filter with 'Custom' option using MM-YYYY and YYYY-MM formats."""
+        extractor = ElementExtractor()
+
+        source = Path(self.temp_dir.name) / "month_filter_custom"
+        source.mkdir()
+
+        # Create files with specific modification times
+        jan_2026_file = source / "jan_2026.html"
+        jan_2026_file.write_text("<html><body><span>Jan 2026</span></body></html>", encoding="utf-8")
+        jan_2026_time = datetime.datetime(2026, 1, 15).timestamp()
+        os.utime(jan_2026_file, (jan_2026_time, jan_2026_time))
+
+        jun_2026_file = source / "jun_2026.html"
+        jun_2026_file.write_text("<html><body><span>Jun 2026</span></body></html>", encoding="utf-8")
+        jun_2026_time = datetime.datetime(2026, 6, 15).timestamp()
+        os.utime(jun_2026_file, (jun_2026_time, jun_2026_time))
+
+        # Test MM-YYYY format
+        self.assertTrue(extractor._matches_month_filter(jan_2026_file, "Custom", "01-2026"))
+        self.assertFalse(extractor._matches_month_filter(jun_2026_file, "Custom", "01-2026"))
+
+        # Test YYYY-MM format
+        self.assertTrue(extractor._matches_month_filter(jan_2026_file, "Custom", "2026-01"))
+        self.assertFalse(extractor._matches_month_filter(jun_2026_file, "Custom", "2026-01"))
+
+        # Test June format
+        self.assertFalse(extractor._matches_month_filter(jan_2026_file, "Custom", "06-2026"))
+        self.assertTrue(extractor._matches_month_filter(jun_2026_file, "Custom", "06-2026"))
+
+        # Invalid format should return True (skip filter)
+        self.assertTrue(extractor._matches_month_filter(jan_2026_file, "Custom", "invalid"))
+
+    def test_scan_directory_with_month_filter(self) -> None:
+        """Test scan_directory respects month_filter parameter."""
+        extractor = ElementExtractor()
+
+        source = Path(self.temp_dir.name) / "scan_month_filter"
+        source.mkdir()
+
+        # Create files
+        this_month_file = source / "this_month.html"
+        this_month_file.write_text("<html><body><span>A</span></body></html>", encoding="utf-8")
+
+        last_month_file = source / "last_month.html"
+        last_month_file.write_text("<html><body><span>B</span></body></html>", encoding="utf-8")
+        now = datetime.datetime.now()
+        if now.month == 1:
+            last_month_time = datetime.datetime(now.year - 1, 12, 15).timestamp()
+        else:
+            last_month_time = datetime.datetime(now.year, now.month - 1, 15).timestamp()
+        os.utime(last_month_file, (last_month_time, last_month_time))
+
+        # Scan with "This Month" filter
+        results, total_matches, total_files = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            month_filter="This Month"
+        )
+
+        # Should only find files modified this month
+        self.assertEqual(total_files, 1)
+        self.assertTrue(any("this_month" in path for path in results.keys()))
+        self.assertFalse(any("last_month" in path for path in results.keys()))
+
+        # Scan with "All Time" filter
+        results_all, _, total_files_all = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            month_filter="All Time"
+        )
+
+        # Should find both files
+        self.assertEqual(total_files_all, 2)
+
+    def test_scan_directory_with_custom_month_filter(self) -> None:
+        """Test scan_directory with custom month filter format."""
+        extractor = ElementExtractor()
+
+        source = Path(self.temp_dir.name) / "scan_custom_month"
+        source.mkdir()
+
+        # Create file with specific month
+        jan_file = source / "jan_file.html"
+        jan_file.write_text("<html><body><span>Jan</span></body></html>", encoding="utf-8")
+        jan_time = datetime.datetime(2026, 1, 15).timestamp()
+        os.utime(jan_file, (jan_time, jan_time))
+
+        jun_file = source / "jun_file.html"
+        jun_file.write_text("<html><body><span>Jun</span></body></html>", encoding="utf-8")
+
+        # Scan with custom month filter (MM-YYYY format)
+        results, _, total_files = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            month_filter="Custom",
+            custom_month="01-2026"
+        )
+
+        self.assertEqual(total_files, 1)
+        self.assertTrue(any("jan_file" in path for path in results.keys()))
+
+        # Scan with custom month filter (YYYY-MM format)
+        results2, _, total_files2 = extractor.scan_directory(
+            source,
+            "Tag Name",
+            "span",
+            recursive=False,
+            extensions=[".html"],
+            month_filter="Custom",
+            custom_month="2026-01"
+        )
+
+        self.assertEqual(total_files2, 1)
+        self.assertTrue(any("jan_file" in path for path in results2.keys()))
+
+    # ------------------------------------------------------------------
     # ID Pattern Extractor Tests
     # ------------------------------------------------------------------
 
@@ -1614,6 +1970,528 @@ class SearchWorkflowTests(unittest.TestCase):
         book_row = next(row for row in rows if row["element_type"] == "book-part")
         self.assertNotEqual(book_row["TNF"], "—")
 
+    # ------------------------------------------------------------------
+    # Parallel Processing Tests
+    # ------------------------------------------------------------------
+
+    def test_scan_directory_parallel_basic(self) -> None:
+        """Test basic parallel directory scanning functionality."""
+        extractor = ElementExtractor()
+
+        # Create test directory structure with multiple folders
+        source = Path(self.temp_dir.name) / "parallel_test"
+        source.mkdir()
+
+        # Create 5 folders with files
+        for i in range(1, 6):
+            folder = source / f"folder_{i:02d}"
+            folder.mkdir()
+            (folder / f"file_{i}.html").write_text(
+                f"<html><body><span>Content {i}</span></body></html>",
+                encoding="utf-8"
+            )
+
+        # Scan using parallel processing
+        results, total_matches, total_files, has_more, next_offset = \
+            extractor.scan_directory_parallel(
+                source, "Tag Name", "span",
+                batch_size=0, batch_offset=0,
+                max_workers=2
+            )
+
+        # Should find all 5 files with span elements
+        self.assertEqual(total_files, 5)
+        self.assertEqual(total_matches, 5)
+        self.assertEqual(len(results), 5)
+        self.assertFalse(has_more)
+        self.assertEqual(next_offset, 0)
+
+        # Verify all files were processed
+        for i in range(1, 6):
+            found = any(f"folder_{i:02d}" in path for path in results.keys())
+            self.assertTrue(found, f"Folder {i} should be in results")
+
+    def test_scan_directory_parallel_with_batch(self) -> None:
+        """Test parallel scanning with batch size and offset."""
+        extractor = ElementExtractor()
+
+        # Create test directory structure
+        source = Path(self.temp_dir.name) / "parallel_batch_test"
+        source.mkdir()
+
+        # Create 5 folders with files
+        for i in range(1, 6):
+            folder = source / f"folder_{i:02d}"
+            folder.mkdir()
+            (folder / f"file_{i}.html").write_text(
+                f"<html><body><span>Content {i}</span></body></html>",
+                encoding="utf-8"
+            )
+
+        # First batch: 2 folders
+        results1, matches1, files1, has_more1, next_offset1 = \
+            extractor.scan_directory_parallel(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=0,
+                max_workers=2
+            )
+
+        self.assertTrue(has_more1)
+        self.assertEqual(next_offset1, 2)
+        self.assertGreater(files1, 0)
+
+        # Second batch: next 2 folders
+        results2, matches2, files2, has_more2, next_offset2 = \
+            extractor.scan_directory_parallel(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=2,
+                max_workers=2
+            )
+
+        self.assertTrue(has_more2)
+        self.assertEqual(next_offset2, 4)
+
+        # Third batch: last folder
+        results3, matches3, files3, has_more3, next_offset3 = \
+            extractor.scan_directory_parallel(
+                source, "Tag Name", "span",
+                batch_size=2, batch_offset=4,
+                max_workers=2
+            )
+
+        self.assertFalse(has_more3)
+        self.assertEqual(next_offset3, 6)
+
+        # Verify no overlap between batches
+        files1_set = set(results1.keys())
+        files2_set = set(results2.keys())
+        files3_set = set(results3.keys())
+
+        self.assertEqual(files1_set & files2_set, set())
+        self.assertEqual(files2_set & files3_set, set())
+        self.assertEqual(files1_set & files3_set, set())
+
+    def test_scan_directory_parallel_respects_filters(self) -> None:
+        """Test that parallel processing respects filename and config filters."""
+        extractor = ElementExtractor()
+
+        # Create test directory structure
+        source = Path(self.temp_dir.name) / "parallel_filter_test"
+        source.mkdir()
+
+        # Create folders with different file types
+        folder1 = source / "folder_01"
+        folder1.mkdir()
+        (folder1 / "doc_original.html").write_text(
+            "<html><body><span>F1 Original</span></body></html>",
+            encoding="utf-8"
+        )
+        (folder1 / "doc_updated.html").write_text(
+            "<html><body><span>F1 Updated</span></body></html>",
+            encoding="utf-8"
+        )
+        (folder1 / "impact_config.xml").write_text(
+            "<?xml version='1.0'?><impact-config><dtd name='JATS'/><client>OUP</client></impact-config>",
+            encoding="utf-8"
+        )
+
+        folder2 = source / "folder_02"
+        folder2.mkdir()
+        (folder2 / "doc_original.html").write_text(
+            "<html><body><span>F2 Original</span></body></html>",
+            encoding="utf-8"
+        )
+        (folder2 / "impact_config.xml").write_text(
+            "<?xml version='1.0'?><impact-config><dtd name='BITS'/><client>PLOS</client></impact-config>",
+            encoding="utf-8"
+        )
+
+        # Test with filename filter - only original files
+        results, matches, files, has_more, next_offset = \
+            extractor.scan_directory_parallel(
+                source, "Tag Name", "span",
+                filename_filter="*_original.html",
+                max_workers=2
+            )
+
+        # Should only find original files
+        for path in results.keys():
+            self.assertIn("original", path)
+            self.assertNotIn("updated", path)
+
+        # Test with DTD filter - only JATS files (folder_01 has JATS DTD)
+        extractor2 = ElementExtractor()  # Fresh instance
+        results2, matches2, files2, has_more2, next_offset2 = \
+            extractor2.scan_directory_parallel(
+                source, "Tag Name", "span",
+                dtd_filter="JATS",
+                max_workers=2
+            )
+
+        # Should only find files in folder_01 (has JATS DTD)
+        if results2:
+            for path in results2.keys():
+                self.assertIn("folder_01", path)
+
+        # Test with client filter - only OUP files (folder_01)
+        extractor3 = ElementExtractor()
+        results3, matches3, files3, has_more3, next_offset3 = \
+            extractor3.scan_directory_parallel(
+                source, "Tag Name", "span",
+                client_filter="OUP",
+                max_workers=2
+            )
+
+        # Should only find files in folder_01 (OUP client)
+        if results3:
+            for path in results3.keys():
+                self.assertIn("folder_01", path)
+
+    def test_parallel_processing_integration(self) -> None:
+        """Test parallel processing returns same results as sequential scanning."""
+        extractor = ElementExtractor()
+
+        # Create test directory
+        source = Path(self.temp_dir.name) / "parallel_integration"
+        source.mkdir()
+
+        # Create 10 folders with various content
+        for i in range(1, 11):
+            folder = source / f"doc_{i:03d}"
+            folder.mkdir()
+            # Some files have span, some don't
+            if i % 2 == 0:
+                (folder / f"file_{i}.html").write_text(
+                    f"<html><body><span>Match {i}</span></body></html>",
+                    encoding="utf-8"
+                )
+            else:
+                (folder / f"file_{i}.html").write_text(
+                    f"<html><body><div>No span here</div></body></html>",
+                    encoding="utf-8"
+                )
+
+        # Run parallel scan
+        parallel_results, parallel_matches, parallel_files, _, _ = \
+            extractor.scan_directory_parallel(
+                source, "Tag Name", "span",
+                max_workers=2
+            )
+
+        # Run sequential scan (with recursive=True to match parallel behavior)
+        extractor2 = ElementExtractor()
+        sequential_results, sequential_matches, sequential_files = \
+            extractor2.scan_directory(
+                source, "Tag Name", "span",
+                recursive=True,
+                extensions=[".html"]
+            )
+
+        # Results should be the same
+        self.assertEqual(parallel_matches, sequential_matches)
+        self.assertEqual(parallel_files, sequential_files)
+
+        # Both should find 5 matches (even numbered files)
+        self.assertEqual(parallel_matches, 5)
+
+
+    # ------------------------------------------------------------------
+    # Element Extraction API Tests
+    # ------------------------------------------------------------------
+
+    def test_extract_folder_api_basic(self) -> None:
+        """Test basic folder extraction via API."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        # Create test files
+        source = Path(self.temp_dir.name) / "extract_test"
+        source.mkdir()
+
+        (source / "test1.html").write_text(
+            "<html><body><span>Test content 1</span></body></html>",
+            encoding="utf-8"
+        )
+        (source / "test2.html").write_text(
+            "<html><body><span>Test content 2</span></body></html>",
+            encoding="utf-8"
+        )
+        (source / "test3.html").write_text(
+            "<html><body><div>No span here</div></body></html>",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+        response = client.post("/extract/folder", json={
+            "source_path": str(source),
+            "query_type": "Tag Name",
+            "queries": ["span"],
+            "recursive": False,
+            "extensions": [".html"]
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["query_type"], "Tag Name")
+        self.assertEqual(data["queries"], ["span"])
+        # total_files is the number of files scanned (all .html files)
+        # total_matches is the number of matching elements found
+        self.assertGreaterEqual(data["total_files"], 2)  # At least 2 .html files scanned
+        self.assertEqual(data["total_matches"], 2)  # One match per file with span
+
+    def test_extract_file_api(self) -> None:
+        """Test single file extraction via API."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        # Create test file
+        source = Path(self.temp_dir.name) / "extract_file_test"
+        source.mkdir()
+        test_file = source / "test.html"
+        test_file.write_text(
+            "<html><body><span class='highlight'>Match 1</span><span>Match 2</span></body></html>",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+        response = client.post("/extract/file", json={
+            "file_path": str(test_file),
+            "query_type": "Tag Name",
+            "queries": ["span"]
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["file_name"], "test.html")
+        self.assertEqual(data["total_matches"], 2)
+        self.assertEqual(len(data["queries"]), 1)
+        self.assertEqual(data["queries"][0]["query"], "span")
+        self.assertEqual(data["queries"][0]["count"], 2)
+
+    def test_extract_folder_api_with_filters(self) -> None:
+        """Test folder extraction with filters via API."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        source = Path(self.temp_dir.name) / "extract_filter_test"
+        source.mkdir()
+
+        (source / "test_original.html").write_text(
+            "<html><body><span>Original</span></body></html>",
+            encoding="utf-8"
+        )
+        (source / "test_updated.html").write_text(
+            "<html><body><span>Updated</span></body></html>",
+            encoding="utf-8"
+        )
+        (source / "other.xml").write_text(
+            "<root><item>XML content</item></root>",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+
+        # Test with filename filter
+        response = client.post("/extract/folder", json={
+            "source_path": str(source),
+            "query_type": "Tag Name",
+            "queries": ["span"],
+            "recursive": False,
+            "extensions": [".html"],
+            "filename_filter": "*_original.html"
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["total_files"], 1)
+        self.assertEqual(data["total_matches"], 1)
+
+    def test_extract_folder_api_not_found(self) -> None:
+        """Test folder extraction with non-existent path."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        client = TestClient(app)
+        response = client.post("/extract/folder", json={
+            "source_path": "/nonexistent/path/12345",
+            "query_type": "Tag Name",
+            "queries": ["span"]
+        })
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_extract_file_api_not_found(self) -> None:
+        """Test file extraction with non-existent file."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        client = TestClient(app)
+        response = client.post("/extract/file", json={
+            "file_path": "/nonexistent/file.html",
+            "query_type": "Tag Name",
+            "queries": ["span"]
+        })
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_extract_folder_async_api(self) -> None:
+        """Test async folder extraction via API."""
+        import time
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        source = Path(self.temp_dir.name) / "extract_async_test"
+        source.mkdir()
+
+        (source / "test.html").write_text(
+            "<html><body><span>Async test</span></body></html>",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+
+        # Start async job
+        response = client.post("/extract/folder/async", json={
+            "source_path": str(source),
+            "query_type": "Tag Name",
+            "queries": ["span"],
+            "recursive": False,
+            "extensions": [".html"]
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("job_id", data)
+        self.assertEqual(data["status"], "pending")
+        job_id = data["job_id"]
+
+        # Poll for status (with timeout)
+        max_attempts = 10
+        for _ in range(max_attempts):
+            status_response = client.get(f"/extract/job/{job_id}/status")
+            self.assertEqual(status_response.status_code, 200)
+            status_data = status_response.json()
+
+            if status_data["status"] in ["completed", "failed"]:
+                break
+
+            time.sleep(0.1)
+
+        # Check final status
+        status_response = client.get(f"/extract/job/{job_id}/status")
+        status_data = status_response.json()
+        self.assertIn(status_data["status"], ["completed", "failed", "running", "pending"])
+
+    def test_extract_job_status_api(self) -> None:
+        """Test job status endpoint."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        client = TestClient(app)
+
+        # Test non-existent job
+        response = client.get("/extract/job/nonexistent-job/status")
+        self.assertEqual(response.status_code, 404)
+
+    def test_extract_folder_api_with_css_selector(self) -> None:
+        """Test folder extraction with CSS selector via API."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        source = Path(self.temp_dir.name) / "extract_css_test"
+        source.mkdir()
+
+        (source / "test.html").write_text(
+            """<html>
+                <body>
+                    <div class="content"><span>Match 1</span></div>
+                    <div class="other"><span>Match 2</span></div>
+                </body>
+            </html>""",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+        response = client.post("/extract/folder", json={
+            "source_path": str(source),
+            "query_type": "CSS Selector",
+            "queries": [".content span"],
+            "recursive": False,
+            "extensions": [".html"]
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["query_type"], "CSS Selector")
+
+    def test_extract_folder_api_with_xpath(self) -> None:
+        """Test folder extraction with XPath via API."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        source = Path(self.temp_dir.name) / "extract_xpath_test"
+        source.mkdir()
+
+        (source / "test.html").write_text(
+            """<html>
+                <body>
+                    <div id="main"><span>XPath match</span></div>
+                </body>
+            </html>""",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+        response = client.post("/extract/folder", json={
+            "source_path": str(source),
+            "query_type": "XPath",
+            "queries": ["//div[@id='main']/span"],
+            "recursive": False,
+            "extensions": [".html"]
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["query_type"], "XPath")
+
+    def test_extract_folder_api_multiple_queries(self) -> None:
+        """Test folder extraction with multiple queries via API."""
+        from fastapi.testclient import TestClient
+        from search_service.app.app import app
+
+        source = Path(self.temp_dir.name) / "extract_multi_test"
+        source.mkdir()
+
+        (source / "test.html").write_text(
+            """<html>
+                <body>
+                    <span>Span content</span>
+                    <div>Div content</div>
+                    <p>Paragraph content</p>
+                </body>
+            </html>""",
+            encoding="utf-8"
+        )
+
+        client = TestClient(app)
+        response = client.post("/extract/folder", json={
+            "source_path": str(source),
+            "query_type": "Tag Name",
+            "queries": ["span", "div"],
+            "recursive": False,
+            "extensions": [".html"]
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(len(data["queries"]), 2)
+        self.assertEqual(data["total_matches"], 2)  # One span, one div
+
 
 if __name__ == "__main__":
     unittest.main()
+

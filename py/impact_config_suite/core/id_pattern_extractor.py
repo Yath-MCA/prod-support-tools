@@ -25,7 +25,7 @@ class IDPatternExtractor:
     def _load_profiles(self, profiles_path: Optional[Path] = None) -> dict:
         """Load area profiles from JSON configuration."""
         if profiles_path is None:
-            profiles_path = Path(__file__).parent.parent / "id_pattern_profiles.json"
+            profiles_path = Path(__file__).parent.parent / "config" / "id_pattern_profiles.json"
         try:
             with open(profiles_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -1268,3 +1268,4 @@ class IDPatternExtractor:
             "rows": rows,
             "element_count": len(element_details)
         }
+

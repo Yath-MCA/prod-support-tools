@@ -472,6 +472,7 @@ class ImpactToCEGProcessor(PGMProcessor):
 
         module_dir = os.path.dirname(__file__)
         package_root = os.path.dirname(module_dir)
+        candidates.append(os.path.join(package_root, 'config', 'impact_to_ceg.json'))
         candidates.append(os.path.join(package_root, 'impact_to_ceg.json'))
         candidates.append(os.path.join(module_dir, 'impact_to_ceg.json'))
         candidates.append(os.path.join(os.getcwd(), 'impact_to_ceg.json'))
@@ -510,3 +511,6 @@ class ImpactToCEGProcessor(PGMProcessor):
                 continue
             cleaned.append(char)
         return ''.join(cleaned)
+
+
+
