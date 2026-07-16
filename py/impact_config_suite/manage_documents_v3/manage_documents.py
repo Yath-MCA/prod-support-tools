@@ -6,6 +6,7 @@ Modes:
     folder      - Organize files into per-document folders
     download    - Download config XML files from backend
     compare     - Run XML comparison for all documents
+    dtd-organize - Move document folders into JATS/BITS by impact_config.xml DTD
     report      - Generate summary reports (HTML, CSV)
     complete    - Run complete workflow (all steps)
 
@@ -18,6 +19,9 @@ import argparse
 import sys
 from pathlib import Path
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 # Import modules
 from manage_documents_v3.modules.database import DocumentDatabase
 from manage_documents_v3.modules.scanner import DocumentScanner
@@ -25,6 +29,7 @@ from manage_documents_v3.modules.organizer import FolderOrganizer
 from manage_documents_v3.modules.downloader import ConfigDownloader
 from manage_documents_v3.modules.comparer import CompareManager
 from manage_documents_v3.modules.reporter import ReportManager
+from manage_documents_v3.modules.dtd_organizer import DTDOrganizer
 from manage_documents_v3 import config
 
 # Import CompareOptions for comparison mode
@@ -106,6 +111,23 @@ def compare_command(project_path: Path) -> int:
     print(f"  Failed: {failed}")
     
     return 0 if failed == 0 else 1
+
+
+def dtd_organize_command(project_path: Path) -> int:
+    """Execute internal DTD-based organization command."""
+    print(f"\nOrganizing document folders by DTD in: {project_path}")
+
+    db = DocumentDatabase(project_path)
+    organizer = DTDOrganizer(db, log_callback=print)
+    moved, skipped, failed, unknown = organizer.organize_by_dtd()
+
+    print(f"\nDTD organization complete.")
+    print(f"  Moved: {moved}")
+    print(f"  Skipped: {skipped}")
+    print(f"  Failed: {failed}")
+    print(f"  Unknown DTD: {unknown}")
+
+    return 0 if failed == 0 and unknown == 0 else 1
 
 
 def report_command(project_path: Path) -> int:
@@ -195,6 +217,7 @@ Modes:
   scan      - Scan source folders and build documents.json database
   folder    - Organize files into per-document folders
   download  - Download config XML files from backend
+  dtd-organize - Move document folders into JATS/BITS by impact_config.xml DTD
   compare   - Run XML comparison for all documents
   report    - Generate HTML and CSV summary reports
   complete  - Run complete workflow (all steps above)
@@ -212,7 +235,7 @@ Examples:
     )
     parser.add_argument(
         "mode",
-        choices=["scan", "folder", "download", "compare", "report", "complete"],
+        choices=["scan", "folder", "download", "dtd-organize", "compare", "report", "complete"],
         help="Operation mode",
     )
     parser.add_argument(
@@ -239,6 +262,7 @@ Examples:
         "scan": lambda p: scan_command(p, args.batch_size),
         "folder": folder_command,
         "download": download_command,
+        "dtd-organize": dtd_organize_command,
         "compare": compare_command,
         "report": report_command,
         "complete": complete_command,

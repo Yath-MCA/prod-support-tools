@@ -301,7 +301,7 @@ When using Folder Scan mode, additional filters and processing options are avail
 |--------|-------------|
 | **Recursive Search** | Include subdirectories |
 | **Extensions** | File types to scan (default: .xml, .html, .htm, .xhtml) |
-| **Filename Filter** | Match specific filename patterns |
+| **Filename Filter** | Match specific filename patterns (`*_original.html`, `*_updated.html`, `*_original.xml`, or None) |
 | **DTD Filter** | Filter by DTD type (requires impact_config.xml) |
 | **Client Filter** | Filter by client (requires impact_config.xml) |
 | **Month Filter** | Filter by file modification date (All Time, This Month, Last Month, Custom) |

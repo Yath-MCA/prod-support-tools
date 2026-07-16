@@ -30,6 +30,8 @@ class ElementExtractorTab(ttk.Frame):
         self.cancelled = False
         self.last_report_path = None
         self.last_summary_report_path = None
+        self.last_citation_report_path = None
+        self.last_entire_citation_report_path = None
         self.last_csv_path = None
         self.history_entries = self._load_history_entries()
         self.filtered_history_entries = list(self.history_entries)
@@ -297,7 +299,7 @@ class ElementExtractorTab(ttk.Frame):
         self.filename_filter_combo = ttk.Combobox(
             options_frame,
             textvariable=self.filename_filter_var,
-            values=["*_original.html", "*_updated.html", "*._original.xml", "None"],
+            values=["*_original.html", "*_updated.html", "*_original.xml", "None"],
             state="readonly",
             width=18,
             font=("Segoe UI", 9),
@@ -526,8 +528,11 @@ class ElementExtractorTab(ttk.Frame):
             bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
         ).grid(row=9, column=0, sticky="w", pady=5)
 
-        report_options_frame = tk.Frame(settings_frame, bg="#1e293b")
-        report_options_frame.grid(row=9, column=1, columnspan=2, sticky="ew", pady=5)
+        report_options_outer = tk.Frame(settings_frame, bg="#1e293b")
+        report_options_outer.grid(row=9, column=1, columnspan=2, sticky="ew", pady=5)
+
+        report_options_frame = tk.Frame(report_options_outer, bg="#1e293b")
+        report_options_frame.pack(anchor="w")
 
         self.show_outer_xml_var = tk.BooleanVar(value=True)
         self.show_outer_xml_chk = tk.Checkbutton(
@@ -572,6 +577,38 @@ class ElementExtractorTab(ttk.Frame):
             font=("Segoe UI", 9)
         )
         self.copy_matched_files_chk.pack(side="left")
+
+        report_options_frame2 = tk.Frame(report_options_outer, bg="#1e293b")
+        report_options_frame2.pack(anchor="w", pady=(6, 0))
+
+        self.citation_type_report_var = tk.BooleanVar(value=False)
+        self.citation_type_report_chk = tk.Checkbutton(
+            report_options_frame2,
+            text="Citation type report (cite pattern)",
+            variable=self.citation_type_report_var,
+            command=self._on_citation_type_toggle,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.citation_type_report_chk.pack(side="left")
+
+        tk.Label(
+            report_options_frame2,
+            text="Cite type:",
+            bg="#1e293b", fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).pack(side="left", padx=(16, 6))
+
+        self.citation_cite_type_var = tk.StringVar(value="bibr")
+        self.citation_cite_type_combo = ttk.Combobox(
+            report_options_frame2,
+            textvariable=self.citation_cite_type_var,
+            values=list(ElementExtractor.CITE_TYPE_PRESETS),
+            width=14,
+            state="disabled",
+        )
+        self.citation_cite_type_combo.pack(side="left")
 
         # Report Organization Section
         tk.Label(
@@ -823,6 +860,12 @@ class ElementExtractorTab(ttk.Frame):
             self.attr_val_entry.config(state="disabled", bg="#1e293b")
             self.attr_filter_lbl.config(fg="#475569")
 
+    def _on_citation_type_toggle(self):
+        """Enable cite-type combobox only when citation report is checked."""
+        enabled = bool(self.citation_type_report_var.get())
+        # ttk Combobox: use 'normal' for editable presets, 'disabled' when off
+        self.citation_cite_type_combo.config(state="normal" if enabled else "disabled")
+
     def _on_month_filter_change(self, event=None):
         is_custom = self.month_filter_var.get() == "Custom"
         state = "normal" if is_custom else "disabled"
@@ -1054,6 +1097,9 @@ class ElementExtractorTab(ttk.Frame):
         self.show_inner_text_var.set(bool(entry.get("show_inner_text", True)))
         self.generate_csv_var.set(bool(entry.get("generate_csv", True)))
         self.copy_matched_files_var.set(bool(entry.get("copy_matched_files", False)))
+        self.citation_type_report_var.set(bool(entry.get("citation_type_report", False)))
+        self.citation_cite_type_var.set(str(entry.get("citation_cite_type", "bibr") or "bibr").strip() or "bibr")
+        self._on_citation_type_toggle()
         # Restore batch state for Next Batch button
         params = entry.get("params", {})
         if params.get("has_more_batches") and params.get("next_batch_offset"):
@@ -1145,6 +1191,8 @@ class ElementExtractorTab(ttk.Frame):
             "show_inner_text": bool(self.show_inner_text_var.get()),
             "generate_csv": bool(self.generate_csv_var.get()),
             "copy_matched_files": bool(self.copy_matched_files_var.get()),
+            "citation_type_report": bool(self.citation_type_report_var.get()),
+            "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
             "params": {
                 "mode": self.mode_var.get().strip(),
                 "query_type": self.selector_type_var.get().strip(),
@@ -1172,6 +1220,8 @@ class ElementExtractorTab(ttk.Frame):
                 "show_inner_text": bool(self.show_inner_text_var.get()),
                 "generate_csv": bool(self.generate_csv_var.get()),
                 "copy_matched_files": bool(self.copy_matched_files_var.get()),
+                "citation_type_report": bool(self.citation_type_report_var.get()),
+                "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
                 "summary_report_path": summary_report_path,
                 "csv_path": csv_path,
                 "copied_files_count": copied_files_count,
@@ -1298,6 +1348,8 @@ class ElementExtractorTab(ttk.Frame):
             show_outer_xml = bool(self.show_outer_xml_var.get())
             show_inner_text = bool(self.show_inner_text_var.get())
             generate_csv = bool(self.generate_csv_var.get())
+            citation_type_report = bool(self.citation_type_report_var.get())
+            citation_cite_type = self.citation_cite_type_var.get().strip() or "bibr"
 
             # Batch processing options
             is_batch_mode = self.batch_mode_var.get() if mode == "Folder Scan" else False
@@ -1324,7 +1376,7 @@ class ElementExtractorTab(ttk.Frame):
             if query_type == "Tag Name" and attr_name:
                 self._log(f"  Attr Filter:   {attr_name} = '{attr_val}'")
             copy_matched_files = bool(self.copy_matched_files_var.get())
-            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}")
+            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type})")
 
             # Parallel and batch mode logging
             batch_has_more = False
@@ -1628,6 +1680,72 @@ class ElementExtractorTab(ttk.Frame):
             self.last_summary_report_path = str(summary_report_path.absolute())
             self._log(f"📊 Summary report saved: {run_folder_name}/{summary_report_name}")
 
+            # Generate citation type (direct/indirect) report if enabled
+            citation_report_path = ""
+            entire_citation_report_path = ""
+            if citation_type_report:
+                self.status_var.set("Generating citation type report...")
+                cite_slug = re.sub(r"[^\w\-]+", "_", citation_cite_type.lower()) or "bibr"
+                self._log(
+                    f"\n📑 Scanning citations for cite type '{citation_cite_type}' "
+                    f"(ref-type | object-type | data-role)..."
+                )
+
+                recursive = bool(self.recursive_var.get()) if not is_single else False
+                ext_str = self.extensions_var.get()
+                filename_filter = self.filename_filter_var.get().strip()
+                dtd_filter = self.dtd_filter_var.get().strip()
+                client_filter = self.client_filter_var.get().strip()
+                month_filter = self.month_filter_var.get().strip() or "All Time"
+                custom_month = self.custom_month_var.get().strip()
+                extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+                if not extensions:
+                    extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                bibr_scan_results, bibr_total_matches, bibr_total_files = self.extractor.scan_bibr_citations(
+                    source_path,
+                    recursive=recursive,
+                    extensions=extensions,
+                    filename_filter=filename_filter if not is_single else None,
+                    dtd_filter=dtd_filter if not is_single else None,
+                    client_filter=client_filter if not is_single else None,
+                    month_filter=month_filter if not is_single else "All Time",
+                    custom_month=custom_month if not is_single else "",
+                    cite_type=citation_cite_type,
+                )
+
+                citation_html = self.extractor.generate_citation_type_report(
+                    str(source_path), bibr_scan_results, bibr_total_matches, bibr_total_files,
+                    cite_type=citation_cite_type,
+                )
+                citation_report_name = f"Citation_Type_Report_{cite_slug}_{safe_target_name}_{ts}.html"
+                citation_report_file = run_folder / citation_report_name
+                with open(citation_report_file, "w", encoding="utf-8") as f:
+                    f.write(citation_html)
+
+                citation_report_path = str(citation_report_file.absolute())
+                self.last_citation_report_path = citation_report_path
+                self._log(
+                    f"📑 Citation type report saved: {run_folder_name}/{citation_report_name} "
+                    f"({bibr_total_matches} citation(s) in {bibr_total_files} file(s))"
+                )
+
+                self.status_var.set("Generating entire citation report...")
+                entire_html = self.extractor.generate_entire_citation_report(
+                    str(source_path), bibr_scan_results, bibr_total_matches, bibr_total_files,
+                    cite_type=citation_cite_type,
+                )
+                entire_report_name = f"Entire_Citation_Report_{cite_slug}_{safe_target_name}_{ts}.html"
+                entire_report_file = run_folder / entire_report_name
+                with open(entire_report_file, "w", encoding="utf-8") as f:
+                    f.write(entire_html)
+
+                entire_citation_report_path = str(entire_report_file.absolute())
+                self.last_entire_citation_report_path = entire_citation_report_path
+                self._log(
+                    f"📑 Entire citation report saved: {run_folder_name}/{entire_report_name}"
+                )
+
             # Generate and save CSV if enabled
             csv_path = ""
             if generate_csv:
@@ -1736,6 +1854,10 @@ class ElementExtractorTab(ttk.Frame):
             # Auto-open detailed report if checked
             if self.open_report_var.get():
                 webbrowser.open(f"file:///{self.last_report_path}")
+                if citation_type_report and citation_report_path:
+                    webbrowser.open(f"file:///{citation_report_path}")
+                if citation_type_report and entire_citation_report_path:
+                    webbrowser.open(f"file:///{entire_citation_report_path}")
 
         except Exception as e:
             self._log(f"\n❌ Error during extraction:\n{str(e)}")

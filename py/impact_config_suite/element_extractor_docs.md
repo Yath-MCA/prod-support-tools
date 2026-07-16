@@ -74,7 +74,7 @@ Specify which file types to scan (default: `.xml, .html, .htm, .xhtml`)
 Filter files by name pattern:
 - `*_original.html` - Files ending with "_original.html"
 - `*_updated.html` - Files ending with "_updated.html"
-- `*._original.xml` - XML files ending with "._original.xml"
+- `*_original.xml` - XML originals ending with "_original.xml" (also accepts legacy "._original.xml")
 - `None` - No filename filter
 
 #### DTD Filter

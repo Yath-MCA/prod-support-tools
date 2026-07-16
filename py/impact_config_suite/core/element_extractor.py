@@ -9,7 +9,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 from lxml import etree
 
 # Suppress warnings when parsing XML files using HTML parsers
@@ -163,9 +163,14 @@ class ElementExtractor:
         if lowered_filter == "*_updated.html":
             stem = Path(file_name).stem
             return bool(re.fullmatch(r"[^_]+_updated", stem, flags=re.IGNORECASE))
-        if lowered_filter == "*._original.xml":
+        # IMPACT originals: DOCID_original.xml (e.g. N20001_original.xml,
+        # TNF_Book_001_original.xml). Also accept legacy name._original.xml.
+        if lowered_filter in ("*_original.xml", "*._original.xml"):
             stem = Path(file_name).stem
-            return bool(re.fullmatch(r"[^.]+\._original", stem, flags=re.IGNORECASE))
+            return bool(
+                re.fullmatch(r".+_original", stem, flags=re.IGNORECASE)
+                or re.fullmatch(r"[^.]+\._original", stem, flags=re.IGNORECASE)
+            )
 
         return fnmatch.fnmatchcase(lowered_name, lowered_filter)
 
@@ -2571,6 +2576,1492 @@ class ElementExtractor:
 </html>
 """
         return pattern_html
+
+    # ------------------------------------------------------------------
+    # Bibliographic citation type (direct / indirect) helpers
+    # ------------------------------------------------------------------
+
+    CITE_TYPE_PRESETS = [
+        "All",
+        "bibr",
+        "fig",
+        "table",
+        "table-wrap",
+        "chapter",
+        "equation",
+        "endnote",
+        "fn",
+        "sec",
+        "boxed-text",
+    ]
+    BIBR_SELECTOR = '[data-role="bibr"]'  # legacy alias; prefer cite_type APIs
+    _PAGE_PP_RE = re.compile(r",\s*pp\.\s*[\d]+", re.IGNORECASE)
+    _PAGE_P_RE = re.compile(r",\s*p\.\s*[\d]+", re.IGNORECASE)
+    _YEAR_IN_PARENS_RE = re.compile(r"\(\s*(?:18|19|20)\d{2}")
+    _AUTHOR_YEAR_COMMA_RE = re.compile(r",\s*(?:18|19|20)\d{2}")
+    _YEAR_BARE_RE = re.compile(r"(?:18|19|20)\d{2}")
+    _ND_RE = re.compile(r"\bn\.?\s*d\.?\b", re.IGNORECASE)
+    _ET_AL_RE = re.compile(r"\bet\s+al\.?\b", re.IGNORECASE)
+    _DUAL_AND_RE = re.compile(r"\band\b", re.IGNORECASE)
+    _POSSESSIVE_RE = re.compile(r"[\u2019']s\b")
+    _DIRECT_AUTHOR_YEAR_RE = re.compile(
+        r"^(.*?)\s*\(\s*([^)]+?)\s*\)\s*$", re.DOTALL
+    )
+    _COMMA_AUTHOR_YEAR_RE = re.compile(
+        r"^(.*?),\s*([^,]+)$", re.DOTALL
+    )
+    _BARE_AUTHOR_YEAR_RE = re.compile(
+        r"^(.*?)\s+((?:18|19|20)\d{2}[a-z]?|n\.?\s*d\.?)\s*$",
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    def resolve_cite_type(self, elem):
+        """
+        Resolve cite type from object-type, then ref-type, then data-role.
+        Returns (value_lower, source) or None.
+        """
+        attrs = getattr(elem, "attrs", None) or {}
+        for source in ("object-type", "ref-type", "data-role"):
+            val = attrs.get(source)
+            if isinstance(val, list):
+                val = " ".join(str(v) for v in val)
+            if val is None:
+                continue
+            text = str(val).strip()
+            if text:
+                return text.lower(), source
+        return None
+
+    def _normalize_cite_type_filter(self, cite_type: str) -> str:
+        """Return lowercase filter, or 'all' when empty/All."""
+        t = (cite_type or "bibr").strip()
+        if not t or t.lower() == "all":
+            return "all"
+        return t.lower()
+
+    def _iter_cite_candidates(self, soup):
+        """Yield unique xref / related-object / typed cite elements."""
+        seen = set()
+        selectors = [
+            "xref",
+            "a.xref",
+            '[data-name="related-object"]',
+            "[ref-type]",
+            "[object-type]",
+            "[data-role]",
+        ]
+        for sel in selectors:
+            try:
+                found = soup.select(sel)
+            except Exception:
+                continue
+            for elem in found:
+                eid = id(elem)
+                if eid in seen:
+                    continue
+                seen.add(eid)
+                yield elem
+
+    def cite_type_selector_label(self, cite_type: str) -> str:
+        """Human-readable selector description for reports."""
+        filtered = self._normalize_cite_type_filter(cite_type)
+        if filtered == "all":
+            return "ref-type | object-type | data-role (All)"
+        return f'ref-type|object-type|data-role = "{filtered}"'
+
+    def _sibling_text_left(self, elem, max_chars: int = 300) -> str:
+        """Collect text from previous siblings within the same parent."""
+        parts = []
+        total = 0
+        node = elem.previous_sibling
+        while node is not None and total < max_chars:
+            if isinstance(node, NavigableString):
+                t = str(node)
+            elif isinstance(node, Tag):
+                t = node.get_text()
+            else:
+                t = ""
+            parts.insert(0, t)
+            total += len(t)
+            node = node.previous_sibling
+        text = "".join(parts)
+        if len(text) > max_chars:
+            text = text[-max_chars:]
+        return text
+
+    def _sibling_text_right(self, elem, max_chars: int = 300) -> str:
+        """Collect text from following siblings within the same parent."""
+        parts = []
+        total = 0
+        node = elem.next_sibling
+        while node is not None and total < max_chars:
+            if isinstance(node, NavigableString):
+                t = str(node)
+            elif isinstance(node, Tag):
+                t = node.get_text()
+            else:
+                t = ""
+            parts.append(t)
+            total += len(t)
+            node = node.next_sibling
+        text = "".join(parts)
+        if len(text) > max_chars:
+            text = text[:max_chars]
+        return text
+
+    def _sibling_html_left(self, elem, max_chars: int = 500) -> str:
+        """Collect raw HTML/string from previous siblings."""
+        parts = []
+        total = 0
+        node = elem.previous_sibling
+        while node is not None and total < max_chars:
+            t = str(node)
+            parts.insert(0, t)
+            total += len(t)
+            node = node.previous_sibling
+        text = "".join(parts)
+        if len(text) > max_chars:
+            text = text[-max_chars:]
+        return text
+
+    def _sibling_html_right(self, elem, max_chars: int = 500) -> str:
+        """Collect raw HTML/string from following siblings."""
+        parts = []
+        total = 0
+        node = elem.next_sibling
+        while node is not None and total < max_chars:
+            t = str(node)
+            parts.append(t)
+            total += len(t)
+            node = node.next_sibling
+        text = "".join(parts)
+        if len(text) > max_chars:
+            text = text[:max_chars]
+        return text
+
+    def _is_inside_outer_parens(self, left: str, right: str) -> bool:
+        """True when an unmatched '(' to the left is closed somewhere to the right."""
+        last_open = left.rfind("(")
+        last_close = left.rfind(")")
+        if last_open > last_close:
+            return ")" in right
+        return False
+
+    def classify_bibr_citation(self, elem) -> str:
+        """
+        Classify a [data-role="bibr"] element as Direct, Indirect, or Unclassified.
+
+        Indirect: parentheses wrap the <a> outside the tag (parenthetical cite).
+        Direct: parentheses appear inside the <a> text (e.g. Author (Year)).
+        Unclassified: neither pattern.
+        """
+        left = self._sibling_text_left(elem)
+        right = self._sibling_text_right(elem)
+        if self._is_inside_outer_parens(left, right):
+            return "Indirect"
+        inner = elem.get_text() if hasattr(elem, "get_text") else str(elem)
+        if "(" in inner and ")" in inner:
+            return "Direct"
+        return "Unclassified"
+
+    def _indirect_subcategory(self, right_text: str) -> str:
+        """
+        Subclassify an Indirect citation by page suffix inside the wrap.
+        Returns: 'Indirect + pp.' | 'Indirect + p.' | 'Indirect'
+        """
+        close = right_text.find(")")
+        segment = right_text[:close] if close >= 0 else right_text
+        if self._PAGE_PP_RE.search(segment):
+            return "Indirect + pp."
+        if self._PAGE_P_RE.search(segment):
+            return "Indirect + p."
+        return "Indirect"
+
+    def _extract_entire_citation(self, elem) -> str:
+        """
+        Full parenthetical HTML unit from unmatched '(' through matching ')'.
+        For Direct/Unclassified (no outer wrap), returns the <a> outer HTML.
+        """
+        left_text = self._sibling_text_left(elem)
+        right_text = self._sibling_text_right(elem)
+        outer = str(elem)
+
+        if not self._is_inside_outer_parens(left_text, right_text):
+            return outer
+
+        left_html = self._sibling_html_left(elem)
+        right_html = self._sibling_html_right(elem)
+        open_idx = left_html.rfind("(")
+        if open_idx < 0:
+            return outer
+
+        prefix = left_html[open_idx:]
+        depth = prefix.count("(") - prefix.count(")")
+        pos = 0
+        while pos < len(right_html) and depth > 0:
+            ch = right_html[pos]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            pos += 1
+        suffix = right_html[:pos] if depth == 0 else right_html
+        return f"{prefix}{outer}{suffix}"
+
+    def _year_kind_from_token(self, token: str) -> str:
+        """Return 'Year', 'n.d.', or 'other' for a year-like token."""
+        t = (token or "").strip()
+        if not t:
+            return "other"
+        if re.match(r"^n\.?\s*d\.?$", t, re.IGNORECASE) or self._ND_RE.fullmatch(t):
+            return "n.d."
+        if re.match(r"^(?:18|19|20)\d{2}[a-z]?$", t, re.IGNORECASE):
+            return "Year"
+        if self._ND_RE.search(t):
+            return "n.d."
+        if self._YEAR_BARE_RE.search(t):
+            return "Year"
+        return "other"
+
+    def _split_author_year(self, text: str):
+        """
+        Split citation display text into (author_part, year_kind, form).
+        form: 'direct_parens' | 'comma' | 'bare' | 'none'
+        year_kind: 'Year' | 'n.d.' | 'other'
+        """
+        text = (text or "").strip()
+        if not text:
+            return "", "other", "none"
+
+        m = self._DIRECT_AUTHOR_YEAR_RE.match(text)
+        if m:
+            return m.group(1).strip(), self._year_kind_from_token(m.group(2)), "direct_parens"
+
+        m = self._COMMA_AUTHOR_YEAR_RE.match(text)
+        if m:
+            author = m.group(1).strip()
+            year_raw = m.group(2).strip()
+            # Drop trailing page-like noise if somehow present in link text
+            year_raw = re.split(r"\s*;\s*", year_raw)[0].strip()
+            return author, self._year_kind_from_token(year_raw), "comma"
+
+        m = self._BARE_AUTHOR_YEAR_RE.match(text)
+        if m:
+            return m.group(1).strip(), self._year_kind_from_token(m.group(2)), "bare"
+
+        return text, "other", "none"
+
+    def _detect_author_structure(self, author_part: str, left_text: str = "") -> str:
+        """
+        Detect author shape:
+          Possessive Author | Author et al. | Dual Author (&) |
+          Dual Author (and) | Single Author (multi-word) | Single Author
+        """
+        author = (author_part or "").strip()
+        left_tail = (left_text or "")[-40:]
+
+        if self._POSSESSIVE_RE.search(author) or self._POSSESSIVE_RE.search(left_tail):
+            return "Possessive Author"
+        if self._ET_AL_RE.search(author):
+            return "Author et al."
+        if "&" in author:
+            return "Dual Author (&)"
+        if self._DUAL_AND_RE.search(author):
+            return "Dual Author (and)"
+
+        tokens = [t for t in re.split(r"\s+", author) if t and t not in {",", ";"}]
+        if len(tokens) >= 2:
+            return "Single Author (multi-word)"
+        return "Single Author"
+
+    def citation_pattern_key(self, classification: str, subcategory: str,
+                             text: str, right_text: str = "",
+                             left_text: str = "") -> str:
+        """
+        Normalize a citation into a context-based pattern template for dedupe.
+
+        Examples:
+          Single Author (Year)
+          Single Author (multi-word), Year
+          Dual Author (&), Year
+          Dual Author (and) (Year)
+          Author et al., Year
+          Possessive Author (Year)
+          Dual Author (&), n.d.
+          Single Author, Year + p.
+        """
+        author, year_kind, form = self._split_author_year(text or "")
+        structure = self._detect_author_structure(author, left_text)
+
+        is_direct_form = (
+            classification == "Direct"
+            or (classification != "Indirect" and form == "direct_parens")
+        )
+
+        if year_kind == "n.d.":
+            year_label = "(n.d.)" if is_direct_form and classification == "Direct" else "n.d."
+        elif year_kind == "Year":
+            year_label = "(Year)" if classification == "Direct" else "Year"
+        else:
+            year_label = "other"
+
+        if classification == "Unclassified" and form == "bare":
+            if year_kind == "Year":
+                key = f"{structure} Year"
+            elif year_kind == "n.d.":
+                key = f"{structure} n.d."
+            else:
+                key = f"{structure} other"
+        elif classification == "Direct":
+            if year_label.startswith("("):
+                key = f"{structure} {year_label}"
+            else:
+                key = f"{structure} ({year_label})"
+        else:
+            # Indirect or Unclassified comma / other
+            if year_label.startswith("("):
+                year_label = year_label.strip("()")
+            if year_kind == "other" and form == "none":
+                key = "Other"
+            else:
+                key = f"{structure}, {year_label}"
+
+        if subcategory == "Indirect + p.":
+            key = f"{key} + p."
+        elif subcategory == "Indirect + pp.":
+            key = f"{key} + pp."
+
+        return key
+
+    def _build_bibr_snippet(self, elem, left_max: int = 80, right_max: int = 80) -> str:
+        """Raw HTML context: surrounding text + element outer HTML."""
+        left = self._sibling_text_left(elem, left_max)
+        right = self._sibling_text_right(elem, right_max)
+        return f"{left}{str(elem)}{right}"
+
+    def extract_bibr_citations(self, file_path: Path, cite_type: str = "bibr") -> list:
+        """
+        Extract and classify cite elements matching cite_type.
+
+        cite_type: specific value (bibr, fig, endnote, …) or 'all' / 'All'.
+        Match uses object-type, then ref-type, then data-role.
+
+        Returns list of dicts including cite_type, cite_type_source, classification, etc.
+        """
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File {file_path} does not exist.")
+
+        type_filter = self._normalize_cite_type_filter(cite_type)
+
+        try:
+            with open(file_path, "rb") as f:
+                content_bytes = f.read()
+        except Exception as e:
+            raise Exception(f"Failed to read file {file_path.name}: {str(e)}")
+
+        try:
+            content_str = content_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            content_str = content_bytes.decode("latin-1", errors="ignore")
+
+        is_xml = file_path.suffix.lower() == ".xml"
+        parser_backend = "lxml-xml" if is_xml else "lxml"
+        soup = BeautifulSoup(content_str, parser_backend)
+
+        results = []
+        for index, elem in enumerate(self._iter_cite_candidates(soup)):
+            resolved = self.resolve_cite_type(elem)
+            if resolved is None:
+                continue
+            resolved_type, resolved_source = resolved
+            if type_filter != "all" and resolved_type != type_filter:
+                continue
+
+            line_num = getattr(elem, "sourceline", None) or (index + 1)
+            tag_name = elem.name or "element"
+            attributes = {}
+            for k, v in elem.attrs.items():
+                if isinstance(v, list):
+                    attributes[k] = " ".join(v)
+                else:
+                    attributes[k] = str(v)
+
+            text_content = elem.get_text().strip()
+            outer_html = str(elem)
+            left = self._sibling_text_left(elem)
+            right = self._sibling_text_right(elem)
+            classification = self.classify_bibr_citation(elem)
+            if classification == "Indirect":
+                subcategory = self._indirect_subcategory(right)
+            else:
+                subcategory = classification
+            snippet = self._build_bibr_snippet(elem)
+            entire_citation = self._extract_entire_citation(elem)
+            pattern_key = self.citation_pattern_key(
+                classification, subcategory, text_content, right, left
+            )
+
+            results.append({
+                "line": line_num,
+                "tag": tag_name,
+                "attributes": attributes,
+                "text": text_content,
+                "html": outer_html,
+                "classification": classification,
+                "subcategory": subcategory,
+                "snippet": snippet,
+                "entire_citation": entire_citation,
+                "pattern_key": pattern_key,
+                "cite_type": resolved_type,
+                "cite_type_source": resolved_source,
+                "left_text": left,
+                "right_text": right,
+            })
+        return results
+
+    def scan_bibr_citations(self, path: Path, recursive: bool = False,
+                            extensions: list = None, filename_filter: str = None,
+                            dtd_filter: str = None, client_filter: str = None,
+                            month_filter: str = "All Time", custom_month: str = "",
+                            progress_callback=None, cite_type: str = "bibr"):
+        """
+        Scan a file or directory for citations matching cite_type and classify each.
+        Returns (scan_results, total_matches, total_files) in the same shape
+        as scan_directory.
+        """
+        path = Path(path)
+        if path.is_file():
+            try:
+                matches = self.extract_bibr_citations(path, cite_type=cite_type)
+                scan_results = {
+                    str(path.absolute()): {"ok": True, "matches": matches}
+                }
+                return scan_results, len(matches), 1
+            except Exception as e:
+                scan_results = {
+                    str(path.absolute()): {
+                        "ok": False,
+                        "error": str(e),
+                        "matches": [],
+                    }
+                }
+                return scan_results, 0, 1
+
+        if not path.is_dir():
+            raise NotADirectoryError(f"'{path}' is not a valid file or directory.")
+
+        if not extensions:
+            extensions = [".xml", ".html", ".htm", ".xhtml"]
+
+        glob_pattern = "**/*" if recursive else "*"
+        all_files = []
+        normalized_filter = filename_filter.strip() if filename_filter else ""
+        if normalized_filter and normalized_filter.lower() != "none" and not any(
+            char in normalized_filter for char in "*?[]"
+        ):
+            normalized_filter = f"*{normalized_filter}"
+
+        for file in path.glob(glob_pattern):
+            if not file.is_file():
+                continue
+            if normalized_filter and normalized_filter.lower() != "none" and not self._matches_filename_filter(
+                file.name, normalized_filter
+            ):
+                continue
+            if file.suffix.lower() in extensions:
+                if not self._matches_config_filters(file, dtd_filter, client_filter):
+                    continue
+                if not self._matches_month_filter(file, month_filter, custom_month):
+                    continue
+                all_files.append(file)
+
+        all_files = sorted(all_files)
+        total_files = len(all_files)
+        scan_results = {}
+        total_matches = 0
+
+        for i, file_path in enumerate(all_files):
+            if progress_callback:
+                progress_callback(i + 1, total_files, file_path.name)
+            try:
+                matches = self.extract_bibr_citations(file_path, cite_type=cite_type)
+                if matches:
+                    scan_results[str(file_path.absolute())] = {
+                        "ok": True,
+                        "matches": matches,
+                    }
+                    total_matches += len(matches)
+            except Exception as e:
+                scan_results[str(file_path.absolute())] = {
+                    "ok": False,
+                    "error": str(e),
+                    "matches": [],
+                }
+
+        return scan_results, total_matches, total_files
+
+    def generate_citation_type_report(self, target_path: str, scan_results: dict,
+                                      total_matches: int, total_files: int,
+                                      cite_type: str = "bibr") -> str:
+        """
+        Generate a Direct/Indirect citation classification HTML report
+        with Indirect page-reference subcategories and cite-type grouping.
+        Returns a self-contained HTML string suitable for GUI rendering.
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        target_name = os.path.basename(target_path)
+        type_filter = self._normalize_cite_type_filter(cite_type)
+        selector_label = self.cite_type_selector_label(cite_type)
+
+        class_order = [
+            "Direct",
+            "Indirect + p.",
+            "Indirect + pp.",
+            "Indirect",
+            "Unclassified",
+        ]
+        class_colors = {
+            "Direct": "#10b981",
+            "Indirect + p.": "#f59e0b",
+            "Indirect + pp.": "#fb923c",
+            "Indirect": "#fbbf24",
+            "Unclassified": "#64748b",
+        }
+        cite_type_colors = {
+            "bibr": "#818cf8",
+            "fig": "#38bdf8",
+            "table": "#34d399",
+            "table-wrap": "#2dd4bf",
+            "chapter": "#a78bfa",
+            "equation": "#f472b6",
+            "endnote": "#fb923c",
+            "fn": "#fbbf24",
+            "sec": "#94a3b8",
+            "boxed-text": "#c084fc",
+        }
+        preset_types = [
+            p.lower() for p in self.CITE_TYPE_PRESETS if str(p).lower() != "all"
+        ]
+        cite_type_order_map = {t: i for i, t in enumerate(preset_types)}
+
+        all_rows = []
+        for file_path_str, data in scan_results.items():
+            if not data.get("ok", True):
+                continue
+            for match in data.get("matches", []):
+                subcategory = match.get("subcategory") or match.get("classification", "Unclassified")
+                row_cite = (match.get("cite_type") or "").strip().lower()
+                if not row_cite:
+                    row_cite = type_filter if type_filter != "all" else "unknown"
+                all_rows.append({
+                    "classification": match.get("classification", "Unclassified"),
+                    "subcategory": subcategory,
+                    "cite_type": row_cite,
+                    "file_name": os.path.basename(file_path_str),
+                    "file_path": file_path_str,
+                    "text": (match.get("text") or "").strip(),
+                    "line": match.get("line", ""),
+                    "html": match.get("html", "") or "",
+                    "snippet": match.get("snippet", "") or match.get("html", "") or "",
+                    "entire_citation": match.get("entire_citation", "") or "",
+                })
+
+        present_types = sorted(
+            {r["cite_type"] for r in all_rows},
+            key=lambda t: (cite_type_order_map.get(t, 99), t),
+        )
+        multi_type = len(present_types) > 1
+
+        order_map = {c: i for i, c in enumerate(class_order)}
+        if multi_type:
+            all_rows.sort(key=lambda r: (
+                cite_type_order_map.get(r["cite_type"], 99),
+                r["cite_type"],
+                order_map.get(r["subcategory"], 99),
+                r["file_name"],
+            ))
+        else:
+            all_rows.sort(key=lambda r: (order_map.get(r["subcategory"], 99), r["file_name"]))
+
+        class_counts = {}
+        type_counts = {}
+        for row in all_rows:
+            class_counts[row["subcategory"]] = class_counts.get(row["subcategory"], 0) + 1
+            type_counts[row["cite_type"]] = type_counts.get(row["cite_type"], 0) + 1
+
+        summary_badges = ""
+        for ct in present_types:
+            cnt = type_counts.get(ct, 0)
+            if cnt > 0:
+                clr = cite_type_colors.get(ct, "#94a3b8")
+                summary_badges += (
+                    f'<span class="badge" style="background:{clr}">'
+                    f"type:{html.escape(ct)}: {cnt}</span> "
+                )
+        for cls in class_order:
+            cnt = class_counts.get(cls, 0)
+            if cnt > 0:
+                clr = class_colors.get(cls, "#94a3b8")
+                summary_badges += (
+                    f'<span class="badge" style="background:{clr}">'
+                    f"{html.escape(cls)}: {cnt}</span> "
+                )
+
+        table_rows = ""
+        current_class = None
+        current_cite = None
+        s_no = 0
+        group_counts = {}
+        for row in all_rows:
+            if multi_type:
+                gkey = (row["cite_type"], row["subcategory"])
+            else:
+                gkey = (row["subcategory"],)
+            group_counts[gkey] = group_counts.get(gkey, 0) + 1
+
+        for row in all_rows:
+            group_changed = False
+            if multi_type:
+                if row["cite_type"] != current_cite or row["subcategory"] != current_class:
+                    group_changed = True
+                    current_cite = row["cite_type"]
+                    current_class = row["subcategory"]
+            else:
+                if row["subcategory"] != current_class:
+                    group_changed = True
+                    current_class = row["subcategory"]
+
+            if group_changed:
+                clr = class_colors.get(current_class, "#94a3b8")
+                if multi_type:
+                    tclr = cite_type_colors.get(current_cite, "#94a3b8")
+                    gkey = (current_cite, current_class)
+                    label = (
+                        f'<span class="pattern-label" style="background:{tclr};">'
+                        f'{html.escape(current_cite)}</span>'
+                        f'<span class="pattern-label" style="background:{clr};">'
+                        f'{html.escape(current_class)}</span>'
+                    )
+                    data_attrs = (
+                        f'data-cite-type="{html.escape(current_cite)}" '
+                        f'data-classification="{html.escape(current_class)}"'
+                    )
+                else:
+                    gkey = (current_class,)
+                    label = (
+                        f'<span class="pattern-label" style="background:{clr};">'
+                        f'{html.escape(current_class)}</span>'
+                    )
+                    data_attrs = (
+                        f'data-cite-type="{html.escape(row["cite_type"])}" '
+                        f'data-classification="{html.escape(current_class)}"'
+                    )
+                table_rows += f"""
+            <tr class="pattern-group-header" {data_attrs}>
+                <td colspan="6" style="border-left:4px solid {clr};">
+                    {label}
+                    <span class="pattern-count">{group_counts.get(gkey, 0)} instance(s)</span>
+                </td>
+            </tr>"""
+
+            s_no += 1
+            clr = class_colors.get(row["subcategory"], "#94a3b8")
+            tclr = cite_type_colors.get(row["cite_type"], "#94a3b8")
+            display_text = html.escape(row["text"]) if row["text"] else '<em class="empty-text">(empty)</em>'
+            snippet_src = row["entire_citation"] or row["snippet"]
+            snippet_html = html.escape(snippet_src) if snippet_src else ""
+
+            table_rows += f"""
+            <tr data-cite-type="{html.escape(row['cite_type'])}" data-classification="{html.escape(row['subcategory'])}">
+                <td class="col-sno">{s_no}</td>
+                <td class="col-file" title="{html.escape(row['file_path'])}">
+                    <strong>{html.escape(row['file_name'])}</strong>
+                    <div class="file-line">Line {row['line']}</div>
+                </td>
+                <td class="col-cite-type">
+                    <span class="pattern-tag" style="background:{tclr};">{html.escape(row['cite_type'])}</span>
+                </td>
+                <td class="col-text">{display_text}</td>
+                <td class="col-pattern">
+                    <span class="pattern-tag" style="background:{clr};">{html.escape(row['subcategory'])}</span>
+                </td>
+                <td class="col-outer"><pre class="outer-preview">{snippet_html}</pre></td>
+            </tr>"""
+
+        if not table_rows:
+            table_rows = f"""
+            <tr>
+                <td colspan="6" class="no-data">No citations found for {html.escape(selector_label)}.</td>
+            </tr>"""
+
+        type_filter_options = "".join(
+            f'<option value="{html.escape(t)}">{html.escape(t)} ({type_counts.get(t, 0)})</option>'
+            for t in present_types if type_counts.get(t, 0) > 0
+        )
+        filter_options = "".join(
+            f'<option value="{html.escape(c)}">{html.escape(c)} ({class_counts.get(c, 0)})</option>'
+            for c in class_order if class_counts.get(c, 0) > 0
+        )
+
+        report_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citation Type Report - {html.escape(target_name)}</title>
+    <style>
+        :root {{
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #818cf8;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+        }}
+
+        .container {{ max-width: 1400px; margin: 0 auto; }}
+
+        header {{
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }}
+
+        h1 {{ margin:0; font-size:1.8rem; color: var(--primary); }}
+
+        .meta {{ color: var(--text-muted); font-size:0.9rem; margin-top:5px; }}
+
+        .timestamp {{
+            font-size: 0.85rem;
+            background: var(--bg-card);
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            display: inline-block;
+            margin-top: 10px;
+        }}
+
+        .badge-bar {{ margin: 15px 0; display: flex; flex-wrap: wrap; gap: 8px; }}
+
+        .badge {{
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #0f172a;
+        }}
+
+        .legend {{
+            display: flex; gap: 16px; flex-wrap: wrap;
+            margin: 10px 0 0; font-size: 0.85rem; color: var(--text-muted);
+        }}
+        .legend-item {{ display: flex; align-items: center; gap: 6px; }}
+        .legend-swatch {{
+            width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+        }}
+
+        .filter-bar {{
+            display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+        }}
+        .filter-bar select, .filter-bar input {{
+            background: var(--bg-card);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }}
+        .filter-bar select {{ min-width: 180px; cursor: pointer; }}
+        .filter-bar input {{ flex: 1; min-width: 200px; }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }}
+
+        th, td {{
+            padding: 10px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        th {{
+            background: rgba(255,255,255,0.03);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            position: sticky; top: 0;
+        }}
+
+        tr:last-child td {{ border-bottom: none; }}
+
+        .col-sno {{
+            width: 55px; font-weight: bold;
+            color: var(--primary); text-align: center;
+        }}
+
+        .col-file {{ width: 180px; vertical-align: top; }}
+
+        .file-line {{
+            font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;
+        }}
+
+        .col-cite-type {{ width: 110px; vertical-align: top; text-align: center; }}
+
+        .col-text {{
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.88rem;
+            color: #34d399;
+            white-space: pre-wrap;
+            word-break: break-word;
+            vertical-align: top;
+            max-width: 240px;
+        }}
+
+        .col-pattern {{ width: 140px; vertical-align: top; text-align: center; }}
+
+        .pattern-tag {{
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #0f172a;
+        }}
+
+        .pattern-group-header td {{
+            background: rgba(255,255,255,0.02);
+            padding: 12px 16px;
+            font-weight: 600;
+        }}
+
+        .pattern-label {{
+            display: inline-block;
+            padding: 3px 14px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-right: 10px;
+        }}
+
+        .pattern-count {{
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 400;
+        }}
+
+        .empty-text {{ color: var(--text-muted); }}
+
+        .no-data {{
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px;
+            font-style: italic;
+        }}
+
+        .col-outer {{ max-width: 480px; }}
+
+        .outer-preview {{
+            margin:0;
+            padding:8px;
+            max-height:180px;
+            overflow:auto;
+            white-space:pre-wrap;
+            word-break:break-word;
+            background:#0f172a;
+            color:#e2e8f0;
+            border-radius:6px;
+            font-size:12px;
+            line-height:1.45;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Citation Type Report</h1>
+            <div class="meta">
+                Selector: <code>{html.escape(selector_label)}</code> |
+                Total Citations: <strong>{total_matches}</strong> in <strong>{total_files}</strong> file(s)
+            </div>
+            <div class="badge-bar">{summary_badges}</div>
+            <div class="legend">
+                <span class="legend-item"><span class="legend-swatch" style="background:#10b981"></span> Direct — parentheses inside &lt;a&gt;</span>
+                <span class="legend-item"><span class="legend-swatch" style="background:#f59e0b"></span> Indirect + p. — with page</span>
+                <span class="legend-item"><span class="legend-swatch" style="background:#fb923c"></span> Indirect + pp. — with page range</span>
+                <span class="legend-item"><span class="legend-swatch" style="background:#fbbf24"></span> Indirect — no page suffix</span>
+                <span class="legend-item"><span class="legend-swatch" style="background:#64748b"></span> Unclassified — neither pattern</span>
+            </div>
+            <div class="timestamp">Generated: {timestamp}</div>
+        </header>
+
+        <div class="filter-bar">
+            <select id="typeFilter" onchange="filterTable()">
+                <option value="">All Cite Types</option>
+                {type_filter_options}
+            </select>
+            <select id="classFilter" onchange="filterTable()">
+                <option value="">All Classifications</option>
+                {filter_options}
+            </select>
+            <input id="textSearch" type="text" placeholder="Search text or filename..." oninput="filterTable()">
+        </div>
+
+        <table id="reportTable">
+            <thead>
+                <tr>
+                    <th style="text-align:center">S.NO</th>
+                    <th>Filename</th>
+                    <th style="text-align:center">Cite Type</th>
+                    <th>Text</th>
+                    <th style="text-align:center">Classification</th>
+                    <th>Snippet</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function filterTable() {{
+            const typeVal = document.getElementById('typeFilter').value.toLowerCase();
+            const classVal = document.getElementById('classFilter').value.toLowerCase();
+            const searchVal  = document.getElementById('textSearch').value.toLowerCase().trim();
+            const rows = document.querySelectorAll('#reportTable tbody tr');
+
+            let currentGroupVisible = true;
+
+            rows.forEach(row => {{
+                if (row.classList.contains('pattern-group-header')) {{
+                    const rowType = (row.getAttribute('data-cite-type') || '').toLowerCase();
+                    const rowClass = (row.getAttribute('data-classification') || '').toLowerCase();
+                    currentGroupVisible = true;
+                    if (typeVal && rowType !== typeVal) currentGroupVisible = false;
+                    if (classVal && rowClass !== classVal) currentGroupVisible = false;
+                    row.style.display = currentGroupVisible ? '' : 'none';
+                    return;
+                }}
+
+                if (!currentGroupVisible) {{
+                    row.style.display = 'none';
+                    return;
+                }}
+
+                const rowType = (row.getAttribute('data-cite-type') || '').toLowerCase();
+                const rowClass = (row.getAttribute('data-classification') || '').toLowerCase();
+                if (typeVal && rowType !== typeVal) {{
+                    row.style.display = 'none';
+                    return;
+                }}
+                if (classVal && rowClass !== classVal) {{
+                    row.style.display = 'none';
+                    return;
+                }}
+
+                const textCell = row.querySelector('.col-text');
+                const textContent = textCell ? textCell.textContent.toLowerCase() : '';
+                const fileCell = row.querySelector('.col-file');
+                const fileName = fileCell ? fileCell.textContent.toLowerCase() : '';
+                const snippetCell = row.querySelector('.col-outer');
+                const snippetText = snippetCell ? snippetCell.textContent.toLowerCase() : '';
+
+                if (searchVal && !textContent.includes(searchVal) && !fileName.includes(searchVal) && !snippetText.includes(searchVal)) {{
+                    row.style.display = 'none';
+                }} else {{
+                    row.style.display = '';
+                }}
+            }});
+        }}
+    </script>
+</body>
+</html>
+"""
+        return report_html
+
+    def generate_entire_citation_report(self, target_path: str, scan_results: dict,
+                                        total_matches: int, total_files: int,
+                                        cite_type: str = "bibr") -> str:
+        """
+        Generate a deduplicated Entire Citation report.
+        One row per (cite_type, pattern_key) with count and an example full citation HTML.
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        target_name = os.path.basename(target_path)
+        type_filter = self._normalize_cite_type_filter(cite_type)
+        selector_label = self.cite_type_selector_label(cite_type)
+
+        pattern_order = [
+            # Direct forms
+            "Possessive Author (Year)",
+            "Possessive Author (n.d.)",
+            "Dual Author (and) (Year)",
+            "Dual Author (and) (n.d.)",
+            "Dual Author (&) (Year)",
+            "Author et al. (Year)",
+            "Single Author (multi-word) (Year)",
+            "Single Author (Year)",
+            # Indirect / comma forms — et al.
+            "Author et al., Year",
+            "Author et al., Year + p.",
+            "Author et al., Year + pp.",
+            "Author et al., n.d.",
+            # Dual &
+            "Dual Author (&), Year",
+            "Dual Author (&), Year + p.",
+            "Dual Author (&), Year + pp.",
+            "Dual Author (&), n.d.",
+            "Dual Author (&), n.d. + p.",
+            # Dual and (indirect)
+            "Dual Author (and), Year",
+            "Dual Author (and), Year + p.",
+            "Dual Author (and), Year + pp.",
+            "Dual Author (and), n.d.",
+            # Single multi-word
+            "Single Author (multi-word), Year",
+            "Single Author (multi-word), Year + p.",
+            "Single Author (multi-word), Year + pp.",
+            "Single Author (multi-word), n.d.",
+            "Single Author (multi-word) Year",
+            # Single one-word
+            "Single Author, Year",
+            "Single Author, Year + p.",
+            "Single Author, Year + pp.",
+            "Single Author, n.d.",
+            "Single Author Year",
+            "Single Author n.d.",
+            # Possessive indirect
+            "Possessive Author, Year",
+            "Possessive Author, n.d.",
+            "Other",
+        ]
+        pattern_colors = {
+            "Possessive Author (Year)": "#a78bfa",
+            "Possessive Author (n.d.)": "#c4b5fd",
+            "Dual Author (and) (Year)": "#34d399",
+            "Dual Author (and) (n.d.)": "#6ee7b7",
+            "Dual Author (&) (Year)": "#2dd4bf",
+            "Author et al. (Year)": "#38bdf8",
+            "Single Author (multi-word) (Year)": "#4ade80",
+            "Single Author (Year)": "#10b981",
+            "Author et al., Year": "#0ea5e9",
+            "Author et al., Year + p.": "#f59e0b",
+            "Author et al., Year + pp.": "#fb923c",
+            "Author et al., n.d.": "#7dd3fc",
+            "Dual Author (&), Year": "#14b8a6",
+            "Dual Author (&), Year + p.": "#f59e0b",
+            "Dual Author (&), Year + pp.": "#fb923c",
+            "Dual Author (&), n.d.": "#5eead4",
+            "Dual Author (&), n.d. + p.": "#fbbf24",
+            "Dual Author (and), Year": "#22c55e",
+            "Dual Author (and), Year + p.": "#f59e0b",
+            "Dual Author (and), Year + pp.": "#fb923c",
+            "Dual Author (and), n.d.": "#86efac",
+            "Single Author (multi-word), Year": "#84cc16",
+            "Single Author (multi-word), Year + p.": "#f59e0b",
+            "Single Author (multi-word), Year + pp.": "#fb923c",
+            "Single Author (multi-word), n.d.": "#bef264",
+            "Single Author (multi-word) Year": "#a3e635",
+            "Single Author, Year": "#fbbf24",
+            "Single Author, Year + p.": "#f59e0b",
+            "Single Author, Year + pp.": "#fb923c",
+            "Single Author, n.d.": "#fde68a",
+            "Single Author Year": "#94a3b8",
+            "Single Author n.d.": "#cbd5e1",
+            "Possessive Author, Year": "#c084fc",
+            "Possessive Author, n.d.": "#e9d5ff",
+            "Other": "#64748b",
+        }
+        subcategory_colors = {
+            "Direct": "#10b981",
+            "Indirect + p.": "#f59e0b",
+            "Indirect + pp.": "#fb923c",
+            "Indirect": "#fbbf24",
+            "Unclassified": "#64748b",
+        }
+        cite_type_colors = {
+            "bibr": "#818cf8",
+            "fig": "#38bdf8",
+            "table": "#34d399",
+            "table-wrap": "#2dd4bf",
+            "chapter": "#a78bfa",
+            "equation": "#f472b6",
+            "endnote": "#fb923c",
+            "fn": "#fbbf24",
+            "sec": "#94a3b8",
+            "boxed-text": "#c084fc",
+        }
+        preset_types = [
+            p.lower() for p in self.CITE_TYPE_PRESETS if str(p).lower() != "all"
+        ]
+        cite_type_order_map = {t: i for i, t in enumerate(preset_types)}
+
+        # Aggregate by (cite_type, pattern_key)
+        patterns = {}
+        instance_total = 0
+        type_counts = {}
+        for file_path_str, data in scan_results.items():
+            if not data.get("ok", True):
+                continue
+            for match in data.get("matches", []):
+                instance_total += 1
+                key = match.get("pattern_key") or "Other"
+                subcategory = match.get("subcategory") or match.get("classification", "Unclassified")
+                row_cite = (match.get("cite_type") or "").strip().lower()
+                if not row_cite:
+                    row_cite = type_filter if type_filter != "all" else "unknown"
+                type_counts[row_cite] = type_counts.get(row_cite, 0) + 1
+                example = match.get("entire_citation") or match.get("html") or match.get("snippet") or ""
+                agg_key = (row_cite, key)
+                if agg_key not in patterns:
+                    patterns[agg_key] = {
+                        "cite_type": row_cite,
+                        "pattern_key": key,
+                        "subcategory": subcategory,
+                        "classification": match.get("classification", "Unclassified"),
+                        "count": 0,
+                        "example": example,
+                        "example_text": (match.get("text") or "").strip(),
+                    }
+                patterns[agg_key]["count"] += 1
+                # Prefer an Indirect entire-wrap example when available
+                if example.startswith("(") and not patterns[agg_key]["example"].startswith("("):
+                    patterns[agg_key]["example"] = example
+                    patterns[agg_key]["example_text"] = (match.get("text") or "").strip()
+
+        order_map = {p: i for i, p in enumerate(pattern_order)}
+        rows = sorted(
+            patterns.values(),
+            key=lambda r: (
+                cite_type_order_map.get(r["cite_type"], 99),
+                r["cite_type"],
+                order_map.get(r["pattern_key"], 99),
+                -r["count"],
+            )
+        )
+        unique_patterns = len(rows)
+        present_types = sorted(
+            type_counts.keys(),
+            key=lambda t: (cite_type_order_map.get(t, 99), t),
+        )
+
+        summary_badges = (
+            f'<span class="badge" style="background:#818cf8">Unique Patterns: {unique_patterns}</span> '
+            f'<span class="badge" style="background:#38bdf8">Total Instances: {instance_total}</span> '
+        )
+        for ct in present_types:
+            clr = cite_type_colors.get(ct, "#94a3b8")
+            summary_badges += (
+                f'<span class="badge" style="background:{clr}">'
+                f"type:{html.escape(ct)}: {type_counts[ct]}</span> "
+            )
+        # Pattern badges (summed across cite types for display)
+        pattern_totals = {}
+        for row in rows:
+            pattern_totals[row["pattern_key"]] = (
+                pattern_totals.get(row["pattern_key"], 0) + row["count"]
+            )
+        badge_keys = [p for p in pattern_order if p in pattern_totals]
+        badge_keys.extend(sorted(k for k in pattern_totals if k not in order_map))
+        for pkey in badge_keys:
+            clr = pattern_colors.get(pkey, "#94a3b8")
+            summary_badges += (
+                f'<span class="badge" style="background:{clr}">'
+                f"{html.escape(pkey)}: {pattern_totals[pkey]}</span> "
+            )
+
+        table_rows = ""
+        s_no = 0
+        for row in rows:
+            s_no += 1
+            pclr = pattern_colors.get(row["pattern_key"], "#94a3b8")
+            sclr = subcategory_colors.get(row["subcategory"], "#94a3b8")
+            tclr = cite_type_colors.get(row["cite_type"], "#94a3b8")
+            example_html = html.escape(row["example"]) if row["example"] else ""
+            table_rows += f"""
+            <tr data-pattern="{html.escape(row['pattern_key'])}" data-cite-type="{html.escape(row['cite_type'])}" data-classification="{html.escape(row['subcategory'])}">
+                <td class="col-sno">{s_no}</td>
+                <td class="col-cite-type">
+                    <span class="pattern-tag" style="background:{tclr};">{html.escape(row['cite_type'])}</span>
+                </td>
+                <td class="col-pattern-key">
+                    <span class="pattern-tag" style="background:{pclr};">{html.escape(row['pattern_key'])}</span>
+                </td>
+                <td class="col-pattern">
+                    <span class="pattern-tag" style="background:{sclr};">{html.escape(row['subcategory'])}</span>
+                </td>
+                <td class="col-count"><strong>{row['count']}</strong></td>
+                <td class="col-outer"><pre class="outer-preview">{example_html}</pre></td>
+            </tr>"""
+
+        if not table_rows:
+            table_rows = f"""
+            <tr>
+                <td colspan="6" class="no-data">No citations found for {html.escape(selector_label)}.</td>
+            </tr>"""
+
+        type_filter_options = "".join(
+            f'<option value="{html.escape(t)}">{html.escape(t)} ({type_counts[t]})</option>'
+            for t in present_types
+        )
+        filter_keys = [p for p in pattern_order if p in pattern_totals]
+        filter_keys.extend(sorted(k for k in pattern_totals if k not in order_map))
+        filter_options = "".join(
+            f'<option value="{html.escape(p)}">{html.escape(p)} ({pattern_totals[p]})</option>'
+            for p in filter_keys
+        )
+
+        report_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entire Citation Report - {html.escape(target_name)}</title>
+    <style>
+        :root {{
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #818cf8;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+        }}
+
+        .container {{ max-width: 1400px; margin: 0 auto; }}
+
+        header {{
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }}
+
+        h1 {{ margin:0; font-size:1.8rem; color: var(--primary); }}
+
+        .meta {{ color: var(--text-muted); font-size:0.9rem; margin-top:5px; }}
+
+        .timestamp {{
+            font-size: 0.85rem;
+            background: var(--bg-card);
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            display: inline-block;
+            margin-top: 10px;
+        }}
+
+        .badge-bar {{ margin: 15px 0; display: flex; flex-wrap: wrap; gap: 8px; }}
+
+        .badge {{
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #0f172a;
+        }}
+
+        .legend {{
+            display: flex; gap: 16px; flex-wrap: wrap;
+            margin: 10px 0 0; font-size: 0.85rem; color: var(--text-muted);
+        }}
+        .legend-item {{ display: flex; align-items: center; gap: 6px; }}
+        .legend-swatch {{
+            width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+        }}
+
+        .filter-bar {{
+            display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+        }}
+        .filter-bar select, .filter-bar input {{
+            background: var(--bg-card);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }}
+        .filter-bar select {{ min-width: 180px; cursor: pointer; }}
+        .filter-bar input {{ flex: 1; min-width: 200px; }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }}
+
+        th, td {{
+            padding: 10px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        th {{
+            background: rgba(255,255,255,0.03);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            position: sticky; top: 0;
+        }}
+
+        tr:last-child td {{ border-bottom: none; }}
+
+        .col-sno {{
+            width: 55px; font-weight: bold;
+            color: var(--primary); text-align: center;
+        }}
+
+        .col-cite-type {{ width: 110px; vertical-align: top; text-align: center; }}
+        .col-pattern-key {{ width: 180px; vertical-align: top; }}
+        .col-pattern {{ width: 140px; vertical-align: top; text-align: center; }}
+        .col-count {{ width: 80px; text-align: center; vertical-align: top; color: #38bdf8; }}
+
+        .pattern-tag {{
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #0f172a;
+        }}
+
+        .no-data {{
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px;
+            font-style: italic;
+        }}
+
+        .col-outer {{ max-width: 580px; }}
+
+        .outer-preview {{
+            margin:0;
+            padding:8px;
+            max-height:180px;
+            overflow:auto;
+            white-space:pre-wrap;
+            word-break:break-word;
+            background:#0f172a;
+            color:#e2e8f0;
+            border-radius:6px;
+            font-size:12px;
+            line-height:1.45;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Entire Citation Report</h1>
+            <div class="meta">
+                Selector: <code>{html.escape(selector_label)}</code> |
+                Deduplicated patterns from <strong>{total_matches}</strong> citation(s)
+                in <strong>{total_files}</strong> file(s)
+            </div>
+            <div class="badge-bar">{summary_badges}</div>
+            <div class="legend">
+                <span class="legend-item">Repeated shapes are collapsed per cite type + pattern, with a count.</span>
+                <span class="legend-item">Example column shows the full parenthetical citation HTML when available.</span>
+            </div>
+            <div class="timestamp">Generated: {timestamp}</div>
+        </header>
+
+        <div class="filter-bar">
+            <select id="typeFilter" onchange="filterTable()">
+                <option value="">All Cite Types</option>
+                {type_filter_options}
+            </select>
+            <select id="patternFilter" onchange="filterTable()">
+                <option value="">All Patterns</option>
+                {filter_options}
+            </select>
+            <input id="textSearch" type="text" placeholder="Search pattern or example HTML..." oninput="filterTable()">
+        </div>
+
+        <table id="reportTable">
+            <thead>
+                <tr>
+                    <th style="text-align:center">S.NO</th>
+                    <th style="text-align:center">Cite Type</th>
+                    <th>Pattern</th>
+                    <th style="text-align:center">Subcategory</th>
+                    <th style="text-align:center">Count</th>
+                    <th>Example Entire Citation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function filterTable() {{
+            const typeVal = document.getElementById('typeFilter').value.toLowerCase();
+            const patternVal = document.getElementById('patternFilter').value.toLowerCase();
+            const searchVal  = document.getElementById('textSearch').value.toLowerCase().trim();
+            const rows = document.querySelectorAll('#reportTable tbody tr');
+
+            rows.forEach(row => {{
+                const rowPattern = (row.getAttribute('data-pattern') || '').toLowerCase();
+                const rowType = (row.getAttribute('data-cite-type') || '').toLowerCase();
+                const exampleCell = row.querySelector('.col-outer');
+                const exampleText = exampleCell ? exampleCell.textContent.toLowerCase() : '';
+                const patternCell = row.querySelector('.col-pattern-key');
+                const patternText = patternCell ? patternCell.textContent.toLowerCase() : '';
+
+                let visible = true;
+                if (typeVal && rowType !== typeVal) {{
+                    visible = false;
+                }}
+                if (visible && patternVal && rowPattern !== patternVal) {{
+                    visible = false;
+                }}
+                if (visible && searchVal && !exampleText.includes(searchVal) && !patternText.includes(searchVal) && !rowPattern.includes(searchVal) && !rowType.includes(searchVal)) {{
+                    visible = false;
+                }}
+                row.style.display = visible ? '' : 'none';
+            }});
+        }}
+    </script>
+</body>
+</html>
+"""
+        return report_html
 
     def generate_consolidated_summary_report(self, all_selector_results: list, target_path: str,
                                              timestamp_str: str, is_single_file: bool) -> str:

@@ -7,6 +7,7 @@ from .impact_to_ceg_tab import ImpactToCEGTab
 from .pgm_processor_tab import PGMProcessorTab
 from .word_extractor_tab import WordExtractorTab
 from .id_pattern_extractor_tab import IDPatternExtractorTab
+from .citation_pattern_extractor_tab import CitationPatternExtractorTab
 from .new_config_tab import NewConfigTab
 from .compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from .element_extractor_tab import ElementExtractorTab
@@ -22,6 +23,7 @@ __all__ = [
     "PGMProcessorTab",
     "WordExtractorTab",
     "IDPatternExtractorTab",
+    "CitationPatternExtractorTab",
     "NewConfigTab",
     "HTMLCompareTab",
     "HTMLCompareReplaceTab",

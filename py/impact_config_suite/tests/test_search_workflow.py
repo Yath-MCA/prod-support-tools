@@ -418,6 +418,82 @@ class SearchWorkflowTests(unittest.TestCase):
         only_path = next(iter(results))
         self.assertIn("jats_oup", only_path)
 
+    def test_element_extractor_xml_original_filename_filter(self) -> None:
+        """*_original.xml matches IMPACT DOCID_original.xml and legacy ._original.xml."""
+        match = ElementExtractor._matches_filename_filter
+
+        self.assertTrue(match("N20001_original.xml", "*_original.xml"))
+        self.assertTrue(match("TNF_Book_001_original.xml", "*_original.xml"))
+        self.assertTrue(match("article._original.xml", "*_original.xml"))
+        self.assertTrue(match("article._original.xml", "*._original.xml"))
+        self.assertTrue(match("N20001_original.xml", "*._original.xml"))
+
+        self.assertFalse(match("N20001_updated.xml", "*_original.xml"))
+        self.assertFalse(match("readme.xml", "*_original.xml"))
+        self.assertFalse(match("notes_backup.xml", "*_original.xml"))
+
+    def test_element_extractor_xml_original_folder_filter_with_jats_plos(self) -> None:
+        source = Path(self.temp_dir.name) / "xml_scan_plos"
+        source.mkdir()
+
+        plos_doc = source / "N20001"
+        plos_doc.mkdir()
+        (plos_doc / "N20001_original.xml").write_text(
+            "<article><supplementary-material mimetype=\"application/pdf\"/></article>",
+            encoding="utf-8",
+        )
+        (plos_doc / "impact_config.xml").write_text(
+            "<root><dtd name=\"JATS\"/><client name=\"PLOS\"/></root>",
+            encoding="utf-8",
+        )
+        (plos_doc / "N20001_updated.xml").write_text("<article/>", encoding="utf-8")
+
+        legacy_doc = source / "legacy"
+        legacy_doc.mkdir()
+        (legacy_doc / "article._original.xml").write_text(
+            "<article><supplementary-material mimetype=\"image/tiff\"/></article>",
+            encoding="utf-8",
+        )
+        (legacy_doc / "impact_config.xml").write_text(
+            "<root><dtd name=\"JATS\"/><client>PLOS</client></root>",
+            encoding="utf-8",
+        )
+
+        other_client = source / "other"
+        other_client.mkdir()
+        (other_client / "OUP001_original.xml").write_text(
+            "<article><supplementary-material mimetype=\"text/plain\"/></article>",
+            encoding="utf-8",
+        )
+        (other_client / "impact_config.xml").write_text(
+            "<root><dtd name=\"JATS\"/><client>OUP</client></root>",
+            encoding="utf-8",
+        )
+
+        extractor = ElementExtractor()
+        results, _, total = extractor.scan_directory(
+            source,
+            "XPath",
+            "//supplementary-material[@mimetype]",
+            recursive=True,
+            extensions=[".xml"],
+            filename_filter="*_original.xml",
+            dtd_filter="JATS",
+            client_filter="PLOS",
+        )
+
+        self.assertEqual(total, 2)
+        self.assertEqual(len(results), 2)
+        result_paths = " ".join(results.keys())
+        self.assertIn("N20001_original.xml", result_paths)
+        self.assertIn("article._original.xml", result_paths)
+        self.assertNotIn("N20001_updated.xml", result_paths)
+        self.assertNotIn("OUP001_original.xml", result_paths)
+        self.assertEqual(
+            sum(len(entry["matches"]) for entry in results.values()),
+            2,
+        )
+
     def test_element_extractor_css_selector_validation(self) -> None:
         source = Path(self.temp_dir.name) / "selector.html"
         source.write_text(

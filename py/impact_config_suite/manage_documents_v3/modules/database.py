@@ -32,6 +32,29 @@ class DocumentDatabase:
     def get_document(self, docid: str) -> dict | None:
         """Get single document by ID."""
         return self._data.get(docid)
+
+    def resolve_document_folder(self, docid: str, doc: dict | None = None) -> Path:
+        """Resolve a document folder using the database folder value when available."""
+        if doc is None:
+            doc = self.get_document(docid) or {}
+        folder_value = doc.get("folder") or docid
+        folder_path = Path(folder_value)
+        if folder_path.is_absolute():
+            return folder_path
+        return self.project_path / folder_path
+
+    def resolve_file_path(self, docid: str, file_key: str, doc: dict | None = None) -> Path | None:
+        """Resolve a file path stored in a document entry."""
+        if doc is None:
+            doc = self.get_document(docid) or {}
+        file_value = doc.get("files", {}).get(file_key)
+        if not file_value:
+            return None
+
+        file_path = Path(file_value)
+        if file_path.is_absolute():
+            return file_path
+        return self.project_path / file_path
     
     def add_document(
         self,

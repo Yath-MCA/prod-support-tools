@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from .. import config
+from .analyzer import WorkflowAnalyzer
 from .database import DocumentDatabase
 from .utils import Logger
 
@@ -75,7 +76,8 @@ class ReportManager:
             writer = csv.writer(f)
             writer.writerow([
                 "DocID", "Organized", "Config Downloaded", "Compared",
-                "Report Generated", "Error", "Last Step", "Retry Count"
+                "Report Generated", "Analysis Status", "Blocker / Next Step",
+                "Error", "Last Step", "Retry Count"
             ])
             for row in data:
                 writer.writerow([
@@ -84,6 +86,8 @@ class ReportManager:
                     row["config_downloaded"],
                     row["compared"],
                     row["report_generated"],
+                    row["analysis_status"],
+                    row["issue"],
                     row["error"],
                     row["last_step"],
                     row["retry_count"],
@@ -124,18 +128,25 @@ class ReportManager:
     
     def _build_summary_data(self) -> list[dict]:
         """Build summary data from database."""
+        analysis_by_docid = {
+            item["docid"]: item
+            for item in WorkflowAnalyzer(self.db).analyze()["documents"]
+        }
         data = []
         for docid, doc in sorted(self.db.get_all().items()):
             if docid.startswith("_"):
                 continue  # Skip meta entries
             
             process = doc.get("process", {})
+            analysis = analysis_by_docid.get(docid, {})
             data.append({
                 "docid": docid,
                 "organized": process.get("organized", False),
                 "config_downloaded": process.get("config_downloaded", False),
                 "compared": process.get("compared", False),
                 "report_generated": process.get("report_generated", False),
+                "analysis_status": analysis.get("analysis_status", "pending"),
+                "issue": analysis.get("issue", ""),
                 "error": doc.get("error", ""),
                 "last_step": doc.get("last_step", ""),
                 "retry_count": doc.get("retry_count", 0),
@@ -204,6 +215,7 @@ class ReportManager:
             <th>Config</th>
             <th>Compared</th>
             <th>Report</th>
+            <th>Analysis</th>
             <th>Status</th>
         </tr>
 """
@@ -218,9 +230,12 @@ class ReportManager:
             config_class = "status-yes" if row["config_downloaded"] else "status-no"
             compared_class = "status-yes" if row["compared"] else "status-no"
             report_class = "status-yes" if row["report_generated"] else "status-no"
+            analysis_status = html.escape(str(row["analysis_status"]).title())
             
             if row["error"]:
-                status = f'<span class="error">Error: {html.escape(str(row["error"])[:50])}</span>'
+                status = f'<span class="error">Error: {html.escape(str(row["error"])[:80])}</span>'
+            elif row["issue"]:
+                status = html.escape(str(row["issue"])[:120])
             else:
                 status = '<span class="status-yes">OK</span>'
             
@@ -230,6 +245,7 @@ class ReportManager:
             <td class="{config_class}">{config}</td>
             <td class="{compared_class}">{compared}</td>
             <td class="{report_class}">{report}</td>
+            <td>{analysis_status}</td>
             <td>{status}</td>
         </tr>
 """

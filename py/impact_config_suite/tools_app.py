@@ -18,6 +18,7 @@ from tabs.impact_to_ceg_tab import ImpactToCEGTab
 from tabs.pgm_processor_tab import PGMProcessorTab
 from tabs.word_extractor_tab import WordExtractorTab
 from tabs.id_pattern_extractor_tab import IDPatternExtractorTab
+from tabs.citation_pattern_extractor_tab import CitationPatternExtractorTab
 from tabs.new_config_tab import NewConfigTab
 from tabs.compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from tabs.element_extractor_tab import ElementExtractorTab
@@ -39,6 +40,7 @@ class CommonToolsApp:
         "impact_to_ceg_pgm": ImpactToCEGTab,
         "word_extractor": WordExtractorTab,
         "id_pattern_extractor": IDPatternExtractorTab,
+        "citation_pattern_extractor": CitationPatternExtractorTab,
         "compare_html": HTMLCompareTab,
         "compare_replace": HTMLCompareReplaceTab,
         "compare_xml": XMLCompareTab,

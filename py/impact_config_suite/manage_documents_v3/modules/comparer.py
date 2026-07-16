@@ -79,7 +79,7 @@ class CompareManager:
                 continue
             
             # Get file paths
-            doc_folder = project_path / docid
+            doc_folder = self.db.resolve_document_folder(docid, doc)
             
             # Check if already has report (look for any HTML report file)
             report_files = list(doc_folder.glob("*_compare_*.html")) + list(doc_folder.glob("*report*.html"))
@@ -104,8 +104,13 @@ class CompareManager:
                 continue
             
             # Build paths
-            orig_path = project_path / original_xml
-            upd_path = project_path / updated_html
+            orig_path = self.db.resolve_file_path(docid, "original_xml", doc)
+            upd_path = self.db.resolve_file_path(docid, "updated_html", doc)
+            if not orig_path or not upd_path:
+                self.db.mark_error(docid, "compare", "Unable to resolve required files for comparison")
+                failed += 1
+                self.logger.error(f"Unable to resolve files for {docid}")
+                continue
             
             # Verify original is XML (required for pipeline)
             if orig_path.suffix.lower() not in ('.xml', '.xhtml'):

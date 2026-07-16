@@ -18,6 +18,8 @@ from manage_documents_v3.modules.organizer import FolderOrganizer
 from manage_documents_v3.modules.downloader import ConfigDownloader
 from manage_documents_v3.modules.comparer import CompareManager
 from manage_documents_v3.modules.reporter import ReportManager
+from manage_documents_v3.modules.analyzer import WorkflowAnalyzer
+from manage_documents_v3.modules.dtd_organizer import DTDOrganizer
 from xml_compare.models import CompareOptions
 
 
@@ -50,6 +52,9 @@ class DocumentManagerTab(ttk.Frame):
         
         # Statistics display
         self._build_stats_section()
+
+        # Preflight analysis display
+        self._build_preflight_section()
         
         # Status log
         self._build_log_section()
@@ -150,6 +155,21 @@ class DocumentManagerTab(ttk.Frame):
             fg="white",
             font=("Segoe UI", 9),
         ).pack(side="left")
+        
+        # Threaded download checkbox
+        self.threaded_download_var = tk.BooleanVar(value=False)
+        self.threaded_checkbox = tk.Checkbutton(
+            project_frame,
+            text="Use threaded download",
+            variable=self.threaded_download_var,
+            bg="#0f172a",
+            fg="#94a3b8",
+            selectcolor="#1e293b",
+            activebackground="#0f172a",
+            activeforeground="#38bdf8",
+            font=("Segoe UI", 9),
+        )
+        self.threaded_checkbox.pack(side="left", padx=(20, 0))
     
     def _build_buttons_section(self) -> None:
         """Build action buttons row."""
@@ -160,6 +180,7 @@ class DocumentManagerTab(ttk.Frame):
         row1 = tk.Frame(buttons_frame, bg="#0f172a")
         row1.pack(fill="x", pady=(0, 4))
         
+        self.analyze_btn = self._create_action_button(row1, "Analyze Project", self._on_analyze, "#14b8a6")
         self.scan_btn = self._create_action_button(row1, "Scan", self._on_scan, "#10b981")
         self.organize_btn = self._create_action_button(row1, "Organize", self._on_organize, "#3b82f6")
         self.download_btn = self._create_action_button(row1, "Download Config", self._on_download, "#8b5cf6")
@@ -170,6 +191,7 @@ class DocumentManagerTab(ttk.Frame):
         
         self.compare_btn = self._create_action_button(row2, "Compare", self._on_compare, "#f59e0b")
         self.report_btn = self._create_action_button(row2, "Report", self._on_report, "#06b6d4")
+        self.dtd_organize_btn = self._create_action_button(row2, "Organize by DTD", self._on_dtd_organize, "#64748b")
         self.complete_btn = self._create_action_button(
             row2, "Complete Workflow", self._on_complete_workflow, "#ef4444", is_primary=True
         )
@@ -246,6 +268,44 @@ class DocumentManagerTab(ttk.Frame):
             font=("Consolas", 10),
             justify="left",
         ).pack(anchor="w")
+
+    def _build_preflight_section(self) -> None:
+        """Build preflight analysis summary."""
+        preflight_frame = tk.LabelFrame(
+            self,
+            text="Preflight Analysis",
+            bg="#0f172a",
+            fg="#94a3b8",
+            font=("Segoe UI", 10, "bold"),
+            padx=12,
+            pady=8,
+        )
+        preflight_frame.pack(fill="x", padx=12, pady=(0, 8))
+
+        self.preflight_summary_var = tk.StringVar(value="Load a project, then click Analyze Project.")
+        tk.Label(
+            preflight_frame,
+            textvariable=self.preflight_summary_var,
+            bg="#0f172a",
+            fg="#cbd5e1",
+            font=("Consolas", 10),
+            justify="left",
+        ).pack(anchor="w", fill="x")
+
+        self.preflight_issues_text = tk.Text(
+            preflight_frame,
+            height=5,
+            wrap="word",
+            bg="#1e293b",
+            fg="#cbd5e1",
+            font=("Consolas", 9),
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground="#334155",
+        )
+        self.preflight_issues_text.pack(fill="x", pady=(8, 0))
+        self.preflight_issues_text.insert("end", "No analysis yet.")
+        self.preflight_issues_text.config(state="disabled")
     
     def _build_log_section(self) -> None:
         """Build status log area."""
@@ -314,6 +374,7 @@ class DocumentManagerTab(ttk.Frame):
             
             self._update_stats()
             self._update_button_states()
+            self._clear_preflight_analysis()
             self._log("\nProject loaded successfully - buttons enabled")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load project: {e}")
@@ -342,12 +403,19 @@ class DocumentManagerTab(ttk.Frame):
             counts["updated_html"] = len([f for f in updated_folder.iterdir() 
                                           if f.is_file() and f.suffix.lower() == ".html"])
         
-        # Count impact_config.xml files in document folders
+        # Count impact_config.xml files in flat and DTD-organized document folders.
+        seen_configs = set()
         for item in project_path.iterdir():
             if item.is_dir() and not item.name.startswith("."):
                 config_file = item / "impact_config.xml"
                 if config_file.exists():
-                    counts["impact_config"] += 1
+                    seen_configs.add(config_file.resolve())
+        for dtd_name in ("JATS", "BITS"):
+            dtd_folder = project_path / dtd_name
+            if dtd_folder.exists():
+                for config_file in dtd_folder.glob("*/impact_config.xml"):
+                    seen_configs.add(config_file.resolve())
+        counts["impact_config"] = len(seen_configs)
         
         return counts
     
@@ -417,6 +485,47 @@ class DocumentManagerTab(ttk.Frame):
             f"Errors: {stats['with_errors']}"
         )
         self.stats_text.set(text)
+
+    def _clear_preflight_analysis(self) -> None:
+        """Reset preflight display after project load or workflow changes."""
+        if hasattr(self, "preflight_summary_var"):
+            self.preflight_summary_var.set("Click Analyze Project to review readiness and blockers.")
+        if hasattr(self, "preflight_issues_text") and self.preflight_issues_text.winfo_exists():
+            self.preflight_issues_text.config(state="normal")
+            self.preflight_issues_text.delete("1.0", "end")
+            self.preflight_issues_text.insert("end", "No analysis run for the current project.")
+            self.preflight_issues_text.config(state="disabled")
+
+    def _update_preflight_analysis(self, analysis: dict) -> None:
+        """Render preflight analysis into the dashboard panel."""
+        counts = analysis["counts"]
+        summary = (
+            f"Documents: {counts['total']} | Complete: {counts['complete']} | "
+            f"Ready: Organize {counts['ready_to_organize']}, "
+            f"Download {counts['ready_to_download']}, "
+            f"Compare {counts['ready_to_compare']}, "
+            f"Report {counts['ready_to_report']} | "
+            f"Blocked: {counts['blocked']} | Errors: {counts['errored']} | "
+            f"Next: {analysis['next_action']}"
+        )
+        self.preflight_summary_var.set(summary)
+
+        issues = analysis["issues"][:25]
+        if issues:
+            issue_lines = [
+                f"{item['docid']}: {item['issue']} [{item['analysis_status']}]"
+                for item in issues
+            ]
+            if len(analysis["issues"]) > len(issues):
+                issue_lines.append(f"... {len(analysis['issues']) - len(issues)} more issue(s)")
+            issue_text = "\n".join(issue_lines)
+        else:
+            issue_text = "No blockers or pending actions found."
+
+        self.preflight_issues_text.config(state="normal")
+        self.preflight_issues_text.delete("1.0", "end")
+        self.preflight_issues_text.insert("end", issue_text)
+        self.preflight_issues_text.config(state="disabled")
     
     def _update_button_states(self) -> None:
         """Enable/disable buttons based on project state."""
@@ -426,11 +535,13 @@ class DocumentManagerTab(ttk.Frame):
         
         # Check if buttons exist before configuring
         buttons = [
+            ("analyze_btn", getattr(self, 'analyze_btn', None)),
             ("scan_btn", getattr(self, 'scan_btn', None)),
             ("organize_btn", getattr(self, 'organize_btn', None)),
             ("download_btn", getattr(self, 'download_btn', None)),
             ("compare_btn", getattr(self, 'compare_btn', None)),
             ("report_btn", getattr(self, 'report_btn', None)),
+            ("dtd_organize_btn", getattr(self, 'dtd_organize_btn', None)),
             ("complete_btn", getattr(self, 'complete_btn', None)),
         ]
         
@@ -461,6 +572,35 @@ class DocumentManagerTab(ttk.Frame):
         
         self._worker_thread = threading.Thread(target=wrapper, daemon=True)
         self._worker_thread.start()
+
+    def _on_analyze(self) -> None:
+        """Handle Analyze Project button."""
+        if not self._db:
+            return
+
+        self._set_buttons_busy(True)
+        self._log("Running preflight analysis...")
+
+        def do_analyze():
+            analyzer = WorkflowAnalyzer(self._db)
+            return analyzer.analyze()
+
+        def on_complete(result):
+            self._set_buttons_busy(False)
+            self._update_preflight_analysis(result)
+            counts = result["counts"]
+            self._log(
+                "Preflight complete. "
+                f"Blocked: {counts['blocked']}, Errors: {counts['errored']}, "
+                f"Next: {result['next_action']}"
+            )
+
+        def on_error(e):
+            self._set_buttons_busy(False)
+            self._log(f"Preflight analysis failed: {e}")
+            messagebox.showerror("Analysis Error", str(e))
+
+        self._run_in_thread(do_analyze, on_complete, on_error)
     
     def _on_scan(self) -> None:
         """Handle Scan button."""
@@ -482,6 +622,7 @@ class DocumentManagerTab(ttk.Frame):
             processed, remaining = result
             self._set_buttons_busy(False)
             self._update_stats()
+            self._clear_preflight_analysis()
             
             if remaining > 0:
                 message = f"Batch complete. Processed: {processed}, Remaining: {remaining}.\nClick Scan again to continue."
@@ -527,6 +668,7 @@ class DocumentManagerTab(ttk.Frame):
             success, failed = result
             self._log(f"Organization complete. Success: {success}, Failed: {failed}")
             self._update_stats()
+            self._clear_preflight_analysis()
             messagebox.showinfo("Organize Complete", f"Success: {success}, Failed: {failed}")
         
         def on_error(e):
@@ -541,8 +683,10 @@ class DocumentManagerTab(ttk.Frame):
         if not self._db:
             return
         
+        use_threaded = self.threaded_download_var.get()
+        mode_text = "threaded" if use_threaded else "sequential"
         self._set_buttons_busy(True)
-        self._log("Starting config downloads...")
+        self._log(f"Starting config downloads ({mode_text} mode)...")
         
         def do_download():
             # Marshal callbacks to main thread
@@ -550,27 +694,100 @@ class DocumentManagerTab(ttk.Frame):
                 self.after(0, lambda: self._log(msg))
             def safe_progress(current, total):
                 self.after(0, lambda: self._update_progress(current, total))
+            def safe_batch_progress(completed, total, successful, failed):
+                self.after(0, lambda: self._update_batch_progress(completed, total, successful, failed))
+            
             downloader = ConfigDownloader(
                 self._db,
                 log_callback=safe_log,
-                progress_callback=safe_progress,
+                progress_callback=safe_progress if not use_threaded else None,
             )
-            return downloader.download_all()
+            
+            if use_threaded:
+                return downloader.download_all_threaded(batch_callback=safe_batch_progress)
+            else:
+                return downloader.download_all()
         
         def on_complete(result):
             self._set_buttons_busy(False)
             success, skipped, failed = result
+            self._update_progress(0, 0)  # Reset progress
             self._log(f"Downloads complete. Success: {success}, Skipped: {skipped}, Failed: {failed}")
             self._update_stats()
+            self._clear_preflight_analysis()
             messagebox.showinfo("Download Complete", f"Success: {success}, Skipped: {skipped}, Failed: {failed}")
         
         def on_error(e):
             self._set_buttons_busy(False)
+            self._update_progress(0, 0)  # Reset progress
             self._log(f"Download failed: {e}")
             messagebox.showerror("Error", str(e))
         
         self._run_in_thread(do_download, on_complete, on_error)
     
+    def _update_batch_progress(self, completed: int, total: int, successful: int, failed: int) -> None:
+        """Update progress bar for batch operations."""
+        if total > 0:
+            percent = (completed / total) * 100
+            self.progress_var.set(percent)
+            self.progress_label.config(
+                text=f"Downloads: {completed}/{total} ({successful} OK, {failed} Failed)"
+            )
+        else:
+            self.progress_var.set(0)
+            self.progress_label.config(text="Ready")
+        self.update_idletasks()
+    
+    def _on_dtd_organize(self) -> None:
+        """Handle Organize by DTD button."""
+        if not self._db:
+            return
+
+        if not messagebox.askyesno(
+            "Organize by DTD",
+            "This will move document folders into JATS or BITS based on impact_config.xml.\n\nContinue?"
+        ):
+            return
+
+        self._set_buttons_busy(True)
+        self._log("Starting internal DTD organization...")
+
+        def do_dtd_organize():
+            def safe_log(msg):
+                self.after(0, lambda: self._log(msg))
+            def safe_progress(current, total):
+                self.after(0, lambda: self._update_progress(current, total))
+
+            organizer = DTDOrganizer(
+                self._db,
+                log_callback=safe_log,
+                progress_callback=safe_progress,
+            )
+            return organizer.organize_by_dtd()
+
+        def on_complete(result):
+            self._set_buttons_busy(False)
+            moved, skipped, failed, unknown = result
+            self._update_progress(0, 0)
+            self._update_stats()
+            self._clear_preflight_analysis()
+            self._log(
+                "DTD organization complete. "
+                f"Moved: {moved}, Skipped: {skipped}, Failed: {failed}, Unknown DTD: {unknown}"
+            )
+            messagebox.showinfo(
+                "Organize by DTD Complete",
+                f"Moved: {moved}\nSkipped: {skipped}\nFailed: {failed}\nUnknown DTD: {unknown}",
+            )
+
+        def on_error(e):
+            self._set_buttons_busy(False)
+            self._update_progress(0, 0)
+            self._log(f"DTD organization failed: {e}")
+            messagebox.showerror("DTD Organization Error", str(e))
+
+        self._run_in_thread(do_dtd_organize, on_complete, on_error)
+
     def _on_compare(self) -> None:
         """Handle Compare button."""
         if not self._db:
@@ -598,6 +815,7 @@ class DocumentManagerTab(ttk.Frame):
             success, skipped, failed = result
             self._log(f"Comparisons complete. Success: {success}, Skipped: {skipped}, Failed: {failed}")
             self._update_stats()
+            self._clear_preflight_analysis()
             messagebox.showinfo("Compare Complete", f"Success: {success}, Skipped: {skipped}, Failed: {failed}")
         
         def on_error(e):
@@ -629,6 +847,7 @@ class DocumentManagerTab(ttk.Frame):
             html_path, csv_path = result
             self._log(f"Reports generated: {html_path}, {csv_path}")
             self._update_stats()
+            self._clear_preflight_analysis()
             
             if messagebox.askyesno("Reports Generated", "Open HTML report?"):
                 # Use as_uri() for proper file URL format on all platforms
@@ -648,7 +867,7 @@ class DocumentManagerTab(ttk.Frame):
         
         if not messagebox.askyesno(
             "Complete Workflow",
-            "This will run: Scan → Organize → Download → Compare → Report.\n\nContinue?"
+            "This will run: Scan  Organize  Download  Compare  Report.\n\nContinue?"
         ):
             return
         
@@ -680,10 +899,16 @@ class DocumentManagerTab(ttk.Frame):
             organizer = FolderOrganizer(self._db, safe_log, safe_progress)
             results['organize'] = organizer.organize()
             
-            # Download
+            # Download (use threaded if enabled)
             safe_log("Step 3/5: Downloading configs...")
-            downloader = ConfigDownloader(self._db, safe_log, safe_progress)
-            results['download'] = downloader.download_all()
+            use_threaded = self.threaded_download_var.get()
+            downloader = ConfigDownloader(self._db, safe_log, safe_progress if not use_threaded else None)
+            if use_threaded:
+                def safe_batch_progress(completed, total, successful, failed):
+                    self.after(0, lambda: self._update_batch_progress(completed, total, successful, failed))
+                results['download'] = downloader.download_all_threaded(batch_callback=safe_batch_progress)
+            else:
+                results['download'] = downloader.download_all()
             
             # Compare
             safe_log("Step 4/5: Comparing...")
@@ -705,6 +930,7 @@ class DocumentManagerTab(ttk.Frame):
             self._set_buttons_busy(False)
             self._log("=== Workflow Complete ===")
             self._update_stats()
+            self._clear_preflight_analysis()
             scan_processed, scan_remaining = results['scan']
             messagebox.showinfo(
                 "Workflow Complete",
@@ -725,8 +951,9 @@ class DocumentManagerTab(ttk.Frame):
     def _set_buttons_busy(self, busy: bool) -> None:
         """Set all action buttons to busy/disabled state."""
         state = "disabled" if busy else "normal"
-        for btn in [self.scan_btn, self.organize_btn, self.download_btn,
-                    self.compare_btn, self.report_btn, self.complete_btn, self.load_btn]:
+        for btn in [self.analyze_btn, self.scan_btn, self.organize_btn, self.download_btn,
+                    self.compare_btn, self.report_btn, self.dtd_organize_btn,
+                    self.complete_btn, self.load_btn]:
             btn.config(state=state)
     
     def get_tab_name(self) -> str:

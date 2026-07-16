@@ -29,6 +29,7 @@ class Logger:
         # Remove existing handlers to prevent accumulation
         for handler in self.logger.handlers[:]:
             self.logger.removeHandler(handler)
+            handler.close()
         
         # File handler
         handler = logging.FileHandler(self.log_file, mode='a')
