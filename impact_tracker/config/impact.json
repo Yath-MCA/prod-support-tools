@@ -1,0 +1,25 @@
+{
+  "projects": [
+    { "id": 0, "name": "IMPACT" }
+  ],
+  "defaultFilters": ["assigned", "unassigned", "reported", "open"],
+  "savedFilterIds": [],
+  "mantisViewUrl": "https://mantis.newgen.co/view.php?id=",
+  "statusOptions": [
+    { "id": 10, "name": "new" },
+    { "id": 20, "name": "feedback" },
+    { "id": 30, "name": "acknowledged" },
+    { "id": 40, "name": "confirmed" },
+    { "id": 50, "name": "assigned" },
+    { "id": 80, "name": "resolved" },
+    { "id": 90, "name": "closed" }
+  ],
+  "priorityOptions": [
+    { "id": 10, "name": "none" },
+    { "id": 20, "name": "low" },
+    { "id": 30, "name": "normal" },
+    { "id": 40, "name": "high" },
+    { "id": 50, "name": "urgent" },
+    { "id": 60, "name": "immediate" }
+  ]
+}
