@@ -2614,6 +2614,12 @@ class ElementExtractor:
         r"^(.*?)\s+((?:18|19|20)\d{2}[a-z]?|n\.?\s*d\.?)\s*$",
         re.IGNORECASE | re.DOTALL,
     )
+    _NUMBER_RANGE_RE = re.compile(
+        r"\d+\s*[-–—]\s*\d+"
+        r"|\d+\s*,\s*\d+"
+        r"|\d+\s+and\s+\d+",
+        re.IGNORECASE,
+    )
 
     def resolve_cite_type(self, elem):
         """
@@ -2903,7 +2909,7 @@ class ElementExtractor:
         elif year_kind == "Year":
             year_label = "(Year)" if classification == "Direct" else "Year"
         else:
-            year_label = "other"
+            year_label = None
 
         if classification == "Unclassified" and form == "bare":
             if year_kind == "Year":
@@ -2911,19 +2917,21 @@ class ElementExtractor:
             elif year_kind == "n.d.":
                 key = f"{structure} n.d."
             else:
-                key = f"{structure} other"
+                key = "Bare Link Text"
         elif classification == "Direct":
-            if year_label.startswith("("):
+            if year_label is None:
+                key = "Bare Link Text"
+            elif year_label.startswith("("):
                 key = f"{structure} {year_label}"
             else:
                 key = f"{structure} ({year_label})"
         else:
             # Indirect or Unclassified comma / other
-            if year_label.startswith("("):
-                year_label = year_label.strip("()")
-            if year_kind == "other" and form == "none":
-                key = "Other"
+            if year_label is None:
+                key = "Bare Link Text"
             else:
+                if year_label.startswith("("):
+                    year_label = year_label.strip("()")
                 key = f"{structure}, {year_label}"
 
         if subcategory == "Indirect + p.":
@@ -2932,6 +2940,117 @@ class ElementExtractor:
             key = f"{key} + pp."
 
         return key
+
+    def _is_number_range(self, text: str) -> bool:
+        """True when display text looks like a number range or multi-number list."""
+        t = (text or "").strip()
+        if not t:
+            return False
+        if self._NUMBER_RANGE_RE.search(t):
+            return True
+        return len(re.findall(r"\d+", t)) >= 2
+
+    def _with_range_suffix(self, base_key: str, text: str) -> str:
+        """Append _range when numbered display is a range/multi."""
+        key = (base_key or "number").strip() or "number"
+        if self._is_number_range(text) and not key.endswith("_range"):
+            return f"{key}_range"
+        return key
+
+    def _elem_inside_tag(self, elem, tag_name: str) -> bool:
+        parent = getattr(elem, "parent", None)
+        while parent is not None:
+            if getattr(parent, "name", None) == tag_name:
+                return True
+            parent = getattr(parent, "parent", None)
+        return False
+
+    def _has_bracket_neighbors(self, elem) -> bool:
+        left = self._sibling_text_left(elem, 40).rstrip()
+        right = self._sibling_text_right(elem, 40).lstrip()
+        return left.endswith("[") and right.startswith("]")
+
+    def _fn_endnote_pattern_key(self, elem, text: str) -> str:
+        """Structural pattern for fn / endnote cites."""
+        in_sup = self._elem_inside_tag(elem, "sup")
+        has_brackets = self._has_bracket_neighbors(elem)
+        # xref/a wrapping a lone <sup>N</sup>
+        contains_sup_only = False
+        if not in_sup and hasattr(elem, "find_all"):
+            children = [c for c in elem.children if not (
+                isinstance(c, NavigableString) and not str(c).strip()
+            )]
+            if (
+                len(children) == 1
+                and isinstance(children[0], Tag)
+                and children[0].name == "sup"
+            ):
+                contains_sup_only = True
+
+        if in_sup and has_brackets:
+            base = "sup_bracket_number"
+        elif in_sup:
+            base = "sup_number"
+        elif has_brackets:
+            base = "bracket_number"
+        elif contains_sup_only:
+            base = "sup_number"
+        else:
+            base = "number"
+        return self._with_range_suffix(base, text)
+
+    def _equation_pattern_key(self, left: str, right: str, text: str) -> str:
+        """Phrase patterns for equation cites."""
+        ctx = f"{(left or '')[-80:]}{text or ''}{(right or '')[:80]}"
+        ctx_norm = re.sub(r"\s+", " ", ctx)
+
+        if re.search(r"\(\s*Equations?\b[^)]*\band\b[^)]*\)", ctx_norm, re.IGNORECASE):
+            return "paren_equations_and"
+
+        m = re.search(r"\(\s*Equations?\s+([^)]+)\)", ctx_norm, re.IGNORECASE)
+        if m:
+            return self._with_range_suffix("paren_equation", m.group(1))
+
+        m = re.search(r"\bEquations?\s*\(\s*([^)]+)\)", ctx_norm, re.IGNORECASE)
+        if m:
+            return self._with_range_suffix("equation_paren_number", m.group(1))
+
+        m = re.search(r"\bEq\.?\s*\(\s*([^)]+)\)", ctx_norm, re.IGNORECASE)
+        if m:
+            return self._with_range_suffix("eq_paren_number", m.group(1))
+
+        return self._with_range_suffix("equation_number", text or "")
+
+    def _typed_cite_pattern_key(self, cite_type: str, left: str, right: str, text: str) -> str:
+        """Type-aware display patterns for fig/table/chapter/sec/etc."""
+        slug = re.sub(r"[^a-z0-9]+", "_", (cite_type or "cite").lower()).strip("_") or "cite"
+        if self._is_inside_outer_parens(left or "", right or ""):
+            base = f"paren_{slug}"
+        else:
+            base = f"{slug}_number"
+        return self._with_range_suffix(base, text or "")
+
+    def _pattern_key_for_cite(
+        self,
+        cite_type: str,
+        elem,
+        classification: str,
+        subcategory: str,
+        text: str,
+        left: str,
+        right: str,
+    ) -> str:
+        """Route pattern key by cite type; bibr keeps author-year names."""
+        ct = (cite_type or "").strip().lower()
+        if ct == "bibr":
+            return self.citation_pattern_key(
+                classification, subcategory, text, right, left
+            )
+        if ct in ("fn", "endnote"):
+            return self._fn_endnote_pattern_key(elem, text)
+        if ct == "equation":
+            return self._equation_pattern_key(left, right, text)
+        return self._typed_cite_pattern_key(ct, left, right, text)
 
     def _build_bibr_snippet(self, elem, left_max: int = 80, right_max: int = 80) -> str:
         """Raw HTML context: surrounding text + element outer HTML."""
@@ -2991,16 +3110,31 @@ class ElementExtractor:
             outer_html = str(elem)
             left = self._sibling_text_left(elem)
             right = self._sibling_text_right(elem)
-            classification = self.classify_bibr_citation(elem)
-            if classification == "Indirect":
-                subcategory = self._indirect_subcategory(right)
+
+            if resolved_type == "bibr":
+                classification = self.classify_bibr_citation(elem)
+                if classification == "Indirect":
+                    subcategory = self._indirect_subcategory(right)
+                else:
+                    subcategory = classification
             else:
-                subcategory = classification
+                classification = resolved_type
+                subcategory = resolved_type
+
             snippet = self._build_bibr_snippet(elem)
             entire_citation = self._extract_entire_citation(elem)
-            pattern_key = self.citation_pattern_key(
-                classification, subcategory, text_content, right, left
+            pattern_key = self._pattern_key_for_cite(
+                resolved_type,
+                elem,
+                classification,
+                subcategory,
+                text_content,
+                left,
+                right,
             )
+            if resolved_type != "bibr":
+                classification = pattern_key
+                subcategory = pattern_key
 
             results.append({
                 "line": line_num,
@@ -3101,6 +3235,78 @@ class ElementExtractor:
 
         return scan_results, total_matches, total_files
 
+    def filter_scan_results_by_cite_type(self, scan_results: dict, cite_type: str):
+        """
+        Keep only matches for cite_type.
+        Returns (filtered_scan_results, total_matches, total_files_with_matches).
+        """
+        type_filter = self._normalize_cite_type_filter(cite_type)
+        filtered = {}
+        total_matches = 0
+        total_files = 0
+        for file_path_str, data in (scan_results or {}).items():
+            if not data.get("ok", True):
+                filtered[file_path_str] = data
+                continue
+            matches = list(data.get("matches") or [])
+            if type_filter != "all":
+                matches = [
+                    m for m in matches
+                    if (m.get("cite_type") or "").strip().lower() == type_filter
+                ]
+            if matches:
+                total_files += 1
+            total_matches += len(matches)
+            filtered[file_path_str] = {
+                **data,
+                "matches": matches,
+            }
+        return filtered, total_matches, total_files
+
+    def discover_cite_types(self, scan_results: dict) -> list:
+        """Sorted cite types present in scan_results (presets first)."""
+        preset_types = [
+            p.lower() for p in self.CITE_TYPE_PRESETS if str(p).lower() != "all"
+        ]
+        order_map = {t: i for i, t in enumerate(preset_types)}
+        found = set()
+        for data in (scan_results or {}).values():
+            if not data.get("ok", True):
+                continue
+            for match in data.get("matches") or []:
+                ct = (match.get("cite_type") or "").strip().lower()
+                if ct:
+                    found.add(ct)
+        return sorted(found, key=lambda t: (order_map.get(t, 99), t))
+
+    def dedupe_matches_per_file_pattern(self, matches: list) -> list:
+        """
+        Keep one match per pattern_key (first sample); attach pattern_count.
+        """
+        seen = {}
+        order = []
+        for match in matches or []:
+            key = match.get("pattern_key") or "Bare Link Text"
+            if key not in seen:
+                kept = dict(match)
+                kept["pattern_count"] = 1
+                seen[key] = kept
+                order.append(key)
+            else:
+                seen[key]["pattern_count"] = seen[key].get("pattern_count", 1) + 1
+        return [seen[k] for k in order]
+
+    def dedupe_scan_results_per_file_pattern(self, scan_results: dict) -> dict:
+        """Dedupe each file's matches to one row per pattern_key (with counts)."""
+        out = {}
+        for file_path_str, data in (scan_results or {}).items():
+            if not data.get("ok", True):
+                out[file_path_str] = data
+                continue
+            deduped = self.dedupe_matches_per_file_pattern(data.get("matches") or [])
+            out[file_path_str] = {**data, "matches": deduped}
+        return out
+
     def generate_citation_type_report(self, target_path: str, scan_results: dict,
                                       total_matches: int, total_files: int,
                                       cite_type: str = "bibr") -> str:
@@ -3145,18 +3351,25 @@ class ElementExtractor:
         ]
         cite_type_order_map = {t: i for i, t in enumerate(preset_types)}
 
+        # One report row per (file, pattern_key); counts stay on pattern_count
+        deduped_scan = self.dedupe_scan_results_per_file_pattern(scan_results)
         all_rows = []
-        for file_path_str, data in scan_results.items():
+        for file_path_str, data in deduped_scan.items():
             if not data.get("ok", True):
                 continue
             for match in data.get("matches", []):
-                subcategory = match.get("subcategory") or match.get("classification", "Unclassified")
+                subcategory = match.get("subcategory") or match.get("classification", "") or (
+                    match.get("pattern_key") or "Bare Link Text"
+                )
                 row_cite = (match.get("cite_type") or "").strip().lower()
                 if not row_cite:
                     row_cite = type_filter if type_filter != "all" else "unknown"
+                pattern_key = match.get("pattern_key") or "Bare Link Text"
                 all_rows.append({
-                    "classification": match.get("classification", "Unclassified"),
+                    "classification": match.get("classification") or pattern_key,
                     "subcategory": subcategory,
+                    "pattern_key": pattern_key,
+                    "pattern_count": match.get("pattern_count", 1),
                     "cite_type": row_cite,
                     "file_name": os.path.basename(file_path_str),
                     "file_path": file_path_str,
@@ -3653,7 +3866,22 @@ class ElementExtractor:
             # Possessive indirect
             "Possessive Author, Year",
             "Possessive Author, n.d.",
-            "Other",
+            "Bare Link Text",
+            "bracket_number",
+            "bracket_number_range",
+            "sup_bracket_number",
+            "sup_bracket_number_range",
+            "sup_number",
+            "sup_number_range",
+            "paren_equation",
+            "paren_equation_range",
+            "paren_equations_and",
+            "equation_paren_number",
+            "equation_paren_number_range",
+            "eq_paren_number",
+            "eq_paren_number_range",
+            "equation_number",
+            "equation_number_range",
         ]
         pattern_colors = {
             "Possessive Author (Year)": "#a78bfa",
@@ -3690,7 +3918,22 @@ class ElementExtractor:
             "Single Author n.d.": "#cbd5e1",
             "Possessive Author, Year": "#c084fc",
             "Possessive Author, n.d.": "#e9d5ff",
-            "Other": "#64748b",
+            "Bare Link Text": "#94a3b8",
+            "bracket_number": "#fbbf24",
+            "bracket_number_range": "#f59e0b",
+            "sup_bracket_number": "#fb923c",
+            "sup_bracket_number_range": "#ea580c",
+            "sup_number": "#fde68a",
+            "sup_number_range": "#fcd34d",
+            "paren_equation": "#f472b6",
+            "paren_equation_range": "#ec4899",
+            "paren_equations_and": "#db2777",
+            "equation_paren_number": "#e879f9",
+            "equation_paren_number_range": "#d946ef",
+            "eq_paren_number": "#c084fc",
+            "eq_paren_number_range": "#a855f7",
+            "equation_number": "#f9a8d4",
+            "equation_number_range": "#f472b6",
         }
         subcategory_colors = {
             "Direct": "#10b981",
@@ -3698,6 +3941,7 @@ class ElementExtractor:
             "Indirect + pp.": "#fb923c",
             "Indirect": "#fbbf24",
             "Unclassified": "#64748b",
+            "Bare Link Text": "#94a3b8",
         }
         cite_type_colors = {
             "bibr": "#818cf8",
@@ -3716,7 +3960,7 @@ class ElementExtractor:
         ]
         cite_type_order_map = {t: i for i, t in enumerate(preset_types)}
 
-        # Aggregate by (cite_type, pattern_key)
+        # One row per (file, cite_type, pattern_key); count = instances in that file
         patterns = {}
         instance_total = 0
         type_counts = {}
@@ -3725,23 +3969,25 @@ class ElementExtractor:
                 continue
             for match in data.get("matches", []):
                 instance_total += 1
-                key = match.get("pattern_key") or "Other"
-                subcategory = match.get("subcategory") or match.get("classification", "Unclassified")
+                key = match.get("pattern_key") or "Bare Link Text"
+                subcategory = match.get("subcategory") or match.get("classification") or key
                 row_cite = (match.get("cite_type") or "").strip().lower()
                 if not row_cite:
                     row_cite = type_filter if type_filter != "all" else "unknown"
                 type_counts[row_cite] = type_counts.get(row_cite, 0) + 1
                 example = match.get("entire_citation") or match.get("html") or match.get("snippet") or ""
-                agg_key = (row_cite, key)
+                agg_key = (file_path_str, row_cite, key)
                 if agg_key not in patterns:
                     patterns[agg_key] = {
                         "cite_type": row_cite,
                         "pattern_key": key,
                         "subcategory": subcategory,
-                        "classification": match.get("classification", "Unclassified"),
+                        "classification": match.get("classification") or key,
                         "count": 0,
                         "example": example,
                         "example_text": (match.get("text") or "").strip(),
+                        "file_name": os.path.basename(file_path_str),
+                        "file_path": file_path_str,
                     }
                 patterns[agg_key]["count"] += 1
                 # Prefer an Indirect entire-wrap example when available
@@ -3755,6 +4001,7 @@ class ElementExtractor:
             key=lambda r: (
                 cite_type_order_map.get(r["cite_type"], 99),
                 r["cite_type"],
+                r.get("file_name", ""),
                 order_map.get(r["pattern_key"], 99),
                 -r["count"],
             )
@@ -3798,9 +4045,11 @@ class ElementExtractor:
             sclr = subcategory_colors.get(row["subcategory"], "#94a3b8")
             tclr = cite_type_colors.get(row["cite_type"], "#94a3b8")
             example_html = html.escape(row["example"]) if row["example"] else ""
+            file_name = html.escape(row.get("file_name") or "")
             table_rows += f"""
             <tr data-pattern="{html.escape(row['pattern_key'])}" data-cite-type="{html.escape(row['cite_type'])}" data-classification="{html.escape(row['subcategory'])}">
                 <td class="col-sno">{s_no}</td>
+                <td class="col-file" title="{html.escape(row.get('file_path') or '')}">{file_name}</td>
                 <td class="col-cite-type">
                     <span class="pattern-tag" style="background:{tclr};">{html.escape(row['cite_type'])}</span>
                 </td>
@@ -4016,6 +4265,7 @@ class ElementExtractor:
             <thead>
                 <tr>
                     <th style="text-align:center">S.NO</th>
+                    <th>File</th>
                     <th style="text-align:center">Cite Type</th>
                     <th>Pattern</th>
                     <th style="text-align:center">Subcategory</th>

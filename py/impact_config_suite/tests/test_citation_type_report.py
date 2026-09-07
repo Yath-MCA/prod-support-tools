@@ -307,8 +307,17 @@ def test_cite_type_all_combined_report():
     assert "All" in report or "all" in report.lower()
     assert "type:bibr" in entire
     assert "type:fig" in entire
-    # Combined = single HTML string outputs (not multiple files)
+    # Generators still return HTML strings; GUI/run_extraction split files per type
     assert isinstance(report, str) and isinstance(entire, str)
+    types = extractor.discover_cite_types(scan_results)
+    assert len(types) >= 2
+    for ct in types:
+        filtered, n, fcount = extractor.filter_scan_results_by_cite_type(scan_results, ct)
+        assert n >= 1
+        per = extractor.generate_entire_citation_report(
+            str(path), filtered, n, fcount, cite_type=ct
+        )
+        assert 'data-pattern="Other"' not in per
 
 
 def test_scan_bibr_citations_directory():

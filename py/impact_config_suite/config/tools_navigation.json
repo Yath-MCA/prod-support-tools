@@ -44,13 +44,20 @@
         { "id": "element_extractor", "label": "Element Extractor" },
         { "id": "word_extractor", "label": "Word Extractor" },
         { "id": "id_pattern_extractor", "label": "ID Pattern Extractor" },
-        { "id": "citation_pattern_extractor", "label": "Citation Pattern Extractor" }
+        { "id": "citation_pattern_extractor", "label": "Citation Pattern Extractor" },
+        { "id": "doi_extractor", "label": "DOI Extractor" }
       ]
     },
     {
       "name": "Configuration",
       "tools": [
         { "id": "new_journal_config", "label": "New Journal Config" }
+      ]
+    },
+    {
+      "name": "Metadata",
+      "tools": [
+        { "id": "metadata_harvester", "label": "Metadata Harvester" }
       ]
     }
   ]

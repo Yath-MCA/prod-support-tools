@@ -1685,7 +1685,6 @@ class ElementExtractorTab(ttk.Frame):
             entire_citation_report_path = ""
             if citation_type_report:
                 self.status_var.set("Generating citation type report...")
-                cite_slug = re.sub(r"[^\w\-]+", "_", citation_cite_type.lower()) or "bibr"
                 self._log(
                     f"\n📑 Scanning citations for cite type '{citation_cite_type}' "
                     f"(ref-type | object-type | data-role)..."
@@ -1714,37 +1713,66 @@ class ElementExtractorTab(ttk.Frame):
                     cite_type=citation_cite_type,
                 )
 
-                citation_html = self.extractor.generate_citation_type_report(
-                    str(source_path), bibr_scan_results, bibr_total_matches, bibr_total_files,
-                    cite_type=citation_cite_type,
-                )
-                citation_report_name = f"Citation_Type_Report_{cite_slug}_{safe_target_name}_{ts}.html"
-                citation_report_file = run_folder / citation_report_name
-                with open(citation_report_file, "w", encoding="utf-8") as f:
-                    f.write(citation_html)
+                # Always write one Citation Type + Entire Citation report per cite type
+                cite_types_to_write = self.extractor.discover_cite_types(bibr_scan_results)
+                if not cite_types_to_write:
+                    cite_types_to_write = (
+                        [citation_cite_type]
+                        if (citation_cite_type or "").strip().lower() != "all"
+                        else []
+                    )
 
-                citation_report_path = str(citation_report_file.absolute())
-                self.last_citation_report_path = citation_report_path
-                self._log(
-                    f"📑 Citation type report saved: {run_folder_name}/{citation_report_name} "
-                    f"({bibr_total_matches} citation(s) in {bibr_total_files} file(s))"
-                )
+                citation_report_path = ""
+                entire_citation_report_path = ""
+                for ct in cite_types_to_write:
+                    type_scan, type_matches, type_files = self.extractor.filter_scan_results_by_cite_type(
+                        bibr_scan_results, ct
+                    )
+                    if type_matches == 0:
+                        continue
+                    type_slug = re.sub(r"[^\w\-]+", "_", ct.lower()) or "cite"
 
-                self.status_var.set("Generating entire citation report...")
-                entire_html = self.extractor.generate_entire_citation_report(
-                    str(source_path), bibr_scan_results, bibr_total_matches, bibr_total_files,
-                    cite_type=citation_cite_type,
-                )
-                entire_report_name = f"Entire_Citation_Report_{cite_slug}_{safe_target_name}_{ts}.html"
-                entire_report_file = run_folder / entire_report_name
-                with open(entire_report_file, "w", encoding="utf-8") as f:
-                    f.write(entire_html)
+                    citation_html = self.extractor.generate_citation_type_report(
+                        str(source_path), type_scan, type_matches, type_files,
+                        cite_type=ct,
+                    )
+                    citation_report_name = (
+                        f"Citation_Type_Report_{type_slug}_{safe_target_name}_{ts}.html"
+                    )
+                    citation_report_file = run_folder / citation_report_name
+                    with open(citation_report_file, "w", encoding="utf-8") as f:
+                        f.write(citation_html)
+                    citation_report_path = str(citation_report_file.absolute())
+                    self._log(
+                        f"📑 Citation type report saved: {run_folder_name}/{citation_report_name} "
+                        f"({type_matches} citation(s) in {type_files} file(s), type={ct})"
+                    )
 
-                entire_citation_report_path = str(entire_report_file.absolute())
-                self.last_entire_citation_report_path = entire_citation_report_path
-                self._log(
-                    f"📑 Entire citation report saved: {run_folder_name}/{entire_report_name}"
-                )
+                    self.status_var.set(f"Generating entire citation report ({ct})...")
+                    entire_html = self.extractor.generate_entire_citation_report(
+                        str(source_path), type_scan, type_matches, type_files,
+                        cite_type=ct,
+                    )
+                    entire_report_name = (
+                        f"Entire_Citation_Report_{type_slug}_{safe_target_name}_{ts}.html"
+                    )
+                    entire_report_file = run_folder / entire_report_name
+                    with open(entire_report_file, "w", encoding="utf-8") as f:
+                        f.write(entire_html)
+                    entire_citation_report_path = str(entire_report_file.absolute())
+                    self._log(
+                        f"📑 Entire citation report saved: {run_folder_name}/{entire_report_name}"
+                    )
+
+                if citation_report_path:
+                    self.last_citation_report_path = citation_report_path
+                if entire_citation_report_path:
+                    self.last_entire_citation_report_path = entire_citation_report_path
+                if not cite_types_to_write:
+                    self._log(
+                        f"📑 No citations found for cite type '{citation_cite_type}' "
+                        f"({bibr_total_matches} match(es) in {bibr_total_files} file(s))"
+                    )
 
             # Generate and save CSV if enabled
             csv_path = ""

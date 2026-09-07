@@ -19,6 +19,11 @@ uvicorn>=0.22.0    # ASGI server
 pydantic>=2.0.0    # Data validation
 jinja2>=3.1.0      # Template engine
 
+# Metadata Harvester (Crossref + ROR/OpenAlex)
+pydantic-settings>=2.0.0  # Env-driven settings for the embedded service
+email-validator>=2.0.0    # Required by pydantic EmailStr fields
+loguru>=0.7.0             # Structured logging for the harvest background tasks
+
 # Reports & Export
 openpyxl>=3.1.0    # Excel file generation
 matplotlib>=3.6.0  # Charts and visualization
@@ -26,3 +31,9 @@ pandas>=1.5.0      # Data manipulation
 
 # Utilities
 python-dateutil>=2.8.0  # Date handling
+
+# Testing (pytest itself was previously installed ad hoc; pinning it here
+# since the new Metadata Harvester tests need it plus HTTP-mocking support)
+pytest>=8.0.0
+responses>=0.25.0  # HTTP mocking for metadata_harvester geo source tests
+httpx2             # Required by starlette's TestClient (used in metadata_harvester crossref test)

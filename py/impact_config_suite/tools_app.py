@@ -19,11 +19,13 @@ from tabs.pgm_processor_tab import PGMProcessorTab
 from tabs.word_extractor_tab import WordExtractorTab
 from tabs.id_pattern_extractor_tab import IDPatternExtractorTab
 from tabs.citation_pattern_extractor_tab import CitationPatternExtractorTab
+from tabs.doi_extractor_tab import DOIExtractorTab
 from tabs.new_config_tab import NewConfigTab
 from tabs.compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from tabs.element_extractor_tab import ElementExtractorTab
 from tabs.xml_compare_tab import XMLCompareTab
 from tabs.document_manager_tab import DocumentManagerTab
+from metadata_harvester.gui import MetadataHarvesterTab
 from core.run_history import RunHistoryStore
 
 
@@ -41,12 +43,14 @@ class CommonToolsApp:
         "word_extractor": WordExtractorTab,
         "id_pattern_extractor": IDPatternExtractorTab,
         "citation_pattern_extractor": CitationPatternExtractorTab,
+        "doi_extractor": DOIExtractorTab,
         "compare_html": HTMLCompareTab,
         "compare_replace": HTMLCompareReplaceTab,
         "compare_xml": XMLCompareTab,
         "new_journal_config": NewConfigTab,
         "element_extractor": ElementExtractorTab,
         "document_manager": DocumentManagerTab,
+        "metadata_harvester": MetadataHarvesterTab,
     }
     DEFAULT_NAVIGATION = {
         "default_category": "Analysis",
@@ -82,6 +86,12 @@ class CommonToolsApp:
                 "tools": [
                     {"id": "new_journal_config", "label": "New Journal Config"},
                     {"id": "element_extractor", "label": "Element Extractor"},
+                ],
+            },
+            {
+                "name": "Metadata",
+                "tools": [
+                    {"id": "metadata_harvester", "label": "Metadata Harvester"},
                 ],
             },
         ],
@@ -619,6 +629,10 @@ class CommonToolsApp:
 
         previous_search_tab = getattr(self, "search_tab", None)
         self.search_tab = self.tool_views.get(("Analysis", "search"), previous_search_tab)
+        previous_metadata_harvester_tab = getattr(self, "metadata_harvester_tab", None)
+        self.metadata_harvester_tab = self.tool_views.get(
+            ("Metadata", "metadata_harvester"), previous_metadata_harvester_tab
+        )
         target_category = self.navigation_config["default_category"]
         target_tool = self.navigation_config["default_tool"]
         if preserve:
@@ -724,6 +738,9 @@ class CommonToolsApp:
         old_search_tab = getattr(self, "search_tab", None)
         if old_search_tab is not None:
             old_search_tab.shutdown(wait=True)
+        old_metadata_harvester_tab = getattr(self, "metadata_harvester_tab", None)
+        if old_metadata_harvester_tab is not None:
+            old_metadata_harvester_tab.shutdown(wait=True)
         self.navigation_config = self._load_navigation_config()
         self.category_order = [item["name"] for item in self.navigation_config["categories"]]
         self.category_by_name = {item["name"]: item for item in self.navigation_config["categories"]}
@@ -765,7 +782,9 @@ class CommonToolsApp:
                 self._nav_watch_active = False
                 if self.search_tab is not None:
                     self.search_tab.shutdown(wait=True)
-                
+                if self.metadata_harvester_tab is not None:
+                    self.metadata_harvester_tab.shutdown(wait=True)
+
                 # Destroy current window
                 self.root.destroy()
                 
@@ -790,6 +809,8 @@ class CommonToolsApp:
         self._nav_watch_active = False
         if self.search_tab is not None:
             self.search_tab.shutdown(wait=True)
+        if self.metadata_harvester_tab is not None:
+            self.metadata_harvester_tab.shutdown(wait=True)
         self.root.destroy()
 
     def run(self) -> None:

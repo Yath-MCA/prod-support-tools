@@ -42,7 +42,13 @@ TNF_HTML = """<!DOCTYPE html>
 """
 
 
-def _make_doc(folder: Path, client: str, html: str, name: str) -> dict:
+def _make_doc(
+    folder: Path,
+    client: str,
+    html: str,
+    name: str,
+    identifier: str | None = None,
+) -> dict:
     folder.mkdir(parents=True, exist_ok=True)
     content = folder / f"{name}_original.html"
     content.write_text(html, encoding="utf-8")
@@ -52,7 +58,7 @@ def _make_doc(folder: Path, client: str, html: str, name: str) -> dict:
         "doc_title": name,
         "client": client,
         "doc_type": "Books",
-        "identifier": name,
+        "identifier": identifier or name,
     }
 
 
@@ -61,8 +67,20 @@ class TestCitationPatternMatrix(unittest.TestCase):
         self.extractor = CitationPatternExtractor()
         self._tmpdir = tempfile.TemporaryDirectory()
         self.root = Path(self._tmpdir.name)
-        oup_doc = _make_doc(self.root / "oup_doc", "OUP", OUP_HTML, "oup_doc")
-        tnf_doc = _make_doc(self.root / "tnf_doc", "TNF", TNF_HTML, "tnf_doc")
+        oup_doc = _make_doc(
+            self.root / "oup_doc",
+            "OUP",
+            OUP_HTML,
+            "The Hidden Politics of Grammar",
+            identifier="9780198722182",
+        )
+        tnf_doc = _make_doc(
+            self.root / "tnf_doc",
+            "TNF",
+            TNF_HTML,
+            "tnf_doc",
+            identifier="9780192866745",
+        )
         self.documents_by_client = {
             "Books|OUP": [oup_doc],
             "Books|TNF": [tnf_doc],
@@ -117,6 +135,39 @@ class TestCitationPatternMatrix(unittest.TestCase):
         )
         self.assertIn("Citation Pattern Matrix (Cite Types × Clients)", html)
         self.assertIn("Citation Pattern Extraction Report", html)
+
+    def test_html_metadata_under_document_name(self):
+        rows, clients, detail, cite_details, meta = self.extractor.build_matrix_data(
+            self.documents_by_client, cite_type="All"
+        )
+        self.assertTrue(
+            any(
+                d.get("document") == "The Hidden Politics of Grammar"
+                and d.get("identifier") == "9780198722182"
+                and d.get("doc_type") == "Books"
+                for d in cite_details
+            )
+        )
+        html = self.extractor.generate_html_report(
+            root_path=str(self.root),
+            doc_type="Books",
+            client_filter="All",
+            cite_type="All",
+            rows=rows,
+            clients=clients,
+            detail_data=detail,
+            cite_details=cite_details,
+            total_docs=2,
+            doc_metadata=meta,
+        )
+        self.assertNotIn('class="metadata-bar"', html)
+        self.assertNotIn('class="metadata-badge"', html)
+        self.assertIn('class="doc-title"', html)
+        self.assertIn('class="doc-meta"', html)
+        self.assertIn("The Hidden Politics of Grammar", html)
+        self.assertIn('<span class="meta-type">Books</span>', html)
+        self.assertIn('<span class="meta-client">OUP</span>', html)
+        self.assertIn('<span class="meta-identifier">9780198722182</span>', html)
 
 
 if __name__ == "__main__":

@@ -164,9 +164,12 @@ class CitationPatternExtractor:
                 "content_file": str(content_file),
             })
 
+            # Matrix counts use all matches; detail rows = one per pattern_key per file
+            file_pattern_counts: Dict[str, int] = defaultdict(int)
+            file_pattern_first: Dict[str, Dict] = {}
             for match in matches:
                 ct = (match.get("cite_type") or "unknown").lower()
-                pattern = match.get("pattern_key") or "Other"
+                pattern = match.get("pattern_key") or "Bare Link Text"
                 text = (match.get("text") or "").strip()
                 subcategory = match.get("subcategory") or match.get("classification", "")
 
@@ -174,17 +177,37 @@ class CitationPatternExtractor:
                 if pattern not in samples_by_type_client[ct][client]:
                     samples_by_type_client[ct][client][pattern] = text[:120]
 
+                detail_key = f"{ct}|{pattern}"
+                file_pattern_counts[detail_key] += 1
+                if detail_key not in file_pattern_first:
+                    file_pattern_first[detail_key] = {
+                        "document": doc_title,
+                        "doc_type": doc.get("doc_type", "") or "",
+                        "client": client,
+                        "identifier": doc.get("identifier", "") or "",
+                        "cite_type": ct,
+                        "classification": subcategory,
+                        "text": text,
+                        "pattern": pattern,
+                        "sample": (match.get("entire_citation") or match.get("html") or "")[:200],
+                        "content_file": str(content_file),
+                    }
+
+            for detail_key, first in file_pattern_first.items():
                 seq += 1
                 cite_details.append({
                     "seq": seq,
-                    "document": doc_title,
-                    "client": client,
-                    "cite_type": ct,
-                    "classification": subcategory,
-                    "text": text,
-                    "pattern": pattern,
-                    "sample": (match.get("entire_citation") or match.get("html") or "")[:200],
-                    "content_file": str(content_file),
+                    "document": first["document"],
+                    "doc_type": first["doc_type"],
+                    "client": first["client"],
+                    "identifier": first["identifier"],
+                    "cite_type": first["cite_type"],
+                    "classification": first["classification"],
+                    "text": first["text"],
+                    "pattern": first["pattern"],
+                    "sample": first["sample"],
+                    "content_file": first["content_file"],
+                    "count": file_pattern_counts[detail_key],
                 })
 
         all_cite_types = sorted(patterns_by_type_client.keys())
@@ -269,11 +292,25 @@ class CitationPatternExtractor:
         detail_table_rows = ""
         for elem in cite_details:
             text_short = elem["text"][:40] + ("..." if len(elem["text"]) > 40 else "")
+            doc_title = elem.get("document") or ""
+            title_display = html.escape(
+                doc_title[:35] + ("..." if len(doc_title) > 35 else "")
+            )
+            meta_type = html.escape(elem.get("doc_type") or "Unknown")
+            meta_client = html.escape(elem.get("client") or "Unknown")
+            meta_id = html.escape(elem.get("identifier") or "N/A")
             detail_table_rows += (
                 "<tr>"
                 f'<td>{elem["seq"]}</td>'
-                f'<td class="doc-name" title="{html.escape(elem["document"])}">'
-                f'{html.escape(elem["document"][:35])}{"..." if len(elem["document"]) > 35 else ""}</td>'
+                f'<td class="doc-name" title="{html.escape(doc_title)}">'
+                f'<div class="doc-title">{title_display}</div>'
+                f'<div class="doc-meta">'
+                f'<span class="meta-type">{meta_type}</span>'
+                f'<span class="meta-sep">|</span>'
+                f'<span class="meta-client">{meta_client}</span>'
+                f'<span class="meta-sep">|</span>'
+                f'<span class="meta-identifier">{meta_id}</span>'
+                f"</div></td>"
                 f'<td><span class="client-badge">{html.escape(elem["client"])}</span></td>'
                 f'<td><code class="tag">{html.escape(elem["cite_type"])}</code></td>'
                 f'<td><span class="area-badge">{html.escape(elem["classification"])}</span></td>'
@@ -281,22 +318,6 @@ class CitationPatternExtractor:
                 f'<td><code class="pattern">{html.escape(elem["pattern"])}</code></td>'
                 "</tr>"
             )
-
-        metadata_badges = ""
-        if doc_metadata:
-            for doc in doc_metadata:
-                type_val = html.escape(doc.get("type", "") or "Unknown")
-                client_val = html.escape(doc.get("client", "") or "Unknown")
-                identifier_val = html.escape(doc.get("identifier", "") or "N/A")
-                metadata_badges += (
-                    '<div class="metadata-badge">'
-                    f'<span class="meta-type">{type_val}</span>'
-                    '<span class="meta-sep">|</span>'
-                    f'<span class="meta-client">{client_val}</span>'
-                    '<span class="meta-sep">|</span>'
-                    f'<span class="meta-identifier">{identifier_val}</span>'
-                    "</div>"
-                )
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -339,14 +360,7 @@ class CitationPatternExtractor:
         }}
         .stat-value {{ font-size: 1.4rem; font-weight: 700; color: var(--accent); }}
         .stat-label {{ font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }}
-        .metadata-bar {{
-            display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 20px;
-        }}
-        .metadata-badge {{
-            background: var(--bg-card); border: 1px solid var(--border-color);
-            border-radius: 6px; padding: 4px 10px; font-size: 0.78rem;
-        }}
-        .meta-sep {{ color: var(--text-muted); margin: 0 4px; }}
+        .meta-sep {{ color: var(--text-muted); margin: 0 3px; }}
         .matrix-container, .detail-container {{
             background: var(--bg-card); border: 1px solid var(--border-color);
             border-radius: 10px; padding: 18px; margin-bottom: 24px; overflow-x: auto;
@@ -384,7 +398,21 @@ class CitationPatternExtractor:
         }}
         .tag {{ color: #c4b5fd; }}
         .id-value {{ color: #e2e8f0; }}
-        .doc-name {{ max-width: 200px; }}
+        .doc-name {{
+            max-width: 260px;
+            white-space: normal;
+            line-height: 1.35;
+        }}
+        .doc-title {{
+            font-weight: 600;
+            color: var(--text-main);
+        }}
+        .doc-meta {{
+            margin-top: 3px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: Consolas, 'Courier New', monospace;
+        }}
     </style>
 </head>
 <body>
@@ -399,8 +427,6 @@ class CitationPatternExtractor:
             </div>
             <div class="timestamp">Generated: {timestamp}</div>
         </header>
-
-        <div class="metadata-bar">{metadata_badges}</div>
 
         <div class="stats">
             <div class="stat-card">
@@ -483,7 +509,7 @@ class CitationPatternExtractor:
             writer = csv.writer(f)
             writer.writerow([
                 "#", "Document", "Client", "Cite Type", "Classification",
-                "Text", "Pattern", "Sample",
+                "Text", "Pattern", "Count", "Sample",
             ])
             for elem in cite_details:
                 writer.writerow([
@@ -494,9 +520,55 @@ class CitationPatternExtractor:
                     elem["classification"],
                     elem["text"],
                     elem["pattern"],
+                    elem.get("count", 1),
                     elem.get("sample", ""),
                 ])
         return output_path
+
+    def _write_type_reports(
+        self,
+        run_folder: Path,
+        ts: str,
+        root_path: str,
+        doc_type: str,
+        client_filter: str,
+        cite_type: str,
+        rows: List[Dict],
+        clients: List[str],
+        detail_data: Dict,
+        cite_details: List[Dict],
+        total_docs: int,
+        doc_metadata: Optional[List[Dict]],
+    ) -> Dict[str, str]:
+        """Write HTML + CSVs for a single cite type. Returns paths dict."""
+        cite_slug = "".join(
+            c if c.isalnum() or c in "-_" else "_" for c in cite_type.lower()
+        ) or "all"
+        html_report = self.generate_html_report(
+            root_path,
+            doc_type,
+            client_filter,
+            cite_type,
+            rows,
+            clients,
+            detail_data,
+            cite_details,
+            total_docs,
+            doc_metadata,
+        )
+        html_path = run_folder / f"citation_pattern_report_{cite_slug}_{ts}.html"
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_report)
+        csv_path = run_folder / f"citation_pattern_matrix_{cite_slug}_{ts}.csv"
+        self.export_csv(rows, clients, csv_path)
+        cite_csv_path = run_folder / f"citation_pattern_cites_{cite_slug}_{ts}.csv"
+        self.export_cite_csv(cite_details, cite_csv_path)
+        return {
+            "html_path": str(html_path),
+            "csv_path": str(csv_path),
+            "cite_csv_path": str(cite_csv_path),
+            "cite_type": cite_type,
+        }
 
     def run_extraction(
         self,
@@ -508,7 +580,7 @@ class CitationPatternExtractor:
         recursive: bool = True,
         progress_callback=None,
     ) -> Dict[str, Any]:
-        """Full pipeline: scan → matrix → HTML + CSV."""
+        """Full pipeline: scan → matrix → HTML + CSV (one report set per cite type)."""
         root_path_obj = Path(root_path)
         output_dir_obj = Path(output_dir)
         output_dir_obj.mkdir(parents=True, exist_ok=True)
@@ -535,57 +607,72 @@ class CitationPatternExtractor:
         if progress_callback:
             progress_callback("analyze", 0, total_docs, "Analyzing citations...")
 
+        # Always scan all types when filter is All, then split reports per type
+        scan_filter = cite_type
         rows, clients, detail_data, cite_details, doc_metadata = self.build_matrix_data(
             documents_by_client,
-            cite_type=cite_type,
+            cite_type=scan_filter,
             progress_callback=lambda cur, tot, name: (
                 progress_callback("analyze", cur, tot, name) if progress_callback else None
             ),
         )
 
-        if progress_callback:
-            progress_callback("report", 0, 3, "Generating reports...")
-
-        html_report = self.generate_html_report(
-            root_path,
-            doc_type,
-            client_filter,
-            cite_type,
-            rows,
-            clients,
-            detail_data,
-            cite_details,
-            total_docs,
-            doc_metadata,
-        )
-
-        cite_slug = "".join(c if c.isalnum() or c in "-_" else "_" for c in cite_type.lower()) or "all"
-        html_path = run_folder / f"citation_pattern_report_{cite_slug}_{ts}.html"
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_report)
+        type_norm = (cite_type or "All").strip().lower()
+        if type_norm == "all":
+            cite_types = sorted({r.get("cite_type") for r in rows if r.get("cite_type")})
+            if not cite_types:
+                cite_types = ["all"]
+        else:
+            cite_types = [cite_type]
 
         if progress_callback:
-            progress_callback("report", 1, 3, "Generating matrix CSV...")
+            progress_callback("report", 0, max(len(cite_types), 1), "Generating reports...")
 
-        csv_path = run_folder / f"citation_pattern_matrix_{cite_slug}_{ts}.csv"
-        self.export_csv(rows, clients, csv_path)
+        per_type_reports = []
+        primary = None
+        for i, ct in enumerate(cite_types):
+            if type_norm == "all" and ct != "all":
+                type_rows = [r for r in rows if r.get("cite_type") == ct]
+                type_details = [d for d in cite_details if d.get("cite_type") == ct]
+            else:
+                type_rows = rows
+                type_details = cite_details
+            paths = self._write_type_reports(
+                run_folder,
+                ts,
+                root_path,
+                doc_type,
+                client_filter,
+                ct,
+                type_rows,
+                clients,
+                detail_data,
+                type_details,
+                total_docs,
+                doc_metadata,
+            )
+            per_type_reports.append(paths)
+            if primary is None:
+                primary = paths
+            if progress_callback:
+                progress_callback("report", i + 1, len(cite_types), f"Wrote {ct} report")
 
         if progress_callback:
-            progress_callback("report", 2, 3, "Generating cite details CSV...")
+            progress_callback("complete", len(cite_types), len(cite_types), "Complete")
 
-        cite_csv_path = run_folder / f"citation_pattern_cites_{cite_slug}_{ts}.csv"
-        self.export_cite_csv(cite_details, cite_csv_path)
-
-        if progress_callback:
-            progress_callback("complete", 3, 3, "Complete")
-
+        primary = primary or {
+            "html_path": "",
+            "csv_path": "",
+            "cite_csv_path": "",
+        }
         return {
-            "html_path": str(html_path),
-            "csv_path": str(csv_path),
-            "cite_csv_path": str(cite_csv_path),
+            "html_path": primary["html_path"],
+            "csv_path": primary["csv_path"],
+            "cite_csv_path": primary["cite_csv_path"],
             "run_folder": str(run_folder),
             "total_docs": total_docs,
             "clients": clients,
             "rows": rows,
-            "cite_count": len(cite_details),
+            "cite_count": sum(d.get("count", 1) for d in cite_details),
+            "per_type_reports": per_type_reports,
         }
