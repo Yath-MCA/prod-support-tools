@@ -981,20 +981,10 @@ class ElementExtractorTab(ttk.Frame):
         if path:
             self.output_dir_var.set(os.path.abspath(path))
 
-    def _ui(self, fn):
-        """Schedule a callable on the Tk main thread."""
-        self.after(0, fn)
-
-    def _set_status(self, message: str):
-        """Thread-safe status line update."""
-        self._ui(lambda m=message: self.status_var.set(m))
-
     def _log(self, message: str):
         """Append log message to the text console in a thread-safe way."""
-        def _append(msg=message):
-            self.res_text.insert(tk.END, msg + "\n")
-            self.res_text.see(tk.END)
-        self._ui(_append)
+        self.res_text.insert(tk.END, message + "\n")
+        self.res_text.see(tk.END)
 
     def _show_context_menu(self, event):
         self.context_menu.post(event.x_root, event.y_root)
@@ -1328,7 +1318,6 @@ class ElementExtractorTab(ttk.Frame):
         self.run_btn.config(state="disabled", text="⏳ EXTRACTING ELEMENTS...")
         self.cancel_btn.config(state="normal")
         self.progress_bar.config(value=0)
-        self.status_var.set("Starting extraction…")
 
         self.cancelled = False
 
@@ -1437,18 +1426,14 @@ class ElementExtractorTab(ttk.Frame):
             grand_total_matches = 0
             total_files_scanned = 0
 
-            # Pre-scan file list for sequential folder mode only.
-            # Parallel mode rediscovers files inside scan_directory_parallel, so
-            # a full silent glob here is redundant and freezes the UI status.
+            # Pre-scan file list for folder mode to avoid re-scanning
             all_files = []
-            if not is_single and not is_batch_mode and not use_parallel:
+            if not is_single and not is_batch_mode:
                 recursive = self.recursive_var.get()
                 ext_str = self.extensions_var.get()
                 filename_filter = self.filename_filter_var.get().strip()
                 dtd_filter = self.dtd_filter_var.get().strip()
                 client_filter = self.client_filter_var.get().strip()
-                month_filter = self.month_filter_var.get()
-                custom_month = self.custom_month_var.get() if month_filter == "Custom" else ""
                 extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
@@ -1461,10 +1446,7 @@ class ElementExtractorTab(ttk.Frame):
                 ):
                     normalized_filter = f"*{normalized_filter}"
 
-                self._set_status("Enumerating files…")
                 for file in source_path.glob(pattern):
-                    if self.cancelled:
-                        break
                     if not file.is_file():
                         continue
                     if normalized_filter and normalized_filter.lower() != "none" and not self.extractor._matches_filename_filter(
@@ -1474,17 +1456,7 @@ class ElementExtractorTab(ttk.Frame):
                     if file.suffix.lower() in extensions:
                         if not self.extractor._matches_config_filters(file, dtd_filter, client_filter):
                             continue
-                        if not self.extractor._matches_month_filter(file, month_filter, custom_month):
-                            continue
                         all_files.append(file)
-                        if len(all_files) % 100 == 0:
-                            count = len(all_files)
-                            self._set_status(f"Enumerating files… {count} found")
-
-                if self.cancelled:
-                    self._log("\n❌ Process Cancelled by User.")
-                    self._set_status("Extraction cancelled.")
-                    return
 
                 all_files = sorted(all_files)
                 total_files_scanned = len(all_files)
@@ -1492,13 +1464,14 @@ class ElementExtractorTab(ttk.Frame):
                 filter_label = filename_filter if filename_filter != "None" else "No filename filter"
                 dtd_label = dtd_filter if dtd_filter != "None" else "No DTD filter"
                 client_label = client_filter if client_filter != "None" else "No client filter"
-                month_label = month_filter if month_filter != "All Time" else "No month filter"
+                month_label = self.month_filter_var.get() if self.month_filter_var.get() != "All Time" else "No month filter"
                 self._log(
                     f"Scanning directory with filters: {', '.join(extensions)} "
                     f"(Recursive: {'Yes' if recursive else 'No'}, Filename: {filter_label}, "
                     f"DTD: {dtd_label}, Client: {client_label}, Month: {month_label})"
                 )
-                if month_filter != "All Time":
+                if self.month_filter_var.get() != "All Time":
+                    custom_month = self.custom_month_var.get() if self.month_filter_var.get() == "Custom" else ""
                     if custom_month:
                         self._log(f"Only scanning files modified in {custom_month}")
                 self._log(f"Found {total_files_scanned} file(s) to scan\n")
@@ -1507,11 +1480,11 @@ class ElementExtractorTab(ttk.Frame):
             for query_idx, query_val in enumerate(queries):
                 if self.cancelled:
                     self._log("\n❌ Process Cancelled by User.")
-                    self._set_status("Extraction cancelled.")
+                    self.status_var.set("Extraction cancelled.")
                     return
 
                 self._log(f"Processing query [{query_idx + 1}/{len(queries)}]: '{query_val}'")
-                self._set_status(f"Processing query {query_idx + 1}/{len(queries)}: {query_val}")
+                self.status_var.set(f"Processing query {query_idx + 1}/{len(queries)}: {query_val}")
 
                 scan_results = {}
                 total_matches = 0
@@ -1550,11 +1523,9 @@ class ElementExtractorTab(ttk.Frame):
 
                     def progress_update(current, total, file_name):
                         percent = int((current / total) * 100) if total > 0 else 0
+                        self.progress_bar.config(value=percent)
                         mode_str = "Parallel" if use_parallel else "Batch"
-                        def _update(p=percent, ms=mode_str, c=current, t=total, n=file_name, qi=query_idx, ql=len(queries)):
-                            self.progress_bar.config(value=p)
-                            self.status_var.set(f"{ms} Query {qi + 1}/{ql} - Scanning ({c}/{t}): {n}")
-                        self._ui(_update)
+                        self.status_var.set(f"{mode_str} Query {query_idx + 1}/{len(queries)} - Scanning ({current}/{total}): {file_name}")
 
                     # Use parallel or batch scanning
                     if use_parallel:
@@ -1585,7 +1556,6 @@ class ElementExtractorTab(ttk.Frame):
                     # Track batch info for enabling Next Batch button
                     batch_has_more = has_more
                     batch_next_offset = next_offset
-                    total_files_scanned = max(total_files_scanned, total_files)
 
                     # Log summary for this query
                     files_with_matches = sum(1 for data in scan_results.values() if data.get("matches"))
@@ -1597,12 +1567,10 @@ class ElementExtractorTab(ttk.Frame):
                         raise ValueError("Folder Scan mode selected, but a file path was provided.")
 
                     def progress_update(current, total, file_name):
-                        percent = int((current / total) * 100) if total > 0 else 0
+                        percent = int((current / total) * 100)
+                        self.progress_bar.config(value=percent)
                         mode_str = "Parallel" if use_parallel else "Query"
-                        def _update(p=percent, ms=mode_str, c=current, t=total, n=file_name, qi=query_idx, ql=len(queries)):
-                            self.progress_bar.config(value=p)
-                            self.status_var.set(f"{ms} {qi + 1}/{ql} - Scanning ({c}/{t}): {n}")
-                        self._ui(_update)
+                        self.status_var.set(f"{mode_str} {query_idx + 1}/{len(queries)} - Scanning ({current}/{total}): {file_name}")
 
                     if use_parallel:
                         # Use parallel processing with scan_directory_parallel
@@ -1629,7 +1597,6 @@ class ElementExtractorTab(ttk.Frame):
                                 progress_callback=progress_update,
                                 recursive=recursive
                             )
-                        total_files_scanned = max(total_files_scanned, total_files)
                     else:
                         # Process each file with caching (sequential mode)
                         total_files = total_files_scanned
@@ -1677,7 +1644,7 @@ class ElementExtractorTab(ttk.Frame):
             # Check for cancellation
             if self.cancelled:
                 self._log("\n❌ Process Cancelled by User.")
-                self._set_status("Extraction cancelled.")
+                self.status_var.set("Extraction cancelled.")
                 return
 
             self._log("\n---------------------------------------------------------------------")
@@ -1706,7 +1673,7 @@ class ElementExtractorTab(ttk.Frame):
             run_folder.mkdir(parents=True, exist_ok=True)
 
             # Generate and save detailed report (with display flags)
-            self._set_status("Generating detailed HTML report...")
+            self.status_var.set("Generating detailed HTML report...")
             report_html = self.extractor.generate_html_report(
                 str(source_path), query_type, ", ".join(queries), attr_name, attr_val,
                 all_selector_results, grand_total_matches, total_files_scanned if not is_single else 1, is_single,
@@ -1723,7 +1690,7 @@ class ElementExtractorTab(ttk.Frame):
             self._log(f"\n📄 Detailed report saved: {run_folder_name}/{detailed_report_name}")
 
             # Generate and save consolidated summary report
-            self._set_status("Generating consolidated summary report...")
+            self.status_var.set("Generating consolidated summary report...")
             summary_html = self.extractor.generate_consolidated_summary_report(
                 all_selector_results, str(source_path), ts, is_single
             )
@@ -1741,7 +1708,7 @@ class ElementExtractorTab(ttk.Frame):
             citation_report_path = ""
             entire_citation_report_path = ""
             if citation_type_report:
-                self._set_status("Generating citation type report...")
+                self.status_var.set("Generating citation type report...")
                 self._log(
                     f"\n📑 Scanning citations for cite type '{citation_cite_type}' "
                     f"(ref-type | object-type | data-role)..."
@@ -1763,7 +1730,7 @@ class ElementExtractorTab(ttk.Frame):
                 def citation_progress_update(current, total, file_name):
                     percent = int((current / total) * 100) if total > 0 else 0
                     self.progress_bar.config(value=percent)
-                    self._set_status(
+                    self.status_var.set(
                         f"Citation-type scan ({current}/{total}): {file_name}"
                     )
 
@@ -1815,7 +1782,7 @@ class ElementExtractorTab(ttk.Frame):
                         f"({type_matches} citation(s) in {type_files} file(s), type={ct})"
                     )
 
-                    self._set_status(f"Generating entire citation report ({ct})...")
+                    self.status_var.set(f"Generating entire citation report ({ct})...")
                     entire_html = self.extractor.generate_entire_citation_report(
                         str(source_path), type_scan, type_matches, type_files,
                         cite_type=ct,
@@ -1844,7 +1811,7 @@ class ElementExtractorTab(ttk.Frame):
             # Generate mixed-citation comment + alpha text report if enabled
             mixed_citation_report_path = ""
             if mixed_citation_direct_hits:
-                self._set_status("Scanning mixed-citation comment / alpha text...")
+                self.status_var.set("Scanning mixed-citation comment / alpha text...")
                 self._log("\nScanning mixed-citation direct comment + alpha text hits...")
 
                 recursive = bool(self.recursive_var.get()) if not is_single else False
@@ -1863,7 +1830,7 @@ class ElementExtractorTab(ttk.Frame):
                 def progress_update(current, total, file_name):
                     percent = int((current / total) * 100) if total > 0 else 0
                     self.progress_bar.config(value=percent)
-                    self._set_status(
+                    self.status_var.set(
                         f"Mixed-citation scan ({current}/{total}): {file_name}"
                     )
 
@@ -1915,7 +1882,7 @@ class ElementExtractorTab(ttk.Frame):
                     f"({total_mixed_hits} hit(s) in {files_with_mixed}/{len(file_results)} file(s))"
                 )
                 self._log(f"Mixed-citation CSV saved: {run_folder_name}/{mixed_csv_name}")
-                self._set_status(
+                self.status_var.set(
                     f"Mixed-citation report complete: {total_mixed_hits} hit(s) "
                     f"in {files_with_mixed}/{len(file_results)} file(s)."
                 )
@@ -1923,7 +1890,7 @@ class ElementExtractorTab(ttk.Frame):
             # Generate and save CSV if enabled
             csv_path = ""
             if generate_csv:
-                self._set_status("Generating CSV export...")
+                self.status_var.set("Generating CSV export...")
                 csv_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.csv"
                 csv_report_path = run_folder / csv_report_name
 
@@ -1937,7 +1904,7 @@ class ElementExtractorTab(ttk.Frame):
             copied_files_count = 0
             copied_folder_path = ""
             if copy_matched_files and grand_total_matches > 0:
-                self._set_status("Copying matched files...")
+                self.status_var.set("Copying matched files...")
                 self._log("\n📁 Copying matched source files...")
 
                 # Create subfolder inside run folder for matched files
@@ -2016,10 +1983,10 @@ class ElementExtractorTab(ttk.Frame):
                     self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
                     if hasattr(self, '_last_batch_next_offset'):
                         delattr(self, '_last_batch_next_offset')
-                self._set_status(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).{batch_info}")
+                self.status_var.set(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).{batch_info}")
                 self._log(batch_info)
             else:
-                self._set_status(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).")
+                self.status_var.set(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).")
                 # Disable Next Batch button in non-batch mode
                 self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
 
@@ -2037,11 +2004,9 @@ class ElementExtractorTab(ttk.Frame):
 
         except Exception as e:
             self._log(f"\n❌ Error during extraction:\n{str(e)}")
-            self._set_status("Extraction failed with errors.")
-            self._ui(lambda err=str(e): messagebox.showerror("Extraction Error", f"An error occurred:\n{err}"))
+            self.status_var.set("Extraction failed with errors.")
+            messagebox.showerror("Extraction Error", f"An error occurred:\n{str(e)}")
 
         finally:
-            def _reset_ui():
-                self.run_btn.config(state="normal", text="🚀  RUN ELEMENT EXTRACTION")
-                self.cancel_btn.config(state="disabled")
-            self._ui(_reset_ui)
+            self.run_btn.config(state="normal", text="🚀  RUN ELEMENT EXTRACTION")
+            self.cancel_btn.config(state="disabled")
