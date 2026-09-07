@@ -19,6 +19,15 @@ from core.mixed_citation_direct_hits import (
 )
 from core.run_history import RunHistoryStore
 
+
+def should_skip_selector_extract(mixed_hits: bool, mixed_only: bool) -> bool:
+    """Return True when Mixed-citation-only mode should skip CSS/selector extract.
+
+    Implies mixed-citation hits is on; callers should gate the checkbox the same way.
+    """
+    return bool(mixed_hits) and bool(mixed_only)
+
+
 class ElementExtractorTab(ttk.Frame):
     """
     Tkinter Tab for HTML/XML Element Extraction and reporting.
@@ -277,6 +286,18 @@ class ElementExtractorTab(ttk.Frame):
             state="disabled" # Disabled by default since default mode is Single File
         )
         self.recursive_chk.grid(row=0, column=0, padx=(0, 20), sticky="w")
+
+        self.use_folder_index_var = tk.BooleanVar(value=True)
+        self.use_folder_index_chk = tk.Checkbutton(
+            options_frame,
+            text="Use folder index (faster re-scan)",
+            variable=self.use_folder_index_var,
+            bg="#1e293b", fg="#94a3b8", activebackground="#1e293b", activeforeground="#818cf8",
+            selectcolor="#334155",
+            font=("Segoe UI", 9),
+            state="disabled",
+        )
+        self.use_folder_index_chk.grid(row=0, column=3, padx=(12, 0), sticky="w")
 
         tk.Label(options_frame, text="Extensions:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9)).grid(row=0, column=1, sticky="e", padx=(0, 5))
         self.extensions_var = tk.StringVar(value=".xml, .html, .htm, .xhtml")
@@ -624,11 +645,24 @@ class ElementExtractorTab(ttk.Frame):
             report_options_frame3,
             text="Mixed-citation comment + alpha text",
             variable=self.mixed_citation_direct_hits_var,
+            command=self._on_mixed_citation_toggle,
             bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
             selectcolor="#334155",
             font=("Segoe UI", 9)
         )
         self.mixed_citation_direct_hits_chk.pack(side="left")
+
+        self.mixed_citation_only_var = tk.BooleanVar(value=False)
+        self.mixed_citation_only_chk = tk.Checkbutton(
+            report_options_frame3,
+            text="Mixed-citation only (skip CSS extract)",
+            variable=self.mixed_citation_only_var,
+            state="disabled",
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.mixed_citation_only_chk.pack(side="left", padx=(16, 0))
 
         # Report Organization Section
         tk.Label(
@@ -886,6 +920,15 @@ class ElementExtractorTab(ttk.Frame):
         # ttk Combobox: use 'normal' for editable presets, 'disabled' when off
         self.citation_cite_type_combo.config(state="normal" if enabled else "disabled")
 
+    def _on_mixed_citation_toggle(self):
+        """Enable mixed-citation-only checkbox only when mixed hits is checked."""
+        enabled = bool(self.mixed_citation_direct_hits_var.get())
+        if enabled:
+            self.mixed_citation_only_chk.config(state="normal")
+        else:
+            self.mixed_citation_only_var.set(False)
+            self.mixed_citation_only_chk.config(state="disabled")
+
     def _on_month_filter_change(self, event=None):
         is_custom = self.month_filter_var.get() == "Custom"
         state = "normal" if is_custom else "disabled"
@@ -914,6 +957,7 @@ class ElementExtractorTab(ttk.Frame):
         mode = self.mode_var.get()
         if mode == "Single File":
             self.recursive_chk.config(state="disabled")
+            self.use_folder_index_chk.config(state="disabled")
             self.ext_entry.config(state="disabled", bg="#1e293b", fg="#475569")
             self.filename_filter_combo.config(state="disabled")
             self.dtd_filter_combo.config(state="disabled")
@@ -931,6 +975,7 @@ class ElementExtractorTab(ttk.Frame):
             self.options_lbl.config(fg="#475569")
         else:
             self.recursive_chk.config(state="normal")
+            self.use_folder_index_chk.config(state="normal")
             self.ext_entry.config(state="normal", bg="#334155", fg="white")
             self.filename_filter_combo.config(state="readonly")
             self.dtd_filter_combo.config(state="readonly")
@@ -1130,7 +1175,9 @@ class ElementExtractorTab(ttk.Frame):
         self.citation_type_report_var.set(bool(entry.get("citation_type_report", False)))
         self.citation_cite_type_var.set(str(entry.get("citation_cite_type", "bibr") or "bibr").strip() or "bibr")
         self.mixed_citation_direct_hits_var.set(bool(entry.get("mixed_citation_direct_hits", False)))
+        self.mixed_citation_only_var.set(bool(entry.get("mixed_citation_only", False)))
         self._on_citation_type_toggle()
+        self._on_mixed_citation_toggle()
         # Restore batch state for Next Batch button
         params = entry.get("params", {})
         if params.get("has_more_batches") and params.get("next_batch_offset"):
@@ -1225,6 +1272,7 @@ class ElementExtractorTab(ttk.Frame):
             "citation_type_report": bool(self.citation_type_report_var.get()),
             "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
             "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
+            "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
             "params": {
                 "mode": self.mode_var.get().strip(),
                 "query_type": self.selector_type_var.get().strip(),
@@ -1255,6 +1303,7 @@ class ElementExtractorTab(ttk.Frame):
                 "citation_type_report": bool(self.citation_type_report_var.get()),
                 "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
                 "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
+                "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
                 "summary_report_path": summary_report_path,
                 "csv_path": csv_path,
                 "copied_files_count": copied_files_count,
@@ -1292,20 +1341,27 @@ class ElementExtractorTab(ttk.Frame):
             query_type = "XPath"
 
         # Parse comma-separated queries for all query types (Tag Name, CSS Selector, XPath)
+        mixed_citation_only = should_skip_selector_extract(
+            bool(self.mixed_citation_direct_hits_var.get()),
+            bool(self.mixed_citation_only_var.get()),
+        )
         queries = self._parse_query_list(raw_query_val)
         if not queries:
-            messagebox.showerror("Error", "Please enter a tag, selector, or XPath query.")
-            return
-
-        # Validate each query
-        normalized_queries = []
-        for query in queries:
-            try:
-                normalized = self._normalize_query_input(query_type, query)
-                normalized_queries.append(normalized)
-            except ValueError as exc:
-                messagebox.showerror("Error", f"Invalid query '{query}': {str(exc)}")
+            if mixed_citation_only:
+                normalized_queries = []
+            else:
+                messagebox.showerror("Error", "Please enter a tag, selector, or XPath query.")
                 return
+        else:
+            # Validate each query
+            normalized_queries = []
+            for query in queries:
+                try:
+                    normalized = self._normalize_query_input(query_type, query)
+                    normalized_queries.append(normalized)
+                except ValueError as exc:
+                    messagebox.showerror("Error", f"Invalid query '{query}': {str(exc)}")
+                    return
 
         if not source_path:
             messagebox.showerror("Error", "Please provide a valid source path (file or folder).")
@@ -1328,7 +1384,14 @@ class ElementExtractorTab(ttk.Frame):
         self.run_btn.config(state="disabled", text="⏳ EXTRACTING ELEMENTS...")
         self.cancel_btn.config(state="normal")
         self.progress_bar.config(value=0)
-        self.status_var.set("Starting extraction…")
+        self.status_var.set(
+            "Starting mixed-citation scan…"
+            if should_skip_selector_extract(
+                bool(self.mixed_citation_direct_hits_var.get()),
+                bool(self.mixed_citation_only_var.get()),
+            )
+            else "Starting extraction…"
+        )
 
         self.cancelled = False
 
@@ -1369,6 +1432,134 @@ class ElementExtractorTab(ttk.Frame):
 
         self.status_var.set(f"Resuming from batch offset {self._last_batch_next_offset}...")
 
+
+    def _collect_paths_for_mixed_scan(
+        self,
+        source_path: Path,
+        is_single: bool,
+        all_files: list,
+        all_selector_results: list,
+    ) -> list:
+        """Reuse files already discovered during selector extract (avoid a second tree walk)."""
+        if is_single:
+            return [Path(source_path)]
+        if all_files:
+            return [Path(p) for p in all_files]
+        paths = []
+        seen = set()
+        for sel in all_selector_results or []:
+            for fp in (sel.get("scan_results") or {}):
+                key = str(fp)
+                if key in seen:
+                    continue
+                seen.add(key)
+                paths.append(Path(fp))
+        return paths
+
+    def _write_mixed_citation_direct_hits_outputs(
+        self,
+        source_path: Path,
+        is_single: bool,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        ts: str,
+        file_paths: list | None = None,
+    ) -> str:
+        """Scan mixed-citation direct hits and write HTML + CSV under run_folder.
+
+        Returns absolute path of the HTML report, or empty string on cancel/no write.
+        """
+        self._set_status("Scanning mixed-citation comment / alpha text…")
+        self._log("\nScanning mixed-citation direct comment + alpha text hits...")
+
+        recursive = bool(self.recursive_var.get()) if not is_single else False
+        ext_str = self.extensions_var.get()
+        filename_filter = self.filename_filter_var.get().strip()
+        dtd_filter = self.dtd_filter_var.get().strip()
+        client_filter = self.client_filter_var.get().strip()
+        month_filter = self.month_filter_var.get().strip() or "All Time"
+        custom_month = self.custom_month_var.get().strip()
+        extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+        if not extensions:
+            extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+        self.progress_bar.config(value=0)
+
+        def progress_update(current, total, file_name):
+            percent = int((current / total) * 100) if total > 0 else 0
+            self.progress_bar.config(value=percent)
+            self._set_status(
+                f"Mixed-citation scan ({current}/{total}): {file_name}"
+            )
+
+        if file_paths is not None:
+            self._log(
+                f"Reusing {len(file_paths)} discovered file path(s) for mixed-citation "
+                f"(skipping tree walk)"
+            )
+        mixed_scan_results = self.extractor.scan_mixed_citation_direct_hits(
+            source_path,
+            recursive=recursive,
+            extensions=extensions,
+            filename_filter=filename_filter if not is_single else None,
+            dtd_filter=dtd_filter if not is_single else None,
+            client_filter=client_filter if not is_single else None,
+            month_filter=month_filter if not is_single else "All Time",
+            custom_month=custom_month if not is_single else "",
+            progress_callback=progress_update,
+            cancel_check=lambda: self.cancelled,
+            file_paths=file_paths,
+            use_index=(bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True) and not is_single and file_paths is None,
+            log_callback=self._log,
+        )
+
+        if self.cancelled:
+            self._log("\nProcess Cancelled by User during mixed-citation scan.")
+            self._set_status("Extraction cancelled.")
+            return ""
+
+        file_results = []
+        for file_path_str, data in (mixed_scan_results or {}).items():
+            file_results.append({
+                "path": file_path_str,
+                "client": data.get("client", "") or "",
+                "ok": bool(data.get("ok", True)),
+                "hits": list(data.get("hits") or []),
+            })
+
+        rollup_rows = rollup_by_client(file_results)
+        mixed_html = generate_mixed_citation_direct_hits_report_html(
+            str(source_path), file_results, rollup_rows
+        )
+        mixed_report_name = (
+            f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.html"
+        )
+        mixed_report_file = run_folder / mixed_report_name
+        with open(mixed_report_file, "w", encoding="utf-8") as f:
+            f.write(mixed_html)
+        mixed_citation_report_path = str(mixed_report_file.absolute())
+        self.last_mixed_citation_report_path = mixed_citation_report_path
+
+        mixed_csv_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.csv"
+        mixed_csv_file = run_folder / mixed_csv_name
+        write_mixed_citation_direct_hits_csv(
+            mixed_csv_file, file_results, rollup_rows
+        )
+
+        total_mixed_hits = sum(len(r.get("hits") or []) for r in file_results)
+        files_with_mixed = sum(1 for r in file_results if r.get("hits"))
+        self._log(
+            f"Mixed-citation report saved: {run_folder_name}/{mixed_report_name} "
+            f"({total_mixed_hits} hit(s) in {files_with_mixed}/{len(file_results)} file(s))"
+        )
+        self._log(f"Mixed-citation CSV saved: {run_folder_name}/{mixed_csv_name}")
+        self._set_status(
+            f"Mixed-citation report complete: {total_mixed_hits} hit(s) "
+            f"in {files_with_mixed}/{len(file_results)} file(s)."
+        )
+        return mixed_citation_report_path
+
     def _run_extraction_thread(self, source_path_str: str, queries: list[str], query_type: str, output_dir_str: str):
         try:
             mode = self.mode_var.get()
@@ -1385,6 +1576,10 @@ class ElementExtractorTab(ttk.Frame):
             citation_type_report = bool(self.citation_type_report_var.get())
             citation_cite_type = self.citation_cite_type_var.get().strip() or "bibr"
             mixed_citation_direct_hits = bool(self.mixed_citation_direct_hits_var.get())
+            mixed_citation_only = should_skip_selector_extract(
+                mixed_citation_direct_hits,
+                bool(self.mixed_citation_only_var.get()),
+            )
 
             # Batch processing options
             is_batch_mode = self.batch_mode_var.get() if mode == "Folder Scan" else False
@@ -1405,13 +1600,16 @@ class ElementExtractorTab(ttk.Frame):
             self._log(f"  Mode:          {mode}")
             self._log(f"  Source Path:   {source_path}")
             self._log(f"  Query Type:    {query_type}")
-            self._log(f"  Queries:       {len(queries)} selector(s) to process")
-            for i, q in enumerate(queries, 1):
-                self._log(f"    [{i}] {q}")
+            if mixed_citation_only:
+                self._log("  Queries:       (skipped — mixed-citation only mode)")
+            else:
+                self._log(f"  Queries:       {len(queries)} selector(s) to process")
+                for i, q in enumerate(queries, 1):
+                    self._log(f"    [{i}] {q}")
             if query_type == "Tag Name" and attr_name:
                 self._log(f"  Attr Filter:   {attr_name} = '{attr_val}'")
             copy_matched_files = bool(self.copy_matched_files_var.get())
-            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}")
+            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}, Mixed-only={'Yes' if mixed_citation_only else 'No'}")
 
             # Parallel and batch mode logging
             batch_has_more = False
@@ -1431,6 +1629,58 @@ class ElementExtractorTab(ttk.Frame):
                 self._log(f"  Total Folders: {total_folders}")
 
             self._log("---------------------------------------------------------------------\n")
+
+            if mixed_citation_only:
+                self._log("Mixed-citation only mode — skipping selector extract")
+                self._set_status("Starting mixed-citation scan…")
+
+                safe_target_name = self._slugify(source_path.stem, "selected_file")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                query_slug = "mixed_citation_only"
+                run_folder_name = f"extraction_{safe_target_name}_{query_slug}_{ts}"
+                if self.org_by_month_var.get():
+                    month_folder = datetime.now().strftime("%Y-%m")
+                    run_folder = output_dir / month_folder / run_folder_name
+                else:
+                    run_folder = output_dir / run_folder_name
+                run_folder.mkdir(parents=True, exist_ok=True)
+
+                mixed_citation_report_path = self._write_mixed_citation_direct_hits_outputs(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    ts=ts,
+                )
+
+                query_label = "(mixed-citation only)"
+                self.last_report_path = mixed_citation_report_path or ""
+                self.last_summary_report_path = ""
+                self._record_history_entry(
+                    self._current_run_settings(
+                        str(source_path),
+                        query_label,
+                        str(output_dir),
+                        self.last_report_path,
+                        "",
+                        "",
+                        0,
+                        "",
+                        batch_offset=0,
+                        has_more_batches=False,
+                        next_batch_offset=0,
+                    )
+                )
+
+                self._log(f"\nAll outputs saved to: {run_folder}")
+                self._set_status("Mixed-citation only scan complete.")
+                self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
+                if self.last_report_path:
+                    self.open_last_btn.config(state="normal")
+                if self.open_report_var.get() and mixed_citation_report_path:
+                    webbrowser.open(f"file:///{mixed_citation_report_path}")
+                return
 
             # Collect results for all selectors
             all_selector_results = []
@@ -1453,40 +1703,28 @@ class ElementExtractorTab(ttk.Frame):
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
 
-                # Build file list once
-                pattern = "**/*" if recursive else "*"
-                normalized_filter = filename_filter.strip() if filename_filter else ""
-                if normalized_filter and normalized_filter.lower() != "none" and not any(
-                    char in normalized_filter for char in "*?[]"
-                ):
-                    normalized_filter = f"*{normalized_filter}"
-
-                self._set_status("Enumerating files…")
-                for file in source_path.glob(pattern):
-                    if self.cancelled:
-                        break
-                    if not file.is_file():
-                        continue
-                    if normalized_filter and normalized_filter.lower() != "none" and not self.extractor._matches_filename_filter(
-                        file.name, normalized_filter
-                    ):
-                        continue
-                    if file.suffix.lower() in extensions:
-                        if not self.extractor._matches_config_filters(file, dtd_filter, client_filter):
-                            continue
-                        if not self.extractor._matches_month_filter(file, month_filter, custom_month):
-                            continue
-                        all_files.append(file)
-                        if len(all_files) % 100 == 0:
-                            count = len(all_files)
-                            self._set_status(f"Enumerating files… {count} found")
+                # Build file list once (durable folder index when enabled)
+                self._set_status("Enumerating files...")
+                use_index = bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True
+                all_files = self.extractor.collect_matching_files(
+                    source_path,
+                    recursive=recursive,
+                    extensions=extensions,
+                    filename_filter=filename_filter,
+                    dtd_filter=dtd_filter,
+                    client_filter=client_filter,
+                    month_filter=month_filter,
+                    custom_month=custom_month,
+                    use_index=use_index,
+                    discover_new=True,
+                    log_callback=self._log,
+                    cancel_check=lambda: self.cancelled,
+                )
 
                 if self.cancelled:
-                    self._log("\n❌ Process Cancelled by User.")
+                    self._log("\nProcess Cancelled by User.")
                     self._set_status("Extraction cancelled.")
                     return
-
-                all_files = sorted(all_files)
                 total_files_scanned = len(all_files)
 
                 filter_label = filename_filter if filename_filter != "None" else "No filename filter"
@@ -1568,7 +1806,9 @@ class ElementExtractorTab(ttk.Frame):
                                 batch_size=batch_size, batch_offset=batch_offset,
                                 max_workers=worker_count,
                                 progress_callback=progress_update,
-                                recursive=recursive
+                                recursive=recursive,
+                                use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
+                                log_callback=self._log,
                             )
                     else:
                         scan_results, total_matches, total_files, has_more, next_offset = \
@@ -1579,7 +1819,9 @@ class ElementExtractorTab(ttk.Frame):
                                 dtd_filter=dtd_filter, client_filter=client_filter,
                                 month_filter=month_filter, custom_month=custom_month,
                                 batch_size=batch_size, batch_offset=batch_offset,
-                                progress_callback=progress_update
+                                progress_callback=progress_update,
+                                use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
+                                log_callback=self._log,
                             )
 
                     # Track batch info for enabling Next Batch button
@@ -1627,7 +1869,9 @@ class ElementExtractorTab(ttk.Frame):
                                 batch_size=0, batch_offset=0,
                                 max_workers=worker_count,
                                 progress_callback=progress_update,
-                                recursive=recursive
+                                recursive=recursive,
+                                use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
+                                log_callback=self._log,
                             )
                         total_files_scanned = max(total_files_scanned, total_files)
                     else:
@@ -1844,80 +2088,17 @@ class ElementExtractorTab(ttk.Frame):
             # Generate mixed-citation comment + alpha text report if enabled
             mixed_citation_report_path = ""
             if mixed_citation_direct_hits:
-                self._set_status("Scanning mixed-citation comment / alpha text...")
-                self._log("\nScanning mixed-citation direct comment + alpha text hits...")
-
-                recursive = bool(self.recursive_var.get()) if not is_single else False
-                ext_str = self.extensions_var.get()
-                filename_filter = self.filename_filter_var.get().strip()
-                dtd_filter = self.dtd_filter_var.get().strip()
-                client_filter = self.client_filter_var.get().strip()
-                month_filter = self.month_filter_var.get().strip() or "All Time"
-                custom_month = self.custom_month_var.get().strip()
-                extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
-                if not extensions:
-                    extensions = ['.xml', '.html', '.htm', '.xhtml']
-
-                self.progress_bar.config(value=0)
-
-                def progress_update(current, total, file_name):
-                    percent = int((current / total) * 100) if total > 0 else 0
-                    self.progress_bar.config(value=percent)
-                    self._set_status(
-                        f"Mixed-citation scan ({current}/{total}): {file_name}"
-                    )
-
-                mixed_scan_results = self.extractor.scan_mixed_citation_direct_hits(
-                    source_path,
-                    recursive=recursive,
-                    extensions=extensions,
-                    filename_filter=filename_filter if not is_single else None,
-                    dtd_filter=dtd_filter if not is_single else None,
-                    client_filter=client_filter if not is_single else None,
-                    month_filter=month_filter if not is_single else "All Time",
-                    custom_month=custom_month if not is_single else "",
-                    progress_callback=progress_update,
-                    cancel_check=lambda: self.cancelled,
+                reused_paths = self._collect_paths_for_mixed_scan(
+                    source_path, is_single, all_files, all_selector_results
                 )
-
-                file_results = []
-                for file_path_str, data in (mixed_scan_results or {}).items():
-                    file_results.append({
-                        "path": file_path_str,
-                        "client": data.get("client", "") or "",
-                        "ok": bool(data.get("ok", True)),
-                        "hits": list(data.get("hits") or []),
-                    })
-
-                rollup_rows = rollup_by_client(file_results)
-                mixed_html = generate_mixed_citation_direct_hits_report_html(
-                    str(source_path), file_results, rollup_rows
-                )
-                mixed_report_name = (
-                    f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.html"
-                )
-                mixed_report_file = run_folder / mixed_report_name
-                with open(mixed_report_file, "w", encoding="utf-8") as f:
-                    f.write(mixed_html)
-                mixed_citation_report_path = str(mixed_report_file.absolute())
-                self.last_mixed_citation_report_path = mixed_citation_report_path
-
-                mixed_csv_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.csv"
-                mixed_csv_file = run_folder / mixed_csv_name
-                write_mixed_citation_direct_hits_csv(
-                    mixed_csv_file, file_results, rollup_rows
-                )
-
-                total_mixed_hits = sum(len(r.get("hits") or []) for r in file_results)
-                files_with_mixed = sum(1 for r in file_results if r.get("hits"))
-                self._log(
-                    f"Mixed-citation report saved: {run_folder_name}/{mixed_report_name} "
-                    f"({total_mixed_hits} hit(s) in {files_with_mixed}/{len(file_results)} file(s))"
-                )
-                self._log(f"Mixed-citation CSV saved: {run_folder_name}/{mixed_csv_name}")
-                self._set_status(
-                    f"Mixed-citation report complete: {total_mixed_hits} hit(s) "
-                    f"in {files_with_mixed}/{len(file_results)} file(s)."
+                mixed_citation_report_path = self._write_mixed_citation_direct_hits_outputs(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    ts=ts,
+                    file_paths=reused_paths if reused_paths else None,
                 )
 
             # Generate and save CSV if enabled

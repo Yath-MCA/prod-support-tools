@@ -371,6 +371,22 @@ class ElementExtractor:
             return "|".join(parts)
         return ""
 
+    def collect_matching_files(self, dir_path: Path, *, recursive: bool = False,
+                               extensions: list = None, filename_filter: str = None,
+                               dtd_filter: str = None, client_filter: str = None,
+                               month_filter: str = "All Time", custom_month: str = "",
+                               use_index: bool = True, discover_new: bool = True,
+                               log_callback=None, cancel_check=None) -> list:
+        """Discover files; uses durable folder-scan JSON index when enabled."""
+        from core.folder_scan_index import collect_matching_files as _collect
+        return _collect(
+            self, dir_path, recursive=recursive, extensions=extensions,
+            filename_filter=filename_filter, dtd_filter=dtd_filter,
+            client_filter=client_filter, month_filter=month_filter,
+            custom_month=custom_month, use_index=use_index, discover_new=discover_new,
+            log_callback=log_callback, cancel_check=cancel_check,
+        )
+
     def parse_and_extract(self, file_path: Path, query_type: str, query_val: str, attr_name: str = "", attr_val: str = ""):
         """
         Parses a single file and extracts elements matching the query.
@@ -527,7 +543,7 @@ class ElementExtractor:
                        extensions: list = None, filename_filter: str = None,
                        dtd_filter: str = None, client_filter: str = None,
                        month_filter: str = "All Time", custom_month: str = "",
-                       progress_callback=None):
+                       progress_callback=None, use_index: bool = True, log_callback=None):
         """
         Scans a directory for matching files and extracts elements.
         Uses cache for files that have not been modified since last scan.
@@ -540,29 +556,19 @@ class ElementExtractor:
         if not extensions:
             extensions = ['.xml', '.html', '.htm', '.xhtml']
 
-        pattern = "**/*" if recursive else "*"
-        all_files = []
-        normalized_filter = filename_filter.strip() if filename_filter else ""
-        if normalized_filter and normalized_filter.lower() != "none" and not any(
-            char in normalized_filter for char in "*?[]"
-        ):
-            normalized_filter = f"*{normalized_filter}"
-        for file in dir_path.glob(pattern):
-            if not file.is_file():
-                continue
-            if normalized_filter and normalized_filter.lower() != "none" and not self._matches_filename_filter(
-                file.name, normalized_filter
-            ):
-                continue
-            if file.suffix.lower() in extensions:
-                if not self._matches_config_filters(file, dtd_filter, client_filter):
-                    continue
-                # Apply month filter
-                if not self._matches_month_filter(file, month_filter, custom_month):
-                    continue
-                all_files.append(file)
-
-        all_files = sorted(all_files)
+        all_files = self.collect_matching_files(
+            dir_path,
+            recursive=recursive,
+            extensions=extensions,
+            filename_filter=filename_filter,
+            dtd_filter=dtd_filter,
+            client_filter=client_filter,
+            month_filter=month_filter,
+            custom_month=custom_month,
+            use_index=use_index,
+            discover_new=True,
+            log_callback=log_callback,
+        )
         total_files = len(all_files)
         
         scan_results = {}
@@ -602,7 +608,7 @@ class ElementExtractor:
                                dtd_filter: str = None, client_filter: str = None,
                                month_filter: str = "All Time", custom_month: str = "",
                                batch_size: int = 50, batch_offset: int = 0,
-                               progress_callback=None):
+                               progress_callback=None, use_index: bool = True, log_callback=None):
         """
         Scan directory in batches - only process batch_size folders starting from offset.
 
@@ -650,33 +656,27 @@ class ElementExtractor:
         next_offset = batch_offset + batch_size
         has_more = next_offset < total_folders
 
-        # Normalize filename filter
-        normalized_filter = filename_filter.strip() if filename_filter else ""
-        if normalized_filter and normalized_filter.lower() != "none" and not any(
-            char in normalized_filter for char in "*?[]"
-        ):
-            normalized_filter = f"*{normalized_filter}"
-
-        # Collect all files from the folders to process (recursive within each folder)
-        all_files = []
+        collected = self.collect_matching_files(
+            dir_path, recursive=True, extensions=extensions,
+            filename_filter=filename_filter, dtd_filter=dtd_filter,
+            client_filter=client_filter, month_filter=month_filter,
+            custom_month=custom_month, use_index=use_index,
+            discover_new=True, log_callback=log_callback,
+        )
+        folder_prefixes = []
         for folder in folders_to_process:
-            for file in folder.rglob("*"):
-                if not file.is_file():
-                    continue
-                if file.suffix.lower() not in extensions:
-                    continue
-                # Apply filename filter
-                if normalized_filter and normalized_filter.lower() != "none":
-                    if not self._matches_filename_filter(file.name, normalized_filter):
-                        continue
-                # Apply DTD and client filters
-                if not self._matches_config_filters(file, dtd_filter, client_filter):
-                    continue
-                # Apply month filter
-                if not self._matches_month_filter(file, month_filter, custom_month):
-                    continue
+            try:
+                folder_prefixes.append(str(folder.resolve()).lower())
+            except OSError:
+                folder_prefixes.append(str(folder.absolute()).lower())
+        all_files = []
+        for file in collected:
+            try:
+                fp = str(file.resolve()).lower()
+            except OSError:
+                fp = str(file.absolute()).lower()
+            if any(fp == pref or fp.startswith(pref + "\\") or fp.startswith(pref + "/") for pref in folder_prefixes):
                 all_files.append(file)
-
         all_files = sorted(all_files)
         total_files = len(all_files)
 
@@ -731,7 +731,7 @@ class ElementExtractor:
                                month_filter: str = "All Time", custom_month: str = "",
                                batch_size: int = 0, batch_offset: int = 0,
                                max_workers: int = None, progress_callback=None,
-                               recursive: bool = True):
+                               recursive: bool = True, use_index: bool = True, log_callback=None):
         """
         Parallel directory scanning using ProcessPoolExecutor for 3-4x speedup on multi-core machines.
 
@@ -784,36 +784,37 @@ class ElementExtractor:
             has_more = False
             next_offset = 0
 
-        # Normalize filename filter
-        normalized_filter = filename_filter.strip() if filename_filter else ""
-        if normalized_filter and normalized_filter.lower() != "none" and not any(
-            char in normalized_filter for char in "*?[]"
-        ):
-            normalized_filter = f"*{normalized_filter}"
-
-        # Collect all files matching filters
-        all_files = []
-        for folder in folders_to_process:
-            # Use rglob for recursive, glob for non-recursive
-            file_iterator = folder.rglob("*") if recursive else folder.glob("*")
-            for file in file_iterator:
-                if not file.is_file():
-                    continue
-                if file.suffix.lower() not in extensions:
-                    continue
-                # Apply filename filter
-                if normalized_filter and normalized_filter.lower() != "none":
-                    if not self._matches_filename_filter(file.name, normalized_filter):
-                        continue
-                # Apply DTD and client filters
-                if not self._matches_config_filters(file, dtd_filter, client_filter):
-                    continue
-                # Apply month filter
-                if not self._matches_month_filter(file, month_filter, custom_month):
-                    continue
-                all_files.append(file)
-
-        all_files = sorted(all_files)
+        if batch_size > 0:
+            collected = self.collect_matching_files(
+                dir_path, recursive=True, extensions=extensions,
+                filename_filter=filename_filter, dtd_filter=dtd_filter,
+                client_filter=client_filter, month_filter=month_filter,
+                custom_month=custom_month, use_index=use_index,
+                discover_new=True, log_callback=log_callback,
+            )
+            folder_prefixes = []
+            for folder in folders_to_process:
+                try:
+                    folder_prefixes.append(str(folder.resolve()).lower())
+                except OSError:
+                    folder_prefixes.append(str(folder.absolute()).lower())
+            all_files = []
+            for file in collected:
+                try:
+                    fp = str(file.resolve()).lower()
+                except OSError:
+                    fp = str(file.absolute()).lower()
+                if any(fp == pref or fp.startswith(pref + "\\") or fp.startswith(pref + "/") for pref in folder_prefixes):
+                    all_files.append(file)
+            all_files = sorted(all_files)
+        else:
+            all_files = self.collect_matching_files(
+                dir_path, recursive=recursive, extensions=extensions,
+                filename_filter=filename_filter, dtd_filter=dtd_filter,
+                client_filter=client_filter, month_filter=month_filter,
+                custom_month=custom_month, use_index=use_index,
+                discover_new=True, log_callback=log_callback,
+            )
         total_files = len(all_files)
 
         # Process files in parallel
@@ -3188,29 +3189,14 @@ class ElementExtractor:
         if not extensions:
             extensions = [".xml", ".html", ".htm", ".xhtml"]
 
-        glob_pattern = "**/*" if recursive else "*"
-        all_files = []
-        normalized_filter = filename_filter.strip() if filename_filter else ""
-        if normalized_filter and normalized_filter.lower() != "none" and not any(
-            char in normalized_filter for char in "*?[]"
-        ):
-            normalized_filter = f"*{normalized_filter}"
-
-        for file in path.glob(glob_pattern):
-            if not file.is_file():
-                continue
-            if normalized_filter and normalized_filter.lower() != "none" and not self._matches_filename_filter(
-                file.name, normalized_filter
-            ):
-                continue
-            if file.suffix.lower() in extensions:
-                if not self._matches_config_filters(file, dtd_filter, client_filter):
-                    continue
-                if not self._matches_month_filter(file, month_filter, custom_month):
-                    continue
-                all_files.append(file)
-
-        all_files = sorted(all_files)
+        all_files = self.collect_matching_files(
+            path, recursive=recursive, extensions=extensions,
+            filename_filter=filename_filter, dtd_filter=dtd_filter,
+            client_filter=client_filter, month_filter=month_filter,
+            custom_month=custom_month, use_index=use_index,
+            discover_new=True, log_callback=log_callback,
+            cancel_check=cancel_check,
+        )
         total_files = len(all_files)
         scan_results = {}
         total_matches = 0
@@ -3257,11 +3243,17 @@ class ElementExtractor:
         custom_month: str = "",
         progress_callback=None,
         cancel_check=None,
+        file_paths: list | None = None,
+        use_index: bool = True,
+        log_callback=None,
     ) -> dict:
         """Scan a file or directory for mixed-citation direct comment/alpha hits.
 
         Returns ``{file_path_str: {ok, hits, client, error?}, ...}``.
         Includes files with zero hits so callers can roll up files searched.
+
+        When ``file_paths`` is provided, skip glob/discovery and process that list
+        (filters already applied by the caller). Still respects cancel/progress.
         """
         path = Path(path)
 
@@ -3278,6 +3270,36 @@ class ElementExtractor:
                 return {"ok": True, "hits": hits, "client": client}
             except Exception as e:
                 return {"ok": False, "error": str(e), "hits": [], "client": client}
+
+        def _scan_file_list(files: list) -> dict:
+            # Dedupe while preserving a stable sort for progress reporting
+            unique = []
+            seen = set()
+            for raw in files:
+                fp = Path(raw)
+                try:
+                    key = str(fp.resolve())
+                except Exception:
+                    key = str(fp.absolute())
+                if key in seen:
+                    continue
+                if not fp.is_file():
+                    continue
+                seen.add(key)
+                unique.append(fp)
+            unique = sorted(unique, key=lambda p: str(p).lower())
+            total_files = len(unique)
+            scan_results = {}
+            for i, file_path in enumerate(unique):
+                if cancel_check is not None and cancel_check():
+                    break
+                if progress_callback:
+                    progress_callback(i + 1, total_files, file_path.name)
+                scan_results[str(file_path.absolute())] = _result_for(file_path)
+            return scan_results
+
+        if file_paths is not None:
+            return _scan_file_list(list(file_paths))
 
         if path.is_file():
             return {str(path.absolute()): _result_for(path)}
@@ -3310,18 +3332,7 @@ class ElementExtractor:
                     continue
                 all_files.append(file)
 
-        all_files = sorted(all_files)
-        total_files = len(all_files)
-        scan_results = {}
-
-        for i, file_path in enumerate(all_files):
-            if cancel_check is not None and cancel_check():
-                break
-            if progress_callback:
-                progress_callback(i + 1, total_files, file_path.name)
-            scan_results[str(file_path.absolute())] = _result_for(file_path)
-
-        return scan_results
+        return _scan_file_list(all_files)
 
     def filter_scan_results_by_cite_type(self, scan_results: dict, cite_type: str):
         """

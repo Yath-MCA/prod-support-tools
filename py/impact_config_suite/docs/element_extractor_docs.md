@@ -1,6 +1,6 @@
 # Element Extractor Documentation
 
-**Version:** 2.9  
+**Version:** 2.10  
 **Module:** `element_extractor_tab.py` + `core/element_extractor.py` + `search_service/app/routes/extractor_routes.py`
 
 ---
@@ -178,6 +178,7 @@ The following settings are preserved in history:
 - **Worker count (v2.7)**
 - Output directory
 - Report content options
+- **Mixed-citation only (skip CSS extract) (v2.10)**
 
 ---
 
@@ -420,6 +421,16 @@ Specialized Element Extractor mode that walks each `mixed-citation` and reports 
 
 Enable the checkbox **Mixed-citation comment + alpha text** on the Element Extractor tab (alongside other report options). Run a single-file or folder scan as usual; when the checkbox is checked, the suite scans for these hits and writes HTML + CSV reports (opening them if **Open report** is enabled).
 
+Optional: **Mixed-citation only (skip CSS extract)** (enabled only when the mixed-citation hits checkbox is on). When checked:
+
+- CSS / Tag / XPath query input may be left empty
+- The selector extract loop and selector-based reports (detailed HTML, consolidated summary, citation-type, selector CSV, copy-matched-from-selector) are skipped
+- A run folder is still created under the impact-support-log output directory
+- Only `scan_mixed_citation_direct_hits` runs (HTML + CSV), with the usual month/client/filename/DTD filters
+- The log records: `Mixed-citation only mode — skipping selector extract`
+
+When only-mode is off but mixed hits is on, behavior is unchanged (CSS extract first, then mixed scan).
+
 ### Match rules
 
 | Hit kind | Rule |
@@ -453,10 +464,17 @@ Reports are written under the run folder in `~/Documents/impact-support-log/` (o
 
 - Module: `core/mixed_citation_direct_hits.py`
 - Thin wrappers: `ElementExtractor.extract_mixed_citation_direct_hits` / `scan_mixed_citation_direct_hits` in `core/element_extractor.py`
+- Folder Scan speed: when CSS extract already ran, mixed scan accepts `file_paths` and **reuses** that list (no second tree walk). Mixed-only mode still does a single discovery walk.
 - Tests: `tests/test_mixed_citation_direct_hits.py`
 
 
 ## Version History
+
+### v2.10 - Mixed-citation Only Mode
+- Added **Mixed-citation only (skip CSS extract)** checkbox (enabled when mixed-citation hits is on)
+- Allows empty selector query; skips selector extract and selector reports; still writes mixed HTML+CSV under a run folder
+- History key: `mixed_citation_only`
+- Folder Scan: reuse CSS-discovered `file_paths` for mixed scan (`scan_mixed_citation_direct_hits(file_paths=...)`) — never three tree walks
 
 ### v2.9 - Mixed-citation Comment + Alpha Text
 - Added specialized report for direct-child `comment` elements and alphabetic-only text under `mixed-citation`

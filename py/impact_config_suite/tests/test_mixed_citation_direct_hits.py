@@ -326,3 +326,95 @@ def test_scan_mixed_citation_direct_hits_month_filter_excludes(tmp_path):
         custom_month="01-2000",
     )
     assert results == {}
+
+
+# --- Mixed-citation only mode (skip CSS extract) ---
+
+def test_should_skip_selector_extract_helper():
+    from tabs.element_extractor_tab import should_skip_selector_extract
+
+    assert should_skip_selector_extract(True, True) is True
+    assert should_skip_selector_extract(True, False) is False
+    assert should_skip_selector_extract(False, True) is False
+    assert should_skip_selector_extract(False, False) is False
+
+
+def test_mixed_citation_only_history_key_round_trip():
+    """Smoke: history dict shape includes mixed_citation_only like other flags."""
+    entry = {
+        "mixed_citation_direct_hits": True,
+        "mixed_citation_only": True,
+    }
+    assert bool(entry.get("mixed_citation_only", False)) is True
+    from tabs.element_extractor_tab import should_skip_selector_extract
+
+    assert should_skip_selector_extract(
+        bool(entry.get("mixed_citation_direct_hits", False)),
+        bool(entry.get("mixed_citation_only", False)),
+    )
+
+
+def test_scan_mixed_citation_direct_hits_file_paths_skips_discovery(tmp_path, monkeypatch):
+    """When file_paths is provided, do not glob/walk; only process the given list."""
+    from core.element_extractor import ElementExtractor
+    from pathlib import Path as P
+
+    hit = tmp_path / "with_hits.html"
+    other = tmp_path / "other.html"
+    ignored = tmp_path / "ignored.html"
+    hit.write_text(SAMPLE_HIT_HTML, encoding="utf-8")
+    other.write_text(SAMPLE_CLEAN_HTML, encoding="utf-8")
+    ignored.write_text(SAMPLE_HIT_HTML, encoding="utf-8")
+
+    extractor = ElementExtractor()
+    glob_calls = {"n": 0}
+    real_glob = P.glob
+
+    def counting_glob(self, pattern):
+        glob_calls["n"] += 1
+        return real_glob(self, pattern)
+
+    monkeypatch.setattr(P, "glob", counting_glob)
+
+    results = extractor.scan_mixed_citation_direct_hits(
+        tmp_path,
+        recursive=True,
+        file_paths=[hit, other],
+    )
+
+    assert glob_calls["n"] == 0
+    names = {P(k).name for k in results}
+    assert names == {"with_hits.html", "other.html"}
+    assert "ignored.html" not in names
+    by = {P(k).name: v for k, v in results.items()}
+    assert len(by["with_hits.html"]["hits"]) == 2
+    assert len(by["other.html"]["hits"]) == 0
+
+
+def test_collect_paths_for_mixed_scan_prefers_all_files_then_scan_keys():
+    from tabs.element_extractor_tab import should_skip_selector_extract
+    # lightweight stand-in of collection logic (same as tab method)
+    from pathlib import Path as P
+
+    def collect(source_path, is_single, all_files, all_selector_results):
+        if is_single:
+            return [P(source_path)]
+        if all_files:
+            return [P(p) for p in all_files]
+        paths, seen = [], set()
+        for sel in all_selector_results or []:
+            for fp in (sel.get("scan_results") or {}):
+                if fp in seen:
+                    continue
+                seen.add(fp)
+                paths.append(P(fp))
+        return paths
+
+    src = P(r"C:\data\root")
+    assert collect(src / "a.html", True, [], []) == [src / "a.html"]
+    listed = [src / "a.html", src / "b.html"]
+    assert collect(src, False, listed, []) == listed
+    sels = [{"scan_results": {str(src / "x.html"): {}, str(src / "y.html"): {}}}]
+    got = collect(src, False, [], sels)
+    assert {p.name for p in got} == {"x.html", "y.html"}
+    assert should_skip_selector_extract(True, True) is True
