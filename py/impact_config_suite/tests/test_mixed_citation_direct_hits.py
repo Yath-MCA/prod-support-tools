@@ -280,3 +280,49 @@ def test_scan_mixed_citation_direct_hits_client_filter(tmp_path):
     assert a_data["ok"] is True
     assert a_data["client"] == "ClientA"
     assert len(a_data["hits"]) == 2
+
+
+def test_scan_mixed_citation_direct_hits_progress_callback(tmp_path):
+    """progress_callback is invoked with (current, total, name) for multi-file dirs."""
+    from core.element_extractor import ElementExtractor
+
+    f1 = tmp_path / "a.html"
+    f2 = tmp_path / "b.html"
+    f1.write_text(SAMPLE_HIT_HTML, encoding="utf-8")
+    f2.write_text(SAMPLE_CLEAN_HTML, encoding="utf-8")
+
+    calls = []
+
+    def progress_callback(current, total, name):
+        calls.append((current, total, name))
+
+    extractor = ElementExtractor()
+    extractor.scan_mixed_citation_direct_hits(
+        tmp_path, recursive=False, progress_callback=progress_callback
+    )
+
+    assert len(calls) >= 1
+    assert len(calls) == 2
+    totals = {t for _, t, _ in calls}
+    assert totals == {2}
+    names = {n for _, _, n in calls}
+    assert names == {"a.html", "b.html"}
+    currents = sorted(c for c, _, _ in calls)
+    assert currents == [1, 2]
+
+
+def test_scan_mixed_citation_direct_hits_month_filter_excludes(tmp_path):
+    """Custom month far in the past excludes newly written temp files (stable mtime)."""
+    from core.element_extractor import ElementExtractor
+
+    f1 = tmp_path / "a.html"
+    f1.write_text(SAMPLE_HIT_HTML, encoding="utf-8")
+
+    extractor = ElementExtractor()
+    results = extractor.scan_mixed_citation_direct_hits(
+        tmp_path,
+        recursive=False,
+        month_filter="Custom",
+        custom_month="01-2000",
+    )
+    assert results == {}

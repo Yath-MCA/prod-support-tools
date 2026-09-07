@@ -1725,6 +1725,15 @@ class ElementExtractorTab(ttk.Frame):
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
 
+                self.progress_bar.config(value=0)
+
+                def citation_progress_update(current, total, file_name):
+                    percent = int((current / total) * 100) if total > 0 else 0
+                    self.progress_bar.config(value=percent)
+                    self.status_var.set(
+                        f"Citation-type scan ({current}/{total}): {file_name}"
+                    )
+
                 bibr_scan_results, bibr_total_matches, bibr_total_files = self.extractor.scan_bibr_citations(
                     source_path,
                     recursive=recursive,
@@ -1734,6 +1743,7 @@ class ElementExtractorTab(ttk.Frame):
                     client_filter=client_filter if not is_single else None,
                     month_filter=month_filter if not is_single else "All Time",
                     custom_month=custom_month if not is_single else "",
+                    progress_callback=citation_progress_update,
                     cite_type=citation_cite_type,
                 )
 
@@ -1809,9 +1819,20 @@ class ElementExtractorTab(ttk.Frame):
                 filename_filter = self.filename_filter_var.get().strip()
                 dtd_filter = self.dtd_filter_var.get().strip()
                 client_filter = self.client_filter_var.get().strip()
+                month_filter = self.month_filter_var.get().strip() or "All Time"
+                custom_month = self.custom_month_var.get().strip()
                 extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
                 if not extensions:
                     extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                self.progress_bar.config(value=0)
+
+                def progress_update(current, total, file_name):
+                    percent = int((current / total) * 100) if total > 0 else 0
+                    self.progress_bar.config(value=percent)
+                    self.status_var.set(
+                        f"Mixed-citation scan ({current}/{total}): {file_name}"
+                    )
 
                 mixed_scan_results = self.extractor.scan_mixed_citation_direct_hits(
                     source_path,
@@ -1820,6 +1841,9 @@ class ElementExtractorTab(ttk.Frame):
                     filename_filter=filename_filter if not is_single else None,
                     dtd_filter=dtd_filter if not is_single else None,
                     client_filter=client_filter if not is_single else None,
+                    month_filter=month_filter if not is_single else "All Time",
+                    custom_month=custom_month if not is_single else "",
+                    progress_callback=progress_update,
                     cancel_check=lambda: self.cancelled,
                 )
 

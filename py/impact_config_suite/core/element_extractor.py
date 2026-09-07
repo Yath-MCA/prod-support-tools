@@ -3253,6 +3253,8 @@ class ElementExtractor:
         filename_filter: str = None,
         dtd_filter: str = None,
         client_filter: str = None,
+        month_filter: str = "All Time",
+        custom_month: str = "",
         progress_callback=None,
         cancel_check=None,
     ) -> dict:
@@ -3303,6 +3305,8 @@ class ElementExtractor:
                 continue
             if file.suffix.lower() in extensions:
                 if not self._matches_config_filters(file, dtd_filter, client_filter):
+                    continue
+                if not self._matches_month_filter(file, month_filter, custom_month):
                     continue
                 all_files.append(file)
 
