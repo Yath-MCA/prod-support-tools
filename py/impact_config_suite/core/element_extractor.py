@@ -3235,6 +3235,90 @@ class ElementExtractor:
 
         return scan_results, total_matches, total_files
 
+
+    def extract_mixed_citation_direct_hits(self, file_path: Path) -> list:
+        """Extract direct-child comment / alpha-text hits under mixed-citation."""
+        from core.mixed_citation_direct_hits import extract_direct_hits_from_file
+
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File {file_path} does not exist.")
+        return extract_direct_hits_from_file(file_path)
+
+    def scan_mixed_citation_direct_hits(
+        self,
+        path: Path,
+        recursive: bool = False,
+        extensions: list = None,
+        filename_filter: str = None,
+        dtd_filter: str = None,
+        client_filter: str = None,
+        progress_callback=None,
+        cancel_check=None,
+    ) -> dict:
+        """Scan a file or directory for mixed-citation direct comment/alpha hits.
+
+        Returns ``{file_path_str: {ok, hits, client, error?}, ...}``.
+        Includes files with zero hits so callers can roll up files searched.
+        """
+        path = Path(path)
+
+        def _client_for(file_path: Path) -> str:
+            try:
+                return self.get_file_metadata(file_path).get("client", "") or ""
+            except Exception:
+                return ""
+
+        def _result_for(file_path: Path) -> dict:
+            client = _client_for(file_path)
+            try:
+                hits = self.extract_mixed_citation_direct_hits(file_path)
+                return {"ok": True, "hits": hits, "client": client}
+            except Exception as e:
+                return {"ok": False, "error": str(e), "hits": [], "client": client}
+
+        if path.is_file():
+            return {str(path.absolute()): _result_for(path)}
+
+        if not path.is_dir():
+            raise NotADirectoryError(f"'{path}' is not a valid file or directory.")
+
+        if not extensions:
+            extensions = [".xml", ".html", ".htm", ".xhtml"]
+
+        glob_pattern = "**/*" if recursive else "*"
+        all_files = []
+        normalized_filter = filename_filter.strip() if filename_filter else ""
+        if normalized_filter and normalized_filter.lower() != "none" and not any(
+            char in normalized_filter for char in "*?[]"
+        ):
+            normalized_filter = f"*{normalized_filter}"
+
+        for file in path.glob(glob_pattern):
+            if not file.is_file():
+                continue
+            if normalized_filter and normalized_filter.lower() != "none" and not self._matches_filename_filter(
+                file.name, normalized_filter
+            ):
+                continue
+            if file.suffix.lower() in extensions:
+                if not self._matches_config_filters(file, dtd_filter, client_filter):
+                    continue
+                all_files.append(file)
+
+        all_files = sorted(all_files)
+        total_files = len(all_files)
+        scan_results = {}
+
+        for i, file_path in enumerate(all_files):
+            if cancel_check is not None and cancel_check():
+                break
+            if progress_callback:
+                progress_callback(i + 1, total_files, file_path.name)
+            scan_results[str(file_path.absolute())] = _result_for(file_path)
+
+        return scan_results
+
     def filter_scan_results_by_cite_type(self, scan_results: dict, cite_type: str):
         """
         Keep only matches for cite_type.

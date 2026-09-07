@@ -12,6 +12,11 @@ import webbrowser
 from bs4 import BeautifulSoup
 
 from core.element_extractor import ElementExtractor
+from core.mixed_citation_direct_hits import (
+    generate_mixed_citation_direct_hits_report_html,
+    rollup_by_client,
+    write_mixed_citation_direct_hits_csv,
+)
 from core.run_history import RunHistoryStore
 
 class ElementExtractorTab(ttk.Frame):
@@ -32,6 +37,7 @@ class ElementExtractorTab(ttk.Frame):
         self.last_summary_report_path = None
         self.last_citation_report_path = None
         self.last_entire_citation_report_path = None
+        self.last_mixed_citation_report_path = None
         self.last_csv_path = None
         self.history_entries = self._load_history_entries()
         self.filtered_history_entries = list(self.history_entries)
@@ -610,6 +616,20 @@ class ElementExtractorTab(ttk.Frame):
         )
         self.citation_cite_type_combo.pack(side="left")
 
+        report_options_frame3 = tk.Frame(report_options_outer, bg="#1e293b")
+        report_options_frame3.pack(anchor="w", pady=(6, 0))
+
+        self.mixed_citation_direct_hits_var = tk.BooleanVar(value=False)
+        self.mixed_citation_direct_hits_chk = tk.Checkbutton(
+            report_options_frame3,
+            text="Mixed-citation comment + alpha text",
+            variable=self.mixed_citation_direct_hits_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.mixed_citation_direct_hits_chk.pack(side="left")
+
         # Report Organization Section
         tk.Label(
             settings_frame,
@@ -1099,6 +1119,7 @@ class ElementExtractorTab(ttk.Frame):
         self.copy_matched_files_var.set(bool(entry.get("copy_matched_files", False)))
         self.citation_type_report_var.set(bool(entry.get("citation_type_report", False)))
         self.citation_cite_type_var.set(str(entry.get("citation_cite_type", "bibr") or "bibr").strip() or "bibr")
+        self.mixed_citation_direct_hits_var.set(bool(entry.get("mixed_citation_direct_hits", False)))
         self._on_citation_type_toggle()
         # Restore batch state for Next Batch button
         params = entry.get("params", {})
@@ -1193,6 +1214,7 @@ class ElementExtractorTab(ttk.Frame):
             "copy_matched_files": bool(self.copy_matched_files_var.get()),
             "citation_type_report": bool(self.citation_type_report_var.get()),
             "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
+            "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
             "params": {
                 "mode": self.mode_var.get().strip(),
                 "query_type": self.selector_type_var.get().strip(),
@@ -1222,6 +1244,7 @@ class ElementExtractorTab(ttk.Frame):
                 "copy_matched_files": bool(self.copy_matched_files_var.get()),
                 "citation_type_report": bool(self.citation_type_report_var.get()),
                 "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
+                "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
                 "summary_report_path": summary_report_path,
                 "csv_path": csv_path,
                 "copied_files_count": copied_files_count,
@@ -1350,6 +1373,7 @@ class ElementExtractorTab(ttk.Frame):
             generate_csv = bool(self.generate_csv_var.get())
             citation_type_report = bool(self.citation_type_report_var.get())
             citation_cite_type = self.citation_cite_type_var.get().strip() or "bibr"
+            mixed_citation_direct_hits = bool(self.mixed_citation_direct_hits_var.get())
 
             # Batch processing options
             is_batch_mode = self.batch_mode_var.get() if mode == "Folder Scan" else False
@@ -1376,7 +1400,7 @@ class ElementExtractorTab(ttk.Frame):
             if query_type == "Tag Name" and attr_name:
                 self._log(f"  Attr Filter:   {attr_name} = '{attr_val}'")
             copy_matched_files = bool(self.copy_matched_files_var.get())
-            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type})")
+            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}")
 
             # Parallel and batch mode logging
             batch_has_more = False
@@ -1774,6 +1798,71 @@ class ElementExtractorTab(ttk.Frame):
                         f"({bibr_total_matches} match(es) in {bibr_total_files} file(s))"
                     )
 
+            # Generate mixed-citation comment + alpha text report if enabled
+            mixed_citation_report_path = ""
+            if mixed_citation_direct_hits:
+                self.status_var.set("Scanning mixed-citation comment / alpha text...")
+                self._log("\nScanning mixed-citation direct comment + alpha text hits...")
+
+                recursive = bool(self.recursive_var.get()) if not is_single else False
+                ext_str = self.extensions_var.get()
+                filename_filter = self.filename_filter_var.get().strip()
+                dtd_filter = self.dtd_filter_var.get().strip()
+                client_filter = self.client_filter_var.get().strip()
+                extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+                if not extensions:
+                    extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                mixed_scan_results = self.extractor.scan_mixed_citation_direct_hits(
+                    source_path,
+                    recursive=recursive,
+                    extensions=extensions,
+                    filename_filter=filename_filter if not is_single else None,
+                    dtd_filter=dtd_filter if not is_single else None,
+                    client_filter=client_filter if not is_single else None,
+                    cancel_check=lambda: self.cancelled,
+                )
+
+                file_results = []
+                for file_path_str, data in (mixed_scan_results or {}).items():
+                    file_results.append({
+                        "path": file_path_str,
+                        "client": data.get("client", "") or "",
+                        "ok": bool(data.get("ok", True)),
+                        "hits": list(data.get("hits") or []),
+                    })
+
+                rollup_rows = rollup_by_client(file_results)
+                mixed_html = generate_mixed_citation_direct_hits_report_html(
+                    str(source_path), file_results, rollup_rows
+                )
+                mixed_report_name = (
+                    f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.html"
+                )
+                mixed_report_file = run_folder / mixed_report_name
+                with open(mixed_report_file, "w", encoding="utf-8") as f:
+                    f.write(mixed_html)
+                mixed_citation_report_path = str(mixed_report_file.absolute())
+                self.last_mixed_citation_report_path = mixed_citation_report_path
+
+                mixed_csv_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.csv"
+                mixed_csv_file = run_folder / mixed_csv_name
+                write_mixed_citation_direct_hits_csv(
+                    mixed_csv_file, file_results, rollup_rows
+                )
+
+                total_mixed_hits = sum(len(r.get("hits") or []) for r in file_results)
+                files_with_mixed = sum(1 for r in file_results if r.get("hits"))
+                self._log(
+                    f"Mixed-citation report saved: {run_folder_name}/{mixed_report_name} "
+                    f"({total_mixed_hits} hit(s) in {files_with_mixed}/{len(file_results)} file(s))"
+                )
+                self._log(f"Mixed-citation CSV saved: {run_folder_name}/{mixed_csv_name}")
+                self.status_var.set(
+                    f"Mixed-citation report complete: {total_mixed_hits} hit(s) "
+                    f"in {files_with_mixed}/{len(file_results)} file(s)."
+                )
+
             # Generate and save CSV if enabled
             csv_path = ""
             if generate_csv:
@@ -1886,6 +1975,8 @@ class ElementExtractorTab(ttk.Frame):
                     webbrowser.open(f"file:///{citation_report_path}")
                 if citation_type_report and entire_citation_report_path:
                     webbrowser.open(f"file:///{entire_citation_report_path}")
+                if mixed_citation_direct_hits and mixed_citation_report_path:
+                    webbrowser.open(f"file:///{mixed_citation_report_path}")
 
         except Exception as e:
             self._log(f"\n❌ Error during extraction:\n{str(e)}")

@@ -1,6 +1,6 @@
 # Element Extractor Documentation
 
-**Version:** 2.8  
+**Version:** 2.9  
 **Module:** `element_extractor_tab.py` + `core/element_extractor.py` + `search_service/app/routes/extractor_routes.py`
 
 ---
@@ -410,8 +410,58 @@ Error response format:
 
 ---
 
+---
+
+## Mixed-citation Comment + Alpha Text Report
+
+Specialized Element Extractor mode that walks each `mixed-citation` and reports **direct-child** hits only (nested content under `string-name` etc. is ignored).
+
+### GUI
+
+Enable the checkbox **Mixed-citation comment + alpha text** on the Element Extractor tab (alongside other report options). Run a single-file or folder scan as usual; when the checkbox is checked, the suite scans for these hits and writes HTML + CSV reports (opening them if **Open report** is enabled).
+
+### Match rules
+
+| Hit kind | Rule |
+|----------|------|
+| **comment** | Direct child of `mixed-citation` (`class` or `data-name="mixed-citation"`) that is a comment element: tag `comment`, class `comment`, or `data-name="comment"` (same recognition style as `patterns/refs.py`). |
+| **alpha_text** | Direct-child text node whose stripped value matches `^[A-Za-z]+$` only (letters only — no digits, punctuation, or spaces). |
+
+Ignorable ref nodes are skipped via `patterns.refs.is_ignorable_ref_node`. Client is resolved from nearby `impact_config.xml` using the existing Element Extractor client filters.
+
+### Client rollup columns
+
+HTML client rollup table and CSV share these columns:
+
+- `client`
+- `files_searched`
+- `files_with_hits`
+- `comment_hits`
+- `alpha_text_hits`
+- `total_hits`
+
+The HTML report also includes a hit-details table (`#`, Client, File, Line, Kind, Value).
+
+### Report output
+
+Reports are written under the run folder in `~/Documents/impact-support-log/` (optionally month-organized), named:
+
+- `Mixed_Citation_Direct_Hits_<target>_<timestamp>.html`
+- `Mixed_Citation_Direct_Hits_<target>_<timestamp>.csv`
+
+### Core helpers
+
+- Module: `core/mixed_citation_direct_hits.py`
+- Thin wrappers: `ElementExtractor.extract_mixed_citation_direct_hits` / `scan_mixed_citation_direct_hits` in `core/element_extractor.py`
+- Tests: `tests/test_mixed_citation_direct_hits.py`
+
+
 ## Version History
 
+### v2.9 - Mixed-citation Comment + Alpha Text
+- Added specialized report for direct-child `comment` elements and alphabetic-only text under `mixed-citation`
+- Client-wise HTML + CSV rollup (files searched vs files with hits)
+- GUI checkbox: Mixed-citation comment + alpha text
 ### v2.8 - REST API
 - Added REST API endpoints for element extraction
 - Supports synchronous and asynchronous extraction
