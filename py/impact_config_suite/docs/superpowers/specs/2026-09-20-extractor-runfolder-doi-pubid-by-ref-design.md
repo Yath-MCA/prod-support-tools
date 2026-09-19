@@ -81,7 +81,7 @@ Dedicated mode module (same pattern as mixed-citation-only) plus a shared run-fo
 
 - Match HTML-ish and XML: class-based (`class="ext-link"`, `data-name="ext-link"`) and element names (`ext-link`, `pub-id`, `comment`, `ref`).
 - `ext-link-type` attribute equals `doi` or `uri` (case-sensitive as in source unless existing extractor normalizes otherwise — prefer exact match used by CSS `ext-link-type="doi"`).
-- `.ref` ancestor: walk parents; treat as in-ref if any ancestor has tag `ref`, or `data-name="ref"`, or CSS class token `ref` (split on whitespace). Do not treat class names that merely contain the substring `ref` (e.g. `xref`) as `.ref`.
+- `.ref` ancestor: walk parents; treat as in-ref if any ancestor matches existing `REF_SELECTOR` semantics from `patterns/refs.py`: class token `ref`, or `data-name="ref"`, or `data-role="ref"`, or tag `ref`. Do not treat class names that merely contain the substring `ref` (e.g. `xref`) as `.ref`.
 
 ### Outputs
 
