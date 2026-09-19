@@ -860,74 +860,74 @@ class ElementExtractor:
 
         return scan_results, total_matches, total_files, has_more, next_offset
 
-    def generate_html_report(self, target_path: str, query_type: str, query_val: str,
-                             attr_name: str, attr_val: str, all_selector_results: list,
-                             total_matches: int, total_files: int, is_single_file: bool,
-                             show_outer_xml: bool = True, show_inner_text: bool = True) -> str:
-        """
-        Generates a premium HTML report containing all the extracted elements.
-        Supports multi-selector results and conditional display of content sections.
-        """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        target_name = os.path.basename(target_path)
+    def _build_html_selector_sections(
+        self,
+        all_selector_results: list,
+        query_val: str,
+        is_multi_selector: bool,
+        show_outer_xml: bool,
+        show_inner_text: bool,
+        *,
+        unique_only: bool,
+        id_prefix: str,
+    ) -> str:
+        """Build file/selector HTML cards for All or Unique views."""
+        from core.match_uniqueness import filter_unique_matches
 
-        # Build query description string
-        query_desc = f"{query_type}: <code>{html.escape(query_val)}</code>"
-        if query_type == "Tag Name" and attr_name.strip():
-            query_desc += f" (Filter: <code>{html.escape(attr_name)}</code>"
-            if attr_val.strip():
-                query_desc += f" = <code>{html.escape(attr_val)}</code>"
-            query_desc += ")"
-
-        # Determine if we have multi-selector results
-        is_multi_selector = len(all_selector_results) > 1
-
-        # Generate selector sections for multi-selector mode
         selector_sections = ""
         file_global_index = 0
+        file_sections = ""
 
         for selector_idx, selector_data in enumerate(all_selector_results):
             query_val_single = selector_data.get("query_val", query_val)
             scan_results = selector_data.get("scan_results", {})
-            selector_matches = selector_data.get("total_matches", 0)
+            raw_matches_count = selector_data.get("total_matches", 0)
+            if unique_only:
+                selector_matches = 0
+                for data in scan_results.values():
+                    if data.get("ok", True):
+                        selector_matches += sum(
+                            1 for m in (data.get("matches") or []) if m.get("is_unique")
+                        )
+            else:
+                selector_matches = raw_matches_count
 
+            sel_id = f"{id_prefix}-selector-{selector_idx}"
             if is_multi_selector:
-                # Add selector header for multi-selector mode
                 selector_sections += f"""
                 <div class="selector-section">
-                    <div class="selector-header" onclick="toggleSelector('selector-{selector_idx}')">
+                    <div class="selector-header" onclick="toggleSelector('{sel_id}')">
                         <span class="toggle-icon">{'▼' if selector_idx == 0 else '▶'}</span>
                         <span class="selector-badge">{selector_matches} Match(es)</span>
                         <strong class="selector-name">{html.escape(query_val_single)}</strong>
                     </div>
-                    <div id="selector-{selector_idx}" class="selector-content" style="display: {'block' if selector_idx == 0 else 'none'}">
+                    <div id="{sel_id}" class="selector-content" style="display: {'block' if selector_idx == 0 else 'none'}">
                 """
 
-            # Generate file sections for this selector
             file_sections = ""
             for file_path_str, data in scan_results.items():
                 file_global_index += 1
+                file_dom_id = f"{id_prefix}-file-{file_global_index}"
                 file_name = os.path.basename(file_path_str)
                 file_uri = Path(file_path_str).as_uri()
                 js_file_path = json.dumps(file_path_str)
 
-                # Get file title info for display
                 title_type, title_value = self.get_file_title(Path(file_path_str))
                 display_title = html.escape(title_value) if title_value else html.escape(file_name)
                 title_badge = f'<span class="title-badge">{html.escape(title_type)}</span>' if title_type != "filename" else ""
                 filename_sub = f'<span class="file-name-sub">{html.escape(file_name)}</span>' if title_type != "filename" else ""
 
-                # Get metadata for display
                 metadata = self.get_file_metadata(Path(file_path_str))
                 metadata_line = self.format_metadata_line(metadata)
                 metadata_html = f'<div class="file-metadata">{html.escape(metadata_line)}</div>' if metadata_line else ""
 
                 if not data.get("ok", True):
-                    # Error file block
+                    if unique_only:
+                        continue
                     err_msg = html.escape(data.get("error", "Unknown parse error"))
                     file_sections += f"""
                     <div class="file-card error-card" data-filename="{html.escape(file_name)}">
-                        <div class="file-header" onclick="toggleCard('file-{file_global_index}')">
+                        <div class="file-header" onclick="toggleCard('{file_dom_id}')">
                             <div class="file-header-main">
                                 <div class="file-title">
                                     <span class="toggle-icon">▶</span>
@@ -944,7 +944,7 @@ class ElementExtractor:
                             <div class="file-path">{html.escape(file_path_str)}</div>
                             {metadata_html}
                         </div>
-                        <div id="file-{file_global_index}" class="file-content" style="display: none;">
+                        <div id="{file_dom_id}" class="file-content" style="display: none;">
                             <div class="error-box">
                                 <strong>Parsing Failed:</strong> {err_msg}
                             </div>
@@ -953,27 +953,27 @@ class ElementExtractor:
                     """
                     continue
 
-                matches = data.get("matches", [])
-                if not matches:
+                matches = data.get("matches", []) or []
+                display_matches = filter_unique_matches(matches) if unique_only else matches
+                if not display_matches:
                     continue
 
                 match_rows = ""
-                for m_idx, match in enumerate(matches):
+                for m_idx, match in enumerate(display_matches):
                     line = match["line"]
                     tag = match["tag"]
                     attributes = match["attributes"]
                     text_content = match["text"]
                     outer_html = match["html"]
 
-                    # Attribute table (always shown)
                     attr_html = ""
                     if attributes:
                         attr_rows = ""
                         for k, v in attributes.items():
                             attr_rows += f"""
                             <tr>
-                                <td class="attr-name">{html.escape(k)}</td>
-                                <td class="attr-val">{html.escape(v)}</td>
+                                <td class="attr-name">{html.escape(str(k))}</td>
+                                <td class="attr-val">{html.escape(str(v))}</td>
                             </tr>
                             """
                         attr_html = f"""
@@ -993,10 +993,8 @@ class ElementExtractor:
                         </div>
                         """
 
-                    # Text section (conditional based on show_inner_text flag)
                     text_section = ""
                     if show_inner_text and text_content:
-                        # Show full text (removed 300 char truncation)
                         text_section = f"""
                         <div class="text-section">
                             <span class="section-lbl">Inner Text Content:</span>
@@ -1004,7 +1002,6 @@ class ElementExtractor:
                         </div>
                         """
 
-                    # Code section (conditional based on show_outer_xml flag)
                     code_section = ""
                     if show_outer_xml:
                         escaped_code = html.escape(outer_html)
@@ -1017,6 +1014,10 @@ class ElementExtractor:
                         </div>
                         """
 
+                    group_note = ""
+                    if match.get("unique_group_size", 1) > 1:
+                        group_note = f'<span class="match-badge">group {match.get("unique_group_size")}</span>'
+
                     match_rows += f"""
                     <div class="match-item" data-tag="{html.escape(tag)}" data-text="{html.escape(text_content)}">
                         <div class="match-header">
@@ -1024,6 +1025,7 @@ class ElementExtractor:
                                 <span class="match-number">#{m_idx + 1}</span>
                                 <span class="match-badge">Line {line}</span>
                                 <span class="match-tag-badge">&lt;{html.escape(tag)}&gt;</span>
+                                {group_note}
                             </div>
                             <button class="copy-btn" onclick="copySnippet(this)">Copy Markup</button>
                         </div>
@@ -1036,11 +1038,11 @@ class ElementExtractor:
 
                 file_sections += f"""
                 <div class="file-card" data-filename="{html.escape(file_name)}">
-                    <div class="file-header" onclick="toggleCard('file-{file_global_index}')">
+                    <div class="file-header" onclick="toggleCard('{file_dom_id}')">
                         <div class="file-header-main">
                             <div class="file-title">
                                 <span class="toggle-icon">▼</span>
-                                <span class="file-badge badge-success">{len(matches)} Match(es)</span>
+                                <span class="file-badge badge-success">{len(display_matches)} Match(es)</span>
                                 {title_badge}
                                 <strong>{display_title}</strong>
                                 {filename_sub}
@@ -1053,7 +1055,7 @@ class ElementExtractor:
                         <div class="file-path">{html.escape(file_path_str)}</div>
                         {metadata_html}
                     </div>
-                    <div id="file-{file_global_index}" class="file-content">
+                    <div id="{file_dom_id}" class="file-content">
                         <div class="matches-list">
                             {match_rows}
                         </div>
@@ -1070,16 +1072,70 @@ class ElementExtractor:
 
             if is_multi_selector:
                 selector_sections += file_sections
-                selector_sections += "</div></div>"  # Close selector-content and selector-section
+                selector_sections += "</div></div>"
             else:
                 selector_sections = file_sections
 
-        if not file_sections:
-            file_sections = f"""
+        if not selector_sections:
+            selector_sections = """
             <div class="no-results">
                 No matching elements found in the scanned files.
             </div>
             """
+        return selector_sections
+
+    def generate_html_report(self, target_path: str, query_type: str, query_val: str,
+                             attr_name: str, attr_val: str, all_selector_results: list,
+                             total_matches: int, total_files: int, is_single_file: bool,
+                             show_outer_xml: bool = True, show_inner_text: bool = True) -> str:
+        """
+        Generates a premium HTML report containing all the extracted elements.
+        Supports multi-selector results and conditional display of content sections.
+        """
+        from core.match_uniqueness import annotate_selector_results
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        target_name = os.path.basename(target_path)
+
+        annotate_selector_results(all_selector_results)
+        unique_matches = 0
+        for selector_data in all_selector_results:
+            for data in (selector_data.get("scan_results") or {}).values():
+                if data.get("ok", True):
+                    unique_matches += sum(
+                        1 for m in (data.get("matches") or []) if m.get("is_unique")
+                    )
+
+        # Build query description string
+        query_desc = f"{query_type}: <code>{html.escape(query_val)}</code>"
+        if query_type == "Tag Name" and attr_name.strip():
+            query_desc += f" (Filter: <code>{html.escape(attr_name)}</code>"
+            if attr_val.strip():
+                query_desc += f" = <code>{html.escape(attr_val)}</code>"
+            query_desc += ")"
+
+        # Determine if we have multi-selector results
+        is_multi_selector = len(all_selector_results) > 1
+
+        all_tree = self._build_html_selector_sections(
+            all_selector_results, query_val, is_multi_selector,
+            show_outer_xml, show_inner_text, unique_only=False, id_prefix="all",
+        )
+        unique_tree = self._build_html_selector_sections(
+            all_selector_results, query_val, is_multi_selector,
+            show_outer_xml, show_inner_text, unique_only=True, id_prefix="uniq",
+        )
+        selector_sections = f"""
+        <div class="view-tabs">
+            <button type="button" class="view-tab active" onclick="showView('all', this)">All matches</button>
+            <button type="button" class="view-tab" onclick="showView('unique', this)">Unique</button>
+        </div>
+        <p class="view-hint" id="unique-hint" style="display:none;">
+            First match per tag+attributes within each file, ignoring xlink:href.
+        </p>
+        <div id="view-all" class="view-panel">{all_tree}</div>
+        <div id="view-unique" class="view-panel" style="display:none;">{unique_tree}</div>
+        """
 
         html_template = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1104,7 +1160,31 @@ class ElementExtractor:
             --tag-color: #38bdf8;
         }}
 
-        /* Selector Section Styles (for multi-selector mode) */
+        .view-tabs {{
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }}
+        .view-tab {{
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 600;
+        }}
+        .view-tab.active {{
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--text-main);
+            border-color: var(--primary);
+        }}
+        .view-hint {{
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin: 0 0 16px 0;
+        }}
+
         .selector-section {{
             margin-bottom: 24px;
             border: 1px solid var(--border-color);
@@ -1695,6 +1775,10 @@ class ElementExtractor:
                 <span class="val highlight-match">{total_matches}</span>
             </div>
             <div class="stat-card">
+                <span class="lbl">Unique Matches</span>
+                <span class="val highlight-match">{unique_matches}</span>
+            </div>
+            <div class="stat-card">
                 <span class="lbl">Files Processed</span>
                 <span class="val">{total_files}</span>
             </div>
@@ -1741,6 +1825,14 @@ class ElementExtractor:
     </div>
 
     <script>
+        function showView(name, btn) {{
+            document.getElementById('view-all').style.display = name === 'all' ? 'block' : 'none';
+            document.getElementById('view-unique').style.display = name === 'unique' ? 'block' : 'none';
+            document.getElementById('unique-hint').style.display = name === 'unique' ? 'block' : 'none';
+            document.querySelectorAll('.view-tab').forEach(el => el.classList.remove('active'));
+            btn.classList.add('active');
+        }}
+
         function toggleCard(id) {{
             const content = document.getElementById(id);
             const card = content.parentElement;
@@ -4864,46 +4956,75 @@ class ElementExtractor:
 """
         return summary_html
 
-    def export_csv(self, all_selector_results: list, output_path: Path) -> Path:
+    def export_csv(
+        self,
+        all_selector_results: list,
+        output_path: Path,
+        unique_only: bool = False,
+    ) -> Path:
         """
-        Exports all match instances to a CSV file.
-        Columns: selector, query_type, file_path, file_name, instance_no, line, tag, inner_text, outer_xml
+        Exports match instances to a CSV file.
+
+        Columns: selector, query_type, file_path, file_name, doc_type, client,
+        link_info, identifier, instance_no, line, tag, inner_text, outer_xml,
+        is_unique, unique_group_size.
+
+        When unique_only=True, only rows with is_unique keep their original
+        instance_no from the full match list.
         """
         import csv
+        from core.match_uniqueness import annotate_selector_results
 
-        with open(output_path, 'w', newline='', encoding='utf-8') as f:
+        annotate_selector_results(all_selector_results)
+
+        header = [
+            "selector", "query_type", "file_path", "file_name",
+            "doc_type", "client", "link_info", "identifier",
+            "instance_no", "line", "tag", "inner_text", "outer_xml",
+            "is_unique", "unique_group_size",
+        ]
+        meta_cache: dict[str, dict] = {}
+
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            # Write header
-            writer.writerow([
-                'selector', 'query_type', 'file_path', 'file_name',
-                'instance_no', 'line', 'tag', 'inner_text', 'outer_xml'
-            ])
+            writer.writerow(header)
 
-            # Write data rows
             for selector_data in all_selector_results:
-                query_val = selector_data.get('query_val', '')
-                query_type = selector_data.get('query_type', '')
-                scan_results = selector_data.get('scan_results', {})
+                query_val = selector_data.get("query_val", "")
+                query_type = selector_data.get("query_type", "")
+                scan_results = selector_data.get("scan_results", {})
 
                 for file_path_str, data in scan_results.items():
-                    if not data.get('ok', True):
+                    if not data.get("ok", True):
                         continue
-                    matches = data.get('matches', [])
+                    matches = data.get("matches", [])
                     if not matches:
                         continue
 
+                    if file_path_str not in meta_cache:
+                        meta_cache[file_path_str] = self.get_file_metadata(Path(file_path_str))
+                    meta = meta_cache[file_path_str]
+
                     file_name = os.path.basename(file_path_str)
                     for idx, match in enumerate(matches, 1):
+                        if unique_only and not match.get("is_unique"):
+                            continue
                         writer.writerow([
                             query_val,
                             query_type,
                             file_path_str,
                             file_name,
+                            meta.get("doc_type", ""),
+                            meta.get("client", ""),
+                            meta.get("link_info", ""),
+                            meta.get("identifier", ""),
                             idx,
-                            match.get('line', ''),
-                            match.get('tag', ''),
-                            match.get('text', ''),
-                            match.get('html', '')
+                            match.get("line", ""),
+                            match.get("tag", ""),
+                            match.get("text", ""),
+                            match.get("html", ""),
+                            "True" if match.get("is_unique") else "False",
+                            match.get("unique_group_size", 1),
                         ])
 
         return output_path

@@ -152,7 +152,7 @@ Toggle the display of full element markup in the detailed report.
 Toggle the display of text content within matched elements.
 
 ### Export CSV Summary
-Generate a CSV file with all match instances for spreadsheet analysis.
+Generate CSV files with all match instances and a unique-first set for spreadsheet analysis.
 
 ### Copy Matched Source Files
 Create a copy of all source files that contain matches in the report folder.
@@ -194,6 +194,8 @@ The following settings are preserved in history:
 ### 1. Detailed Report (`Element_Extraction_Report_*.html`)
 - Interactive collapsible file cards
 - Per-element details with attributes
+- **All matches** and **Unique** tabs (unique = first match per tag+attributes within each file, ignoring `xlink:href` / Clark `{…}href`)
+- Header stats include Total Matches and Unique Matches
 - Highlighted year patterns in text
 - Copy-to-clipboard functionality
 - Search within results
@@ -204,10 +206,12 @@ The following settings are preserved in history:
 - Overall scan metrics
 - Selector comparison
 
-### 3. CSV Export (`Element_Extraction_Report_*.csv`)
+### 3. CSV Export (`Element_Extraction_Report_*.csv` and `Element_Extraction_Unique_*.csv`)
 - Spreadsheet-compatible format
-- Columns: selector, query_type, file_path, file_name, instance_no, line, tag, inner_text, outer_xml
-- One row per match instance
+- Columns: selector, query_type, file_path, file_name, doc_type, client, link_info, identifier, instance_no, line, tag, inner_text, outer_xml, is_unique, unique_group_size
+- Full CSV: one row per match instance
+- Unique CSV: first match per tag+attributes within each file, ignoring `xlink:href` (keeps original `instance_no`)
+- Metadata columns match the HTML `TYPE|CLIENT|LINK-INFO|IDENTIFIER` fields (separate columns, not a pipe string)
 
 ---
 

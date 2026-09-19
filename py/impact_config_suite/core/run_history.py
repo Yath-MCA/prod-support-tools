@@ -22,28 +22,36 @@ class RunHistoryStore:
         return cls.base_dir() / cls.DEFAULT_FILE_NAME
 
     @classmethod
+    def _load_entries_unlocked(cls) -> list[dict]:
+        history_path = cls.history_file_path()
+        if not history_path.exists():
+            return []
+        try:
+            raw = json.loads(history_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        if not isinstance(raw, list):
+            return []
+        return [item for item in raw if isinstance(item, dict)][: cls.HISTORY_LIMIT]
+
+    @classmethod
+    def _save_entries_unlocked(cls, entries: list[dict]) -> None:
+        history_path = cls.history_file_path()
+        history_path.parent.mkdir(parents=True, exist_ok=True)
+        history_path.write_text(
+            json.dumps(entries[: cls.HISTORY_LIMIT], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    @classmethod
     def load_entries(cls) -> list[dict]:
         with cls._lock:
-            history_path = cls.history_file_path()
-            if not history_path.exists():
-                return []
-            try:
-                raw = json.loads(history_path.read_text(encoding="utf-8"))
-            except Exception:
-                return []
-            if not isinstance(raw, list):
-                return []
-            return [item for item in raw if isinstance(item, dict)][: cls.HISTORY_LIMIT]
+            return cls._load_entries_unlocked()
 
     @classmethod
     def save_entries(cls, entries: list[dict]) -> None:
         with cls._lock:
-            history_path = cls.history_file_path()
-            history_path.parent.mkdir(parents=True, exist_ok=True)
-            history_path.write_text(
-                json.dumps(entries[: cls.HISTORY_LIMIT], ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            cls._save_entries_unlocked(entries)
 
     @classmethod
     def add_entry(cls, entry: dict) -> dict:
@@ -56,7 +64,7 @@ class RunHistoryStore:
             payload.setdefault("summary", "")
             payload.setdefault("params", {})
 
-            entries = cls.load_entries()
+            entries = cls._load_entries_unlocked()
             entry_key = (
                 str(payload.get("tool_id", "")),
                 str(payload.get("action", "")),
@@ -77,7 +85,7 @@ class RunHistoryStore:
                 ) != entry_key
             ]
             entries.insert(0, payload)
-            cls.save_entries(entries)
+            cls._save_entries_unlocked(entries)
             return payload
 
     @classmethod

@@ -10,6 +10,10 @@
 
 2. **No unique-return view:** A single query often returns multiple elements in the same document that differ only by `xlink:href` (including lxml Clark notation `{http://www.w3.org/1999/xlink}href`). Users need a first-of-group unique set alongside the full match list, in both HTML and CSV.
 
+3. **Post-run buttons stuck:** After an extraction “completes” (reports on disk), only **Cancel** remains usable; **Run**, **Open Last Report**, and history actions do not respond. Primary cause: worker hangs in `RunHistoryStore.add_entry` (see #4) so `finally` never re-enables Run. Secondary cause: any remaining worker-thread Tk `.config()` calls (e.g. `open_last_btn.config(...)`) which are unsafe on Windows.
+
+4. **Run history not recorded (and can hang the worker):** `RunHistoryStore.add_entry` acquires `threading.Lock`, then calls `load_entries()` / `save_entries()` which try to acquire the **same non-reentrant lock** → deadlock. Confirmed via timed thread join. Secondary issue: `_current_run_settings` reads many Tk `StringVar`s from the worker thread, which can yield incomplete or wrong history fields even after the lock is fixed.
+
 ## Goals
 
 - Add CSV columns for `doc_type`, `client`, `link_info`, `identifier` (same fields as the HTML metadata line; not a single pipe string; no extra `dtd` / title columns).
@@ -18,6 +22,8 @@
 - Uniqueness key (per selector/query run, per file): same `tag` + all attributes equal **except** ignore `xlink:href` / keys ending with `}href`. Different `class` values remain different.
 - HTML: **All matches** + **Unique** tab/section.
 - CSV when export is enabled: full file + unique file, and uniqueness columns on both for Excel filtering.
+- After any run ends (success, cancel, or error), restore action buttons on the **main thread** only so Run / Open Last Report / history actions work again.
+- Fix `RunHistoryStore.add_entry` lock deadlock so history persists; snapshot run settings for history without reading Tk vars from the worker thread.
 
 ## Non-goals
 
@@ -63,6 +69,22 @@ Metadata for CSV rows comes from existing `get_file_metadata(Path)` (same source
 | CSV call site | Write `Element_Extraction_Report_*.csv` (all) and `Element_Extraction_Unique_*.csv` (unique). Same column schema on both. |
 | `generate_html_report` | Tabs/sections **All matches** and **Unique**; badges for total and unique counts. |
 | Tab / logging | No new checkbox. When CSV export is on, log both paths. History settings unchanged. |
+| `_finish_run_ui(...)` (tab) | Single main-thread helper: re-enable Run, disable Cancel, enable Open Last Report when `last_report_path` exists; never call widget `.config` from the worker thread. |
+| `RunHistoryStore` | Fix re-entrant lock bug in `add_entry` (unlocked load/save internals or `RLock`); keep public API unchanged. |
+
+## Run history (normative)
+
+- `add_entry` must not deadlock: while holding the store lock, call unlocked load/save helpers (preferred) or use `threading.RLock`.
+- Element Extractor: build the history payload from values already captured on the main thread before the worker starts (path, queries, filters, report options), plus paths/counts produced by the worker (`report_path`, `csv_path`, unique csv path, match counts). Do not call `.get()` on Tk variables inside `_current_run_settings` from the worker.
+- After a successful write, `_update_history_ui` on the main thread must show the new entry at the top of Saved Runs.
+- Include unique CSV path in `params` when dual CSV is written (`unique_csv_path`).
+
+## Post-run UI (normative)
+
+- All Tk widget mutations from `_run_extraction_thread` (and helpers it calls) MUST go through `_ui` / `self.after(0, ...)`.
+- Replace direct `self.open_last_btn.config(...)` in the success and mixed-only success paths with a scheduled finish helper.
+- `finally` already resets Run/Cancel via `_ui`; fold Open Last Report enable into that same callback when a report path was set, so one atomic main-thread update restores the action row.
+- Do not leave Cancel enabled after a completed run.
 
 ## CSV schema
 
@@ -124,9 +146,10 @@ Update `docs/element_extractor_docs.md` (and root `element_extractor_docs.md` if
 
 ## File touch list (implementation)
 
+- `core/run_history.py` — fix `add_entry` lock deadlock
 - `core/element_extractor.py` — uniqueness helpers, HTML Unique view, CSV schema + dual write
-- `tabs/element_extractor_tab.py` — wire dual CSV paths / logging
-- `tests/` — new or extended unit tests for uniqueness + CSV meta
+- `tabs/element_extractor_tab.py` — dual CSV; main-thread UI finish; history payload snapshot
+- `tests/` — uniqueness + CSV meta; `RunHistoryStore.add_entry` does not hang and persists
 - `docs/element_extractor_docs.md` (+ mirror if applicable)
 
 ## Success criteria
@@ -135,3 +158,5 @@ Update `docs/element_extractor_docs.md` (and root `element_extractor_docs.md` if
 - HTML Unique and unique CSV show the same first-of-group set for href-only attribute differences.
 - Full match list remains available in HTML All and the full CSV.
 - Existing scans and filters behave as today.
+- After a completed run, **Run** and **Open Last Report** work; **Cancel** is disabled until the next run starts.
+- Completed runs appear in Saved Runs with correct source/query/report path; `RunHistoryStore.add_entry` returns without hanging.

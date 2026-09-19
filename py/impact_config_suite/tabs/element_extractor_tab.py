@@ -12,6 +12,7 @@ import webbrowser
 from bs4 import BeautifulSoup
 
 from core.element_extractor import ElementExtractor
+from core.match_uniqueness import annotate_selector_results
 from core.mixed_citation_direct_hits import (
     generate_mixed_citation_direct_hits_report_html,
     rollup_by_client,
@@ -48,6 +49,7 @@ class ElementExtractorTab(ttk.Frame):
         self.last_entire_citation_report_path = None
         self.last_mixed_citation_report_path = None
         self.last_csv_path = None
+        self.last_unique_csv_path = None
         self.history_entries = self._load_history_entries()
         self.filtered_history_entries = list(self.history_entries)
         self._build_ui()
@@ -1030,6 +1032,45 @@ class ElementExtractorTab(ttk.Frame):
         """Schedule a callable on the Tk main thread."""
         self.after(0, fn)
 
+    def _finish_run_ui(self, *, enable_open_last: bool = False) -> None:
+        """Reset action buttons after a run. Must run on the Tk main thread."""
+        self.run_btn.config(state="normal", text="🚀  RUN ELEMENT EXTRACTION")
+        self.cancel_btn.config(state="disabled")
+        if enable_open_last and self.last_report_path and os.path.exists(self.last_report_path):
+            self.open_last_btn.config(state="normal")
+
+    def _snapshot_ui_settings(self) -> dict:
+        """Capture UI settings on the main thread for safe use in the worker."""
+        return {
+            "mode": self.mode_var.get().strip(),
+            "query_type": self.selector_type_var.get().strip(),
+            "attr_name": self.attr_name_var.get().strip(),
+            "attr_value": self.attr_val_var.get().strip(),
+            "recursive": bool(self.recursive_var.get()),
+            "extensions": self.extensions_var.get().strip(),
+            "filename_filter": self.filename_filter_var.get().strip() or "None",
+            "dtd_filter": self.dtd_filter_var.get().strip() or "None",
+            "client_filter": self.client_filter_var.get().strip() or "None",
+            "month_filter": self.month_filter_var.get().strip() or "All Time",
+            "custom_month": self.custom_month_var.get().strip(),
+            "org_by_month": bool(self.org_by_month_var.get()),
+            "parallel_mode": bool(self.parallel_mode_var.get()),
+            "worker_count": self.worker_count_var.get().strip() or "Auto",
+            "batch_mode": bool(self.batch_mode_var.get()),
+            "batch_size": self.batch_size_var.get().strip() or "50",
+            "batch_offset_ui": self.batch_offset_var.get(),
+            "open_report": bool(self.open_report_var.get()),
+            "show_outer_xml": bool(self.show_outer_xml_var.get()),
+            "show_inner_text": bool(self.show_inner_text_var.get()),
+            "generate_csv": bool(self.generate_csv_var.get()),
+            "copy_matched_files": bool(self.copy_matched_files_var.get()),
+            "citation_type_report": bool(self.citation_type_report_var.get()),
+            "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
+            "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
+            "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
+            "use_folder_index": bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True,
+        }
+
     def _set_status(self, message: str):
         """Thread-safe status line update."""
         self._ui(lambda m=message: self.status_var.set(m))
@@ -1233,79 +1274,77 @@ class ElementExtractorTab(ttk.Frame):
                                summary_report_path: str = "", csv_path: str = "",
                                copied_files_count: int = 0, copied_folder_path: str = "",
                                batch_offset: int = 0, has_more_batches: bool = False,
-                               next_batch_offset: int = 0) -> dict:
+                               next_batch_offset: int = 0, settings: dict | None = None,
+                               unique_csv_path: str = "") -> dict:
+        s = settings or self._snapshot_ui_settings()
         return {
             "tool_id": self.history_tool_id,
             "tool_label": self.history_tool_label,
             "action": "extract",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "mode": self.mode_var.get().strip(),
+            "mode": s.get("mode", ""),
             "source_path": source_path,
-            "query_type": self.selector_type_var.get().strip(),
+            "query_type": s.get("query_type", ""),
             "query_value": query_val,
-            "attr_name": self.attr_name_var.get().strip(),
-            "attr_value": self.attr_val_var.get().strip(),
-            "recursive": bool(self.recursive_var.get()),
-            "extensions": self.extensions_var.get().strip(),
-            "filename_filter": self.filename_filter_var.get().strip() or "None",
-            "dtd_filter": self.dtd_filter_var.get().strip() or "None",
-            "client_filter": self.client_filter_var.get().strip() or "None",
-            "month_filter": self.month_filter_var.get().strip() or "All Time",
-            "custom_month": self.custom_month_var.get().strip(),
-            "org_by_month": bool(self.org_by_month_var.get()),
-            # Parallel processing settings
-            "parallel_mode": bool(self.parallel_mode_var.get()),
-            "worker_count": self.worker_count_var.get().strip() or "Auto",
-            # Batch processing settings
-            "batch_mode": bool(self.batch_mode_var.get()),
-            "batch_size": self.batch_size_var.get().strip() or "50",
+            "attr_name": s.get("attr_name", ""),
+            "attr_value": s.get("attr_value", ""),
+            "recursive": bool(s.get("recursive", False)),
+            "extensions": s.get("extensions", ""),
+            "filename_filter": s.get("filename_filter", "None"),
+            "dtd_filter": s.get("dtd_filter", "None"),
+            "client_filter": s.get("client_filter", "None"),
+            "month_filter": s.get("month_filter", "All Time"),
+            "custom_month": s.get("custom_month", ""),
+            "org_by_month": bool(s.get("org_by_month", False)),
+            "parallel_mode": bool(s.get("parallel_mode", False)),
+            "worker_count": s.get("worker_count", "Auto"),
+            "batch_mode": bool(s.get("batch_mode", False)),
+            "batch_size": s.get("batch_size", "50"),
             "batch_offset": batch_offset,
             "output_dir": output_dir,
-            "open_report": bool(self.open_report_var.get()),
+            "open_report": bool(s.get("open_report", True)),
             "report_path": report_path,
-            "summary": f"{self.mode_var.get().strip()} | {self.selector_type_var.get().strip()}: {query_val}",
-            # New report content options
-            "show_outer_xml": bool(self.show_outer_xml_var.get()),
-            "show_inner_text": bool(self.show_inner_text_var.get()),
-            "generate_csv": bool(self.generate_csv_var.get()),
-            "copy_matched_files": bool(self.copy_matched_files_var.get()),
-            "citation_type_report": bool(self.citation_type_report_var.get()),
-            "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
-            "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
-            "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
+            "summary": f"{s.get('mode', '')} | {s.get('query_type', '')}: {query_val}",
+            "show_outer_xml": bool(s.get("show_outer_xml", True)),
+            "show_inner_text": bool(s.get("show_inner_text", True)),
+            "generate_csv": bool(s.get("generate_csv", True)),
+            "copy_matched_files": bool(s.get("copy_matched_files", False)),
+            "citation_type_report": bool(s.get("citation_type_report", False)),
+            "citation_cite_type": s.get("citation_cite_type", "bibr"),
+            "mixed_citation_direct_hits": bool(s.get("mixed_citation_direct_hits", False)),
+            "mixed_citation_only": bool(s.get("mixed_citation_only", False)),
             "params": {
-                "mode": self.mode_var.get().strip(),
-                "query_type": self.selector_type_var.get().strip(),
+                "mode": s.get("mode", ""),
+                "query_type": s.get("query_type", ""),
                 "query_value": query_val,
-                "attr_name": self.attr_name_var.get().strip(),
-                "attr_value": self.attr_val_var.get().strip(),
-                "recursive": bool(self.recursive_var.get()),
-                "extensions": self.extensions_var.get().strip(),
-                "filename_filter": self.filename_filter_var.get().strip() or "None",
-                "dtd_filter": self.dtd_filter_var.get().strip() or "None",
-                "client_filter": self.client_filter_var.get().strip() or "None",
-                "month_filter": self.month_filter_var.get().strip() or "All Time",
-                "custom_month": self.custom_month_var.get().strip(),
-                "org_by_month": bool(self.org_by_month_var.get()),
-                # Parallel processing params
-                "parallel_mode": bool(self.parallel_mode_var.get()),
-                "worker_count": self.worker_count_var.get().strip() or "Auto",
-                # Batch processing params
-                "batch_mode": bool(self.batch_mode_var.get()),
-                "batch_size": self.batch_size_var.get().strip() or "50",
+                "attr_name": s.get("attr_name", ""),
+                "attr_value": s.get("attr_value", ""),
+                "recursive": bool(s.get("recursive", False)),
+                "extensions": s.get("extensions", ""),
+                "filename_filter": s.get("filename_filter", "None"),
+                "dtd_filter": s.get("dtd_filter", "None"),
+                "client_filter": s.get("client_filter", "None"),
+                "month_filter": s.get("month_filter", "All Time"),
+                "custom_month": s.get("custom_month", ""),
+                "org_by_month": bool(s.get("org_by_month", False)),
+                "parallel_mode": bool(s.get("parallel_mode", False)),
+                "worker_count": s.get("worker_count", "Auto"),
+                "batch_mode": bool(s.get("batch_mode", False)),
+                "batch_size": s.get("batch_size", "50"),
                 "batch_offset": batch_offset,
                 "has_more_batches": has_more_batches,
                 "next_batch_offset": next_batch_offset,
-                "show_outer_xml": bool(self.show_outer_xml_var.get()),
-                "show_inner_text": bool(self.show_inner_text_var.get()),
-                "generate_csv": bool(self.generate_csv_var.get()),
-                "copy_matched_files": bool(self.copy_matched_files_var.get()),
-                "citation_type_report": bool(self.citation_type_report_var.get()),
-                "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
-                "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
-                "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
+                "show_outer_xml": bool(s.get("show_outer_xml", True)),
+                "show_inner_text": bool(s.get("show_inner_text", True)),
+                "generate_csv": bool(s.get("generate_csv", True)),
+                "copy_matched_files": bool(s.get("copy_matched_files", False)),
+                "citation_type_report": bool(s.get("citation_type_report", False)),
+                "citation_cite_type": s.get("citation_cite_type", "bibr"),
+                "mixed_citation_direct_hits": bool(s.get("mixed_citation_direct_hits", False)),
+                "mixed_citation_only": bool(s.get("mixed_citation_only", False)),
                 "summary_report_path": summary_report_path,
                 "csv_path": csv_path,
+                "unique_csv_path": unique_csv_path,
                 "copied_files_count": copied_files_count,
                 "copied_folder_path": copied_folder_path,
             },
@@ -1394,11 +1433,12 @@ class ElementExtractorTab(ttk.Frame):
         )
 
         self.cancelled = False
+        ui_settings = self._snapshot_ui_settings()
 
         # Start Thread with multiple queries
         self.scan_thread = threading.Thread(
             target=self._run_extraction_thread,
-            args=(source_path, normalized_queries, query_type, output_dir),
+            args=(source_path, normalized_queries, query_type, output_dir, ui_settings),
             daemon=True
         )
         self.scan_thread.start()
@@ -1560,35 +1600,52 @@ class ElementExtractorTab(ttk.Frame):
         )
         return mixed_citation_report_path
 
-    def _run_extraction_thread(self, source_path_str: str, queries: list[str], query_type: str, output_dir_str: str):
+    def _run_extraction_thread(
+        self,
+        source_path_str: str,
+        queries: list[str],
+        query_type: str,
+        output_dir_str: str,
+        ui_settings: dict | None = None,
+    ):
+        settings = ui_settings or {}
         try:
-            mode = self.mode_var.get()
+            mode = settings.get("mode") or self.mode_var.get()
             # Fix XPath label normalization
             if query_type == "XPath Query":
                 query_type = "XPath"
-            attr_name = self.attr_name_var.get().strip()
-            attr_val = self.attr_val_var.get().strip()
+            attr_name = (settings.get("attr_name") if settings else None)
+            if attr_name is None:
+                attr_name = self.attr_name_var.get().strip()
+            else:
+                attr_name = str(attr_name).strip()
+            attr_val = (settings.get("attr_value") if settings else None)
+            if attr_val is None:
+                attr_val = self.attr_val_var.get().strip()
+            else:
+                attr_val = str(attr_val).strip()
 
             # Report content options
-            show_outer_xml = bool(self.show_outer_xml_var.get())
-            show_inner_text = bool(self.show_inner_text_var.get())
-            generate_csv = bool(self.generate_csv_var.get())
-            citation_type_report = bool(self.citation_type_report_var.get())
-            citation_cite_type = self.citation_cite_type_var.get().strip() or "bibr"
-            mixed_citation_direct_hits = bool(self.mixed_citation_direct_hits_var.get())
+            show_outer_xml = bool(settings.get("show_outer_xml", True))
+            show_inner_text = bool(settings.get("show_inner_text", True))
+            generate_csv = bool(settings.get("generate_csv", True))
+            citation_type_report = bool(settings.get("citation_type_report", False))
+            citation_cite_type = str(settings.get("citation_cite_type") or "bibr").strip() or "bibr"
+            mixed_citation_direct_hits = bool(settings.get("mixed_citation_direct_hits", False))
             mixed_citation_only = should_skip_selector_extract(
                 mixed_citation_direct_hits,
-                bool(self.mixed_citation_only_var.get()),
+                bool(settings.get("mixed_citation_only", False)),
             )
 
             # Batch processing options
-            is_batch_mode = self.batch_mode_var.get() if mode == "Folder Scan" else False
-            batch_size = int(self.batch_size_var.get()) if is_batch_mode else 0
-            batch_offset = self.batch_offset_var.get() if is_batch_mode else 0
+            is_batch_mode = bool(settings.get("batch_mode", False)) if mode == "Folder Scan" else False
+            batch_size = int(settings.get("batch_size") or 0) if is_batch_mode else 0
+            batch_offset = settings.get("batch_offset_ui", 0) if is_batch_mode else 0
 
             # Parallel processing options
-            use_parallel = self.parallel_mode_var.get() if mode == "Folder Scan" else False
-            worker_count = None if self.worker_count_var.get() == "Auto" else int(self.worker_count_var.get())
+            use_parallel = bool(settings.get("parallel_mode", False)) if mode == "Folder Scan" else False
+            worker_count_raw = settings.get("worker_count", "Auto")
+            worker_count = None if worker_count_raw == "Auto" else int(worker_count_raw)
 
             source_path = Path(source_path_str)
             output_dir = Path(output_dir_str)
@@ -1608,7 +1665,9 @@ class ElementExtractorTab(ttk.Frame):
                     self._log(f"    [{i}] {q}")
             if query_type == "Tag Name" and attr_name:
                 self._log(f"  Attr Filter:   {attr_name} = '{attr_val}'")
-            copy_matched_files = bool(self.copy_matched_files_var.get())
+            copy_matched_files = bool(settings.get("copy_matched_files", False))
+            open_report = bool(settings.get("open_report", True))
+            org_by_month = bool(settings.get("org_by_month", False))
             self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}, Mixed-only={'Yes' if mixed_citation_only else 'No'}")
 
             # Parallel and batch mode logging
@@ -1638,7 +1697,7 @@ class ElementExtractorTab(ttk.Frame):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 query_slug = "mixed_citation_only"
                 run_folder_name = f"extraction_{safe_target_name}_{query_slug}_{ts}"
-                if self.org_by_month_var.get():
+                if org_by_month:
                     month_folder = datetime.now().strftime("%Y-%m")
                     run_folder = output_dir / month_folder / run_folder_name
                 else:
@@ -1670,15 +1729,14 @@ class ElementExtractorTab(ttk.Frame):
                         batch_offset=0,
                         has_more_batches=False,
                         next_batch_offset=0,
+                        settings=settings,
                     )
                 )
 
                 self._log(f"\nAll outputs saved to: {run_folder}")
                 self._set_status("Mixed-citation only scan complete.")
                 self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
-                if self.last_report_path:
-                    self.open_last_btn.config(state="normal")
-                if self.open_report_var.get() and mixed_citation_report_path:
+                if open_report and mixed_citation_report_path:
                     webbrowser.open(f"file:///{mixed_citation_report_path}")
                 return
 
@@ -1942,7 +2000,7 @@ class ElementExtractorTab(ttk.Frame):
             run_folder_name = f"extraction_{safe_target_name}_{query_slug}_{ts}"
 
             # Create month-based subfolder if enabled
-            if self.org_by_month_var.get():
+            if org_by_month:
                 month_folder = datetime.now().strftime("%Y-%m")
                 run_folder = output_dir / month_folder / run_folder_name
             else:
@@ -2103,16 +2161,25 @@ class ElementExtractorTab(ttk.Frame):
 
             # Generate and save CSV if enabled
             csv_path = ""
+            unique_csv_path = ""
             if generate_csv:
                 self._set_status("Generating CSV export...")
-                csv_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.csv"
-                csv_report_path = run_folder / csv_report_name
+                annotate_selector_results(all_selector_results)
 
-                self.extractor.export_csv(all_selector_results, csv_report_path)
+                csv_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.csv"
+                csv_unique_name = f"Element_Extraction_Unique_{safe_target_name}_{query_slug}.csv"
+                csv_report_path = run_folder / csv_report_name
+                csv_unique_file = run_folder / csv_unique_name
+
+                self.extractor.export_csv(all_selector_results, csv_report_path, unique_only=False)
+                self.extractor.export_csv(all_selector_results, csv_unique_file, unique_only=True)
 
                 self.last_csv_path = str(csv_report_path.absolute())
+                self.last_unique_csv_path = str(csv_unique_file.absolute())
                 csv_path = self.last_csv_path
+                unique_csv_path = self.last_unique_csv_path
                 self._log(f"📋 CSV export saved: {run_folder_name}/{csv_report_name}")
+                self._log(f"📋 Unique CSV saved: {run_folder_name}/{csv_unique_name}")
 
             # Copy matched files if enabled
             copied_files_count = 0
@@ -2176,7 +2243,9 @@ class ElementExtractorTab(ttk.Frame):
                     copied_folder_path if copy_matched_files else "",
                     batch_offset=current_batch_offset,
                     has_more_batches=current_has_more,
-                    next_batch_offset=current_next_offset
+                    next_batch_offset=current_next_offset,
+                    settings=settings,
+                    unique_csv_path=unique_csv_path,
                 )
             )
 
@@ -2204,10 +2273,8 @@ class ElementExtractorTab(ttk.Frame):
                 # Disable Next Batch button in non-batch mode
                 self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
 
-            self.open_last_btn.config(state="normal")
-
             # Auto-open detailed report if checked
-            if self.open_report_var.get():
+            if open_report:
                 webbrowser.open(f"file:///{self.last_report_path}")
                 if citation_type_report and citation_report_path:
                     webbrowser.open(f"file:///{citation_report_path}")
@@ -2222,7 +2289,5 @@ class ElementExtractorTab(ttk.Frame):
             self._ui(lambda err=str(e): messagebox.showerror("Extraction Error", f"An error occurred:\n{err}"))
 
         finally:
-            def _reset_ui():
-                self.run_btn.config(state="normal", text="🚀  RUN ELEMENT EXTRACTION")
-                self.cancel_btn.config(state="disabled")
-            self._ui(_reset_ui)
+            enable_open = bool(self.last_report_path and os.path.exists(self.last_report_path))
+            self._ui(lambda eo=enable_open: self._finish_run_ui(enable_open_last=eo))
