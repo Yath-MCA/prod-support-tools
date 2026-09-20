@@ -129,7 +129,7 @@ When enabled, reports are organized into month-based subfolders using the format
 ```
 ~/Documents/impact-support-log/
 └── 2026-06/
-    └── extraction_target_selector_20260622_143052/
+    └── 20260622_143052_extraction_target_selector/
         ├── Element_Extraction_Report_*.html
         ├── Element_Extraction_Summary_*.html
         ├── Element_Extraction_Report_*.csv
@@ -153,6 +153,11 @@ Toggle the display of text content within matched elements.
 
 ### Export CSV Summary
 Generate CSV files with all match instances and a unique-first set for spreadsheet analysis.
+
+### DOI / pub-id by ref (unique)
+When checked, skips normal selector extract and scans each file for first hits in six buckets:
+`pub-id` / `ext-link[ext-link-type=doi]` / `ext-link[ext-link-type=uri]` × inside vs outside `.ref`.
+Flags: `under_comment` (ext-link direct child of comment), `doi_org_in_href`, `doi_org_in_text` (URI rows).
 
 ### Copy Matched Source Files
 Create a copy of all source files that contain matches in the report folder.

@@ -11,7 +11,13 @@ import webbrowser
 
 from bs4 import BeautifulSoup
 
+from core.doi_pubid_by_ref import (
+    extract_buckets_from_file,
+    generate_doi_pubid_by_ref_html,
+    write_doi_pubid_by_ref_csv,
+)
 from core.element_extractor import ElementExtractor
+from core.extraction_run_paths import format_extraction_run_folder_name
 from core.match_uniqueness import annotate_selector_results
 from core.mixed_citation_direct_hits import (
     generate_mixed_citation_direct_hits_report_html,
@@ -21,11 +27,18 @@ from core.mixed_citation_direct_hits import (
 from core.run_history import RunHistoryStore
 
 
-def should_skip_selector_extract(mixed_hits: bool, mixed_only: bool) -> bool:
-    """Return True when Mixed-citation-only mode should skip CSS/selector extract.
+def should_skip_selector_extract(
+    mixed_hits: bool,
+    mixed_only: bool,
+    doi_pubid_by_ref: bool = False,
+) -> bool:
+    """Return True when selector extract should be skipped.
 
-    Implies mixed-citation hits is on; callers should gate the checkbox the same way.
+    DOI/pub-id by-ref mode always skips. Mixed-citation-only skips when both
+    mixed hits and mixed-only are on.
     """
+    if doi_pubid_by_ref:
+        return True
     return bool(mixed_hits) and bool(mixed_only)
 
 
@@ -666,6 +679,18 @@ class ElementExtractorTab(ttk.Frame):
         )
         self.mixed_citation_only_chk.pack(side="left", padx=(16, 0))
 
+        self.doi_pubid_by_ref_var = tk.BooleanVar(value=False)
+        self.doi_pubid_by_ref_chk = tk.Checkbutton(
+            report_options_frame3,
+            text="DOI / pub-id by ref (unique)",
+            variable=self.doi_pubid_by_ref_var,
+            command=self._on_doi_pubid_by_ref_toggle,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.doi_pubid_by_ref_chk.pack(side="left", padx=(16, 0))
+
         # Report Organization Section
         tk.Label(
             settings_frame,
@@ -925,11 +950,19 @@ class ElementExtractorTab(ttk.Frame):
     def _on_mixed_citation_toggle(self):
         """Enable mixed-citation-only checkbox only when mixed hits is checked."""
         enabled = bool(self.mixed_citation_direct_hits_var.get())
-        if enabled:
+        if enabled and not bool(self.doi_pubid_by_ref_var.get()):
             self.mixed_citation_only_chk.config(state="normal")
         else:
             self.mixed_citation_only_var.set(False)
             self.mixed_citation_only_chk.config(state="disabled")
+
+    def _on_doi_pubid_by_ref_toggle(self):
+        """DOI/pub-id by-ref mode replaces extract; uncheck mixed-only when enabled."""
+        if bool(self.doi_pubid_by_ref_var.get()):
+            self.mixed_citation_only_var.set(False)
+            self.mixed_citation_only_chk.config(state="disabled")
+        else:
+            self._on_mixed_citation_toggle()
 
     def _on_month_filter_change(self, event=None):
         is_custom = self.month_filter_var.get() == "Custom"
@@ -1068,6 +1101,7 @@ class ElementExtractorTab(ttk.Frame):
             "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
             "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
             "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
+            "doi_pubid_by_ref": bool(self.doi_pubid_by_ref_var.get()),
             "use_folder_index": bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True,
         }
 
@@ -1217,8 +1251,10 @@ class ElementExtractorTab(ttk.Frame):
         self.citation_cite_type_var.set(str(entry.get("citation_cite_type", "bibr") or "bibr").strip() or "bibr")
         self.mixed_citation_direct_hits_var.set(bool(entry.get("mixed_citation_direct_hits", False)))
         self.mixed_citation_only_var.set(bool(entry.get("mixed_citation_only", False)))
+        self.doi_pubid_by_ref_var.set(bool(entry.get("doi_pubid_by_ref", False)))
         self._on_citation_type_toggle()
         self._on_mixed_citation_toggle()
+        self._on_doi_pubid_by_ref_toggle()
         # Restore batch state for Next Batch button
         params = entry.get("params", {})
         if params.get("has_more_batches") and params.get("next_batch_offset"):
@@ -1313,6 +1349,7 @@ class ElementExtractorTab(ttk.Frame):
             "citation_cite_type": s.get("citation_cite_type", "bibr"),
             "mixed_citation_direct_hits": bool(s.get("mixed_citation_direct_hits", False)),
             "mixed_citation_only": bool(s.get("mixed_citation_only", False)),
+            "doi_pubid_by_ref": bool(s.get("doi_pubid_by_ref", False)),
             "params": {
                 "mode": s.get("mode", ""),
                 "query_type": s.get("query_type", ""),
@@ -1342,6 +1379,7 @@ class ElementExtractorTab(ttk.Frame):
                 "citation_cite_type": s.get("citation_cite_type", "bibr"),
                 "mixed_citation_direct_hits": bool(s.get("mixed_citation_direct_hits", False)),
                 "mixed_citation_only": bool(s.get("mixed_citation_only", False)),
+                "doi_pubid_by_ref": bool(s.get("doi_pubid_by_ref", False)),
                 "summary_report_path": summary_report_path,
                 "csv_path": csv_path,
                 "unique_csv_path": unique_csv_path,
@@ -1380,13 +1418,15 @@ class ElementExtractorTab(ttk.Frame):
             query_type = "XPath"
 
         # Parse comma-separated queries for all query types (Tag Name, CSS Selector, XPath)
+        doi_pubid_by_ref = bool(self.doi_pubid_by_ref_var.get())
         mixed_citation_only = should_skip_selector_extract(
             bool(self.mixed_citation_direct_hits_var.get()),
             bool(self.mixed_citation_only_var.get()),
+            doi_pubid_by_ref=doi_pubid_by_ref,
         )
         queries = self._parse_query_list(raw_query_val)
         if not queries:
-            if mixed_citation_only:
+            if mixed_citation_only or doi_pubid_by_ref:
                 normalized_queries = []
             else:
                 messagebox.showerror("Error", "Please enter a tag, selector, or XPath query.")
@@ -1423,14 +1463,16 @@ class ElementExtractorTab(ttk.Frame):
         self.run_btn.config(state="disabled", text="⏳ EXTRACTING ELEMENTS...")
         self.cancel_btn.config(state="normal")
         self.progress_bar.config(value=0)
-        self.status_var.set(
-            "Starting mixed-citation scan…"
-            if should_skip_selector_extract(
-                bool(self.mixed_citation_direct_hits_var.get()),
-                bool(self.mixed_citation_only_var.get()),
-            )
-            else "Starting extraction…"
-        )
+        if doi_pubid_by_ref:
+            start_msg = "Starting DOI / pub-id by-ref scan…"
+        elif should_skip_selector_extract(
+            bool(self.mixed_citation_direct_hits_var.get()),
+            bool(self.mixed_citation_only_var.get()),
+        ):
+            start_msg = "Starting mixed-citation scan…"
+        else:
+            start_msg = "Starting extraction…"
+        self.status_var.set(start_msg)
 
         self.cancelled = False
         ui_settings = self._snapshot_ui_settings()
@@ -1495,6 +1537,98 @@ class ElementExtractorTab(ttk.Frame):
                 seen.add(key)
                 paths.append(Path(fp))
         return paths
+
+    def _write_doi_pubid_by_ref_outputs(
+        self,
+        source_path: Path,
+        is_single: bool,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        ts: str,
+        settings: dict | None = None,
+    ) -> str:
+        """Scan DOI/pub-id by-ref buckets and write HTML + CSV. Returns HTML path."""
+        settings = settings or {}
+        self._set_status("Scanning DOI / pub-id by ref…")
+        self._log("\nScanning pub-id / ext-link doi|uri (in vs out of .ref)…")
+
+        recursive = bool(settings.get("recursive", False)) if not is_single else False
+        ext_str = settings.get("extensions", ".xml, .html, .htm, .xhtml")
+        filename_filter = str(settings.get("filename_filter", "None") or "None").strip()
+        dtd_filter = str(settings.get("dtd_filter", "None") or "None").strip()
+        client_filter = str(settings.get("client_filter", "None") or "None").strip()
+        month_filter = str(settings.get("month_filter", "All Time") or "All Time").strip()
+        custom_month = str(settings.get("custom_month", "") or "").strip()
+        extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+        if not extensions:
+            extensions = [".xml", ".html", ".htm", ".xhtml"]
+
+        if is_single:
+            file_list = [Path(source_path)]
+        else:
+            use_index = bool(settings.get("use_folder_index", True))
+            file_list = self.extractor.collect_matching_files(
+                source_path,
+                recursive=recursive,
+                extensions=extensions,
+                filename_filter=filename_filter if filename_filter != "None" else None,
+                dtd_filter=dtd_filter if dtd_filter != "None" else None,
+                client_filter=client_filter if client_filter != "None" else None,
+                month_filter=month_filter,
+                custom_month=custom_month if month_filter == "Custom" else "",
+                use_index=use_index,
+                discover_new=True,
+                log_callback=self._log,
+                cancel_check=lambda: self.cancelled,
+            )
+
+        file_results = []
+        total = len(file_list)
+        for i, fp in enumerate(file_list, 1):
+            if self.cancelled:
+                break
+            percent = int((i / total) * 100) if total else 0
+            self._ui(lambda p=percent: self.progress_bar.config(value=p))
+            self._set_status(f"DOI/pub-id by ref ({i}/{total}): {fp.name}")
+            parsed = extract_buckets_from_file(fp)
+            meta = self.extractor.get_file_metadata(fp)
+            file_results.append({
+                "path": str(fp.absolute()),
+                "doc_type": meta.get("doc_type", ""),
+                "client": meta.get("client", ""),
+                "link_info": meta.get("link_info", ""),
+                "identifier": meta.get("identifier", ""),
+                "ok": parsed.get("ok", False),
+                "error": parsed.get("error", ""),
+                "buckets": parsed.get("buckets") or [],
+            })
+
+        if self.cancelled:
+            self._log("\nProcess Cancelled by User.")
+            self._set_status("Extraction cancelled.")
+            return ""
+
+        report_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.html"
+        csv_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.csv"
+        report_path = run_folder / report_name
+        csv_path = run_folder / csv_name
+
+        html_out = generate_doi_pubid_by_ref_html(
+            file_results, str(source_path), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        report_path.write_text(html_out, encoding="utf-8")
+        write_doi_pubid_by_ref_csv(file_results, csv_path)
+
+        self.last_csv_path = str(csv_path.absolute())
+        bucket_rows = sum(len(r.get("buckets") or []) for r in file_results if r.get("ok"))
+        files_with = sum(1 for r in file_results if r.get("ok") and r.get("buckets"))
+        self._log(
+            f"DOI/pub-id by-ref report saved: {run_folder_name}/{report_name} "
+            f"({bucket_rows} bucket row(s) in {files_with}/{len(file_results)} file(s))"
+        )
+        self._log(f"DOI/pub-id by-ref CSV saved: {run_folder_name}/{csv_name}")
+        return str(report_path.absolute())
 
     def _write_mixed_citation_direct_hits_outputs(
         self,
@@ -1632,9 +1766,11 @@ class ElementExtractorTab(ttk.Frame):
             citation_type_report = bool(settings.get("citation_type_report", False))
             citation_cite_type = str(settings.get("citation_cite_type") or "bibr").strip() or "bibr"
             mixed_citation_direct_hits = bool(settings.get("mixed_citation_direct_hits", False))
+            doi_pubid_by_ref = bool(settings.get("doi_pubid_by_ref", False))
             mixed_citation_only = should_skip_selector_extract(
                 mixed_citation_direct_hits,
                 bool(settings.get("mixed_citation_only", False)),
+                doi_pubid_by_ref=doi_pubid_by_ref,
             )
 
             # Batch processing options
@@ -1657,8 +1793,10 @@ class ElementExtractorTab(ttk.Frame):
             self._log(f"  Mode:          {mode}")
             self._log(f"  Source Path:   {source_path}")
             self._log(f"  Query Type:    {query_type}")
-            if mixed_citation_only:
+            if mixed_citation_only and not doi_pubid_by_ref:
                 self._log("  Queries:       (skipped — mixed-citation only mode)")
+            elif doi_pubid_by_ref:
+                self._log("  Queries:       (skipped — DOI / pub-id by ref mode)")
             else:
                 self._log(f"  Queries:       {len(queries)} selector(s) to process")
                 for i, q in enumerate(queries, 1):
@@ -1668,7 +1806,15 @@ class ElementExtractorTab(ttk.Frame):
             copy_matched_files = bool(settings.get("copy_matched_files", False))
             open_report = bool(settings.get("open_report", True))
             org_by_month = bool(settings.get("org_by_month", False))
-            self._log(f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, Copy Files={'Yes' if copy_matched_files else 'No'}, Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}, Mixed-only={'Yes' if mixed_citation_only else 'No'}")
+            self._log(
+                f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, "
+                f"Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, "
+                f"Copy Files={'Yes' if copy_matched_files else 'No'}, "
+                f"Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), "
+                f"Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}, "
+                f"Mixed-only={'Yes' if mixed_citation_only and not doi_pubid_by_ref else 'No'}, "
+                f"DOI/pub-id by ref={'Yes' if doi_pubid_by_ref else 'No'}"
+            )
 
             # Parallel and batch mode logging
             batch_has_more = False
@@ -1689,6 +1835,57 @@ class ElementExtractorTab(ttk.Frame):
 
             self._log("---------------------------------------------------------------------\n")
 
+            if doi_pubid_by_ref:
+                self._log("DOI / pub-id by ref mode — skipping selector extract")
+                self._set_status("Starting DOI / pub-id by-ref scan…")
+
+                safe_target_name = self._slugify(source_path.stem, "selected_file")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                query_slug = "doi_pubid_by_ref"
+                run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
+                if org_by_month:
+                    month_folder = datetime.now().strftime("%Y-%m")
+                    run_folder = output_dir / month_folder / run_folder_name
+                else:
+                    run_folder = output_dir / run_folder_name
+                run_folder.mkdir(parents=True, exist_ok=True)
+
+                report_path = self._write_doi_pubid_by_ref_outputs(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    ts=ts,
+                    settings=settings,
+                )
+
+                self.last_report_path = report_path or ""
+                self.last_summary_report_path = ""
+                self._record_history_entry(
+                    self._current_run_settings(
+                        str(source_path),
+                        "(doi_pubid_by_ref)",
+                        str(output_dir),
+                        self.last_report_path,
+                        "",
+                        getattr(self, "last_csv_path", "") or "",
+                        0,
+                        "",
+                        batch_offset=0,
+                        has_more_batches=False,
+                        next_batch_offset=0,
+                        settings=settings,
+                    )
+                )
+
+                self._log(f"\nAll outputs saved to: {run_folder}")
+                self._set_status("DOI / pub-id by-ref scan complete.")
+                self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
+                if open_report and report_path:
+                    webbrowser.open(f"file:///{report_path}")
+                return
+
             if mixed_citation_only:
                 self._log("Mixed-citation only mode — skipping selector extract")
                 self._set_status("Starting mixed-citation scan…")
@@ -1696,7 +1893,7 @@ class ElementExtractorTab(ttk.Frame):
                 safe_target_name = self._slugify(source_path.stem, "selected_file")
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 query_slug = "mixed_citation_only"
-                run_folder_name = f"extraction_{safe_target_name}_{query_slug}_{ts}"
+                run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
                 if org_by_month:
                     month_folder = datetime.now().strftime("%Y-%m")
                     run_folder = output_dir / month_folder / run_folder_name
@@ -1997,7 +2194,7 @@ class ElementExtractorTab(ttk.Frame):
                 query_slug = f"{self._slugify(queries[0][:30], 'selector')}_and_{len(queries)-1}_more"
 
             # Create run folder for all outputs (reports, CSV, copied files)
-            run_folder_name = f"extraction_{safe_target_name}_{query_slug}_{ts}"
+            run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
 
             # Create month-based subfolder if enabled
             if org_by_month:
