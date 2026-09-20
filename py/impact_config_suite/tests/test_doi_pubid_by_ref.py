@@ -128,7 +128,9 @@ def test_html_omits_empty_files_and_has_controls(tmp_path):
     assert 'id="filterUnderComment"' in html_out
     assert 'id="filterDoiOrgHref"' in html_out
     assert 'id="filterDoiOrgText"' in html_out
+    assert 'id="filterProjectShortcode"' in html_out
     assert 'src="report-data.js"' in html_out
+    assert 'class="file-path"' not in html_out
     payload = json.loads(data_path.read_text(encoding="utf-8").split("=", 1)[1].strip().rstrip(";"))
     names = [f.get("name") for f in payload["files"]]
     assert "hit.xml" in names

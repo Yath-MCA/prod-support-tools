@@ -79,5 +79,9 @@ def test_doi_shell_html_loads_report_data_js(tmp_path):
     text = html_path.read_text(encoding="utf-8")
     assert 'src="report-data.js"' in text
     assert "filterUnderComment" in text
+    assert 'id="filterProjectShortcode"' in text
     assert "Outer HTML/XML Markup" in text
     assert "Copy Markup" in text
+    assert "Copy Path" in text
+    assert 'class="file-path"' not in text
+    assert 'class="file-metadata"' in text

@@ -451,3 +451,4 @@ git commit -m "Wire DOI/pub-id runs to progressive report-data.js with open-once
 - Parallel ProcessPool writing partials (safe: workers write only `partials/<id>.json`; coordinator merges)
 - Detailed / Unique / mixed HTML migration
 - Lazy outer-markup chunks
+- DOI CSV: add `project_shortcode` column (see polish design addendum)

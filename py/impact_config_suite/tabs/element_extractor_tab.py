@@ -1597,6 +1597,16 @@ class ElementExtractorTab(ttk.Frame):
         meta_root = source_path if source_path.is_dir() else source_path.parent
         if store.snapshot_run_meta(meta_root):
             self._log("Copied meta.json → run_meta.json")
+        run_meta_map = {}
+        run_meta_path = run_folder / "run_meta.json"
+        if run_meta_path.is_file():
+            try:
+                import json as _json
+                loaded = _json.loads(run_meta_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    run_meta_map = loaded
+            except Exception:
+                run_meta_map = {}
         store.write_manifest(
             dtd_norm,
             client_norm,
@@ -1620,6 +1630,13 @@ class ElementExtractorTab(ttk.Frame):
             self._set_status(f"DOI/pub-id by ref ({i}/{total}): {fp.name}")
             parsed = extract_buckets_from_file(fp)
             meta = self.extractor.get_file_metadata(fp)
+            docid = fp.parent.name
+            meta_entry = run_meta_map.get(docid) if isinstance(run_meta_map.get(docid), dict) else {}
+            project_shortcode = str(
+                meta_entry.get("project-shortcode")
+                or meta_entry.get("project_shortcode")
+                or ""
+            ).strip()
             buckets = parsed.get("buckets") or []
             matches = []
             for b in buckets:
@@ -1636,13 +1653,14 @@ class ElementExtractorTab(ttk.Frame):
                     "html": b.get("html", ""),
                 })
             record = {
-                "id": f"{fp.parent.name}_{fp.name}",
+                "id": f"{docid}_{fp.name}",
                 "path": str(fp.absolute()),
                 "name": fp.name,
-                "doc_type": meta.get("doc_type", ""),
-                "client": meta.get("client", ""),
+                "doc_type": meta.get("doc_type", "") or str(meta_entry.get("type") or ""),
+                "client": meta.get("client", "") or str(meta_entry.get("client") or ""),
                 "link_info": meta.get("link_info", ""),
-                "identifier": meta.get("identifier", ""),
+                "identifier": meta.get("identifier", "") or str(meta_entry.get("file-id") or ""),
+                "project_shortcode": project_shortcode,
                 "ok": parsed.get("ok", False),
                 "error": parsed.get("error", ""),
                 "matches": matches,
@@ -1662,10 +1680,10 @@ class ElementExtractorTab(ttk.Frame):
             )
             file_results.append({
                 "path": str(fp.absolute()),
-                "doc_type": meta.get("doc_type", ""),
-                "client": meta.get("client", ""),
-                "link_info": meta.get("link_info", ""),
-                "identifier": meta.get("identifier", ""),
+                "doc_type": record["doc_type"],
+                "client": record["client"],
+                "link_info": record["link_info"],
+                "identifier": record["identifier"],
                 "ok": parsed.get("ok", False),
                 "error": parsed.get("error", ""),
                 "buckets": buckets,

@@ -145,7 +145,7 @@ header {{ display:flex; justify-content:space-between; gap:16px; margin-bottom:2
 .file-header {{ padding:14px 16px; cursor:pointer; }}
 .file-header-main {{ display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
 .file-title {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }}
-.file-path, .file-metadata {{ color:var(--muted); font-size:0.85rem; margin-top:6px; word-break:break-all; }}
+.file-metadata {{ color:var(--muted); font-size:0.85rem; margin-top:6px; word-break:break-all; }}
 .file-badge {{ font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; }}
 .badge-success {{ background:rgba(16,185,129,0.2); color:var(--success); }}
 .badge-error {{ background:rgba(239,68,68,0.2); color:var(--error); }}
@@ -211,6 +211,9 @@ header {{ display:flex; justify-content:space-between; gap:16px; margin-bottom:2
       </select>
       <select id="filterIdentifier" class="filter-select" onchange="applyFilters()">
         <option value="">All identifiers</option>
+      </select>
+      <select id="filterProjectShortcode" class="filter-select" onchange="applyFilters()">
+        <option value="">All project-shortcodes</option>
       </select>
       <select id="filterUnderComment" class="filter-select" onchange="applyFilters()">
         <option value="">All — Under comment</option>
@@ -289,9 +292,11 @@ function renderReport() {{
   const docTypes = [...new Set(visible.map(f => f.doc_type).filter(Boolean))].sort();
   const clients = [...new Set(visible.map(f => f.client).filter(Boolean))].sort();
   const idents = [...new Set(visible.map(f => f.identifier).filter(Boolean))].sort();
+  const shortcodes = [...new Set(visible.map(f => f.project_shortcode).filter(Boolean))].sort();
   fillSelect('filterDocType', docTypes, 'All types (Books/Journals…)');
   fillSelect('filterClient', clients, 'All clients');
   fillSelect('filterIdentifier', idents, 'All identifiers');
+  fillSelect('filterProjectShortcode', shortcodes, 'All project-shortcodes');
 
   if (!visible.length) {{
     document.getElementById('resultsList').innerHTML =
@@ -303,17 +308,19 @@ function renderReport() {{
   visible.forEach((item, idx) => {{
     const fileId = 'file-' + idx;
     const name = item.name || (item.path || '').split(/[/\\\\]/).pop() || '';
-    const metaLine = [item.doc_type, item.client, item.link_info, item.identifier].filter(Boolean).join(' | ');
+    const metaLine = [item.doc_type, item.client, item.link_info, item.identifier, item.project_shortcode]
+      .filter(Boolean).join(' | ');
     const uri = fileUri(item.path);
     if (!item.ok) {{
       html += '<div class="file-card error-card" data-filename="' + esc(name) + '" data-doc-type="' + esc(item.doc_type||'') +
-        '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') + '">' +
+        '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') +
+        '" data-project-shortcode="' + esc(item.project_shortcode||'') + '">' +
         '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-header-main"><div class="file-title">' +
         '<span class="toggle-icon">▶</span><span class="file-badge badge-error">Error</span><strong>' + esc(name) + '</strong></div>' +
         '<div class="file-actions">' +
         (uri ? '<a class="file-action-btn" href="' + esc(uri) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>' : '') +
         '<button class="file-action-btn" onclick=\\'copyFilePath(' + JSON.stringify(item.path||'') + ', this, event)\\'>Copy Path</button></div></div>' +
-        '<div class="file-path">' + esc(item.path||'') + '</div><div class="file-metadata">' + esc(metaLine) + '</div></div>' +
+        '<div class="file-metadata">' + esc(metaLine) + '</div></div>' +
         '<div id="' + fileId + '" class="file-content" style="display:none;"><div class="error-box"><strong>Parsing Failed:</strong> ' +
         esc(item.error||'') + '</div></div></div>';
       return;
@@ -346,13 +353,14 @@ function renderReport() {{
         '<div class="code-wrapper"><pre><code>' + esc(m.html||'') + '</code></pre></div></div></div>';
     }});
     html += '<div class="file-card" data-filename="' + esc(name) + '" data-doc-type="' + esc(item.doc_type||'') +
-      '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') + '">' +
+      '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') +
+      '" data-project-shortcode="' + esc(item.project_shortcode||'') + '">' +
       '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-header-main"><div class="file-title">' +
       '<span class="toggle-icon">▼</span><span class="file-badge badge-success">' + matches.length + ' Match(es)</span><strong>' +
       esc(name) + '</strong></div><div class="file-actions">' +
       (uri ? '<a class="file-action-btn" href="' + esc(uri) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>' : '') +
       '<button class="file-action-btn" onclick=\\'copyFilePath(' + JSON.stringify(item.path||'') + ', this, event)\\'>Copy Path</button></div></div>' +
-      '<div class="file-path">' + esc(item.path||'') + '</div><div class="file-metadata">' + esc(metaLine) + '</div></div>' +
+      '<div class="file-metadata">' + esc(metaLine) + '</div></div>' +
       '<div id="' + fileId + '" class="file-content"><div class="matches-list">' + matchHtml + '</div></div></div>';
   }});
   document.getElementById('resultsList').innerHTML = html;
@@ -419,6 +427,7 @@ function applyFilters() {{
   const docType = document.getElementById('filterDocType').value;
   const client = document.getElementById('filterClient').value;
   const identifier = document.getElementById('filterIdentifier').value;
+  const projectShortcode = document.getElementById('filterProjectShortcode').value;
   const underComment = document.getElementById('filterUnderComment').value;
   const doiOrgHref = document.getElementById('filterDoiOrgHref').value;
   const doiOrgText = document.getElementById('filterDoiOrgText').value;
@@ -431,6 +440,9 @@ function applyFilters() {{
       card.style.display = 'none'; return;
     }}
     if (identifier && card.getAttribute('data-identifier') !== identifier) {{
+      card.style.display = 'none'; return;
+    }}
+    if (projectShortcode && card.getAttribute('data-project-shortcode') !== projectShortcode) {{
       card.style.display = 'none'; return;
     }}
 
