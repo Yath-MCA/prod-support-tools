@@ -31,6 +31,8 @@ class ElementExtractor:
         self._cache = {}
         # Config cache for doc-title: {config_path: {"mtime": float, "doc_title": str}}
         self._config_cache = {}
+        # meta.json cache: {meta_path: {"mtime": float, "data": dict|None}}
+        self._meta_json_cache = {}
 
     def _cache_key(self, file_path: Path, query_type: str, query_val: str,
                    attr_name: str, attr_val: str) -> str:
@@ -254,6 +256,19 @@ class ElementExtractor:
         if not dtd_filter and not client_filter:
             return True
 
+        file_path = Path(file_path)
+        from core.meta_json_filters import lookup_meta_entry
+
+        entry = lookup_meta_entry(file_path, self._meta_json_cache)
+        if entry is not None:
+            dtd_name = (entry.get("dtd") or "").strip()
+            client_name = (entry.get("client") or "").strip()
+            if dtd_filter and dtd_name.upper() != dtd_filter.upper():
+                return False
+            if client_filter and client_name.upper() != client_filter.upper():
+                return False
+            return True
+
         config_path = file_path.parent / "impact_config.xml"
         if not config_path.is_file():
             return False
@@ -318,8 +333,9 @@ class ElementExtractor:
             return "filename", file_path.name
 
     def clear_config_cache(self) -> None:
-        """Clear the impact_config.xml cache."""
+        """Clear the impact_config.xml and meta.json caches."""
         self._config_cache.clear()
+        self._meta_json_cache.clear()
 
     def get_file_metadata(self, file_path: Path) -> dict[str, str]:
         """
