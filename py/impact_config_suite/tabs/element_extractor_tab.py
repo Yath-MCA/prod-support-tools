@@ -17,6 +17,7 @@ from core.doi_pubid_by_ref import (
     write_doi_pubid_by_ref_csv,
 )
 from core.element_extractor import ElementExtractor
+from core.ee_report_store import EEReportStore
 from core.extraction_run_paths import format_extraction_run_folder_name
 from core.match_uniqueness import annotate_selector_results
 from core.mixed_citation_direct_hits import (
@@ -555,7 +556,7 @@ class ElementExtractorTab(ttk.Frame):
         self.open_report_var = tk.BooleanVar(value=True)
         self.open_report_chk = tk.Checkbutton(
             settings_frame,
-            text="Open HTML report automatically in web browser after completion",
+            text="Open HTML report in browser when first results are ready",
             variable=self.open_report_var,
             bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
             selectcolor="#334155",
@@ -1548,10 +1549,11 @@ class ElementExtractorTab(ttk.Frame):
         ts: str,
         settings: dict | None = None,
     ) -> str:
-        """Scan DOI/pub-id by-ref buckets and write HTML + CSV. Returns HTML path."""
+        """Scan DOI/pub-id by-ref buckets; progressive report-data.js + shell HTML + CSV."""
         settings = settings or {}
         self._set_status("Scanning DOI / pub-id by ref…")
         self._log("\nScanning pub-id / ext-link doi|uri (in vs out of .ref)…")
+        self._doi_report_opened_early = False
 
         recursive = bool(settings.get("recursive", False)) if not is_single else False
         ext_str = settings.get("extensions", ".xml, .html, .htm, .xhtml")
@@ -1563,6 +1565,9 @@ class ElementExtractorTab(ttk.Frame):
         extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
         if not extensions:
             extensions = [".xml", ".html", ".htm", ".xhtml"]
+        open_report = bool(settings.get("open_report", True))
+        dtd_norm = dtd_filter if dtd_filter != "None" else ""
+        client_norm = client_filter if client_filter != "None" else ""
 
         if is_single:
             file_list = [Path(source_path)]
@@ -1573,8 +1578,8 @@ class ElementExtractorTab(ttk.Frame):
                 recursive=recursive,
                 extensions=extensions,
                 filename_filter=filename_filter if filename_filter != "None" else None,
-                dtd_filter=dtd_filter if dtd_filter != "None" else None,
-                client_filter=client_filter if client_filter != "None" else None,
+                dtd_filter=dtd_norm or None,
+                client_filter=client_norm or None,
                 month_filter=month_filter,
                 custom_month=custom_month if month_filter == "Custom" else "",
                 use_index=use_index,
@@ -1583,6 +1588,27 @@ class ElementExtractorTab(ttk.Frame):
                 cancel_check=lambda: self.cancelled,
             )
             self._log(f"Files to scan after filters: {len(file_list)}")
+
+        report_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.html"
+        csv_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.csv"
+        store = EEReportStore(
+            run_folder, kind="doi_pubid_by_ref", source_path=str(source_path)
+        )
+        meta_root = source_path if source_path.is_dir() else source_path.parent
+        if store.snapshot_run_meta(meta_root):
+            self._log("Copied meta.json → run_meta.json")
+        store.write_manifest(
+            dtd_norm,
+            client_norm,
+            [{"docid": fp.parent.name, "path": str(fp)} for fp in file_list],
+        )
+        report_path = store.write_doi_shell_html(
+            report_name, f"DOI / pub-id by ref — {safe_target_name}"
+        )
+        store.rebuild_report_data(
+            status="running",
+            stats={"files_done": 0, "files_total": len(file_list)},
+        )
 
         file_results = []
         total = len(file_list)
@@ -1594,6 +1620,46 @@ class ElementExtractorTab(ttk.Frame):
             self._set_status(f"DOI/pub-id by ref ({i}/{total}): {fp.name}")
             parsed = extract_buckets_from_file(fp)
             meta = self.extractor.get_file_metadata(fp)
+            buckets = parsed.get("buckets") or []
+            matches = []
+            for b in buckets:
+                matches.append({
+                    "bucket": b.get("bucket"),
+                    "element_kind": b.get("element_kind", ""),
+                    "in_ref": bool(b.get("in_ref")),
+                    "under_comment": bool(b.get("under_comment")),
+                    "doi_org_in_href": bool(b.get("doi_org_in_href")),
+                    "doi_org_in_text": bool(b.get("doi_org_in_text")),
+                    "line": b.get("line", ""),
+                    "href": b.get("href", ""),
+                    "text": b.get("text", ""),
+                    "html": b.get("html", ""),
+                })
+            record = {
+                "id": f"{fp.parent.name}_{fp.name}",
+                "path": str(fp.absolute()),
+                "name": fp.name,
+                "doc_type": meta.get("doc_type", ""),
+                "client": meta.get("client", ""),
+                "link_info": meta.get("link_info", ""),
+                "identifier": meta.get("identifier", ""),
+                "ok": parsed.get("ok", False),
+                "error": parsed.get("error", ""),
+                "matches": matches,
+            }
+            store.write_partial(record)
+            partials = store._load_partials()
+            bucket_rows = sum(len(r.get("matches") or []) for r in partials if r.get("ok"))
+            files_with = sum(1 for r in partials if r.get("ok") and r.get("matches"))
+            store.rebuild_report_data(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": total,
+                    "files_with_hits": files_with,
+                    "bucket_rows": bucket_rows,
+                },
+            )
             file_results.append({
                 "path": str(fp.absolute()),
                 "doc_type": meta.get("doc_type", ""),
@@ -1602,34 +1668,43 @@ class ElementExtractorTab(ttk.Frame):
                 "identifier": meta.get("identifier", ""),
                 "ok": parsed.get("ok", False),
                 "error": parsed.get("error", ""),
-                "buckets": parsed.get("buckets") or [],
+                "buckets": buckets,
             })
+            if open_report and not self._doi_report_opened_early:
+                webbrowser.open(f"file:///{report_path}")
+                self._doi_report_opened_early = True
 
-        if self.cancelled:
+        status = "cancelled" if self.cancelled else "complete"
+        if self.cancelled and not file_results:
+            store.finalize(status="cancelled", stats={"files_total": total})
             self._log("\nProcess Cancelled by User.")
             self._set_status("Extraction cancelled.")
             return ""
 
-        report_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.html"
-        csv_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.csv"
-        report_path = run_folder / report_name
-        csv_path = run_folder / csv_name
-
-        html_out = generate_doi_pubid_by_ref_html(
-            file_results, str(source_path), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
-        report_path.write_text(html_out, encoding="utf-8")
-        write_doi_pubid_by_ref_csv(file_results, csv_path)
-
-        self.last_csv_path = str(csv_path.absolute())
         bucket_rows = sum(len(r.get("buckets") or []) for r in file_results if r.get("ok"))
         files_with = sum(1 for r in file_results if r.get("ok") and r.get("buckets"))
+        store.finalize(
+            status=status,
+            stats={
+                "files_scanned": len(file_results),
+                "files_total": total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            },
+        )
+        if self.cancelled:
+            self._log("\nProcess Cancelled by User.")
+            self._set_status("Extraction cancelled.")
+
+        csv_path = run_folder / csv_name
+        write_doi_pubid_by_ref_csv(file_results, csv_path)
+        self.last_csv_path = str(csv_path.absolute())
         self._log(
             f"DOI/pub-id by-ref report saved: {run_folder_name}/{report_name} "
             f"({bucket_rows} bucket row(s) in {files_with}/{len(file_results)} file(s))"
         )
         self._log(f"DOI/pub-id by-ref CSV saved: {run_folder_name}/{csv_name}")
-        return str(report_path.absolute())
+        return str(Path(report_path).absolute())
 
     def _write_mixed_citation_direct_hits_outputs(
         self,
@@ -1883,7 +1958,7 @@ class ElementExtractorTab(ttk.Frame):
                 self._log(f"\nAll outputs saved to: {run_folder}")
                 self._set_status("DOI / pub-id by-ref scan complete.")
                 self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
-                if open_report and report_path:
+                if open_report and report_path and not getattr(self, "_doi_report_opened_early", False):
                     webbrowser.open(f"file:///{report_path}")
                 return
 

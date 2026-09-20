@@ -81,35 +81,41 @@ def test_write_csv(tmp_path):
 
 
 def test_html_omits_empty_files_and_has_controls(tmp_path):
+    import json
+    from core.ee_report_store import EEReportStore
     from core.doi_pubid_by_ref import generate_doi_pubid_by_ref_html
 
-    results = [
-        {
-            "path": str(tmp_path / "hit.xml"),
-            "doc_type": "Books", "client": "TNF", "link_info": "pub", "identifier": "DOC1",
-            "ok": True,
-            "buckets": [
-                {
-                    "bucket": 1, "element_kind": "pub-id", "in_ref": True,
-                    "under_comment": False, "doi_org_in_href": False, "doi_org_in_text": False,
-                    "line": 1, "text": "10.1/A", "href": "", "html": "<pub-id>10.1/A</pub-id>",
-                },
-                {
-                    "bucket": 5, "element_kind": "uri", "in_ref": True,
-                    "under_comment": True, "doi_org_in_href": True, "doi_org_in_text": True,
-                    "line": 2, "text": "see doi.org", "href": "https://doi.org/10.1/x",
-                    "html": "<a href='https://doi.org/10.1/x'>see doi.org</a>",
-                },
-            ],
-        },
-        {
-            "path": str(tmp_path / "empty.xml"),
-            "doc_type": "Journals", "client": "Other", "link_info": "", "identifier": "DOC2",
-            "ok": True,
-            "buckets": [],
-        },
-    ]
-    html_out = generate_doi_pubid_by_ref_html(results, str(tmp_path))
+    run = tmp_path / "run"
+    run.mkdir()
+    store = EEReportStore(run, kind="doi_pubid_by_ref", source_path=str(tmp_path))
+    shell = store.write_doi_shell_html("DOI_report.html", "DOI / pub-id by ref — test")
+    store.write_partial({
+        "id": "hit", "path": str(tmp_path / "hit.xml"), "name": "hit.xml",
+        "doc_type": "Books", "client": "TNF", "link_info": "pub", "identifier": "DOC1",
+        "ok": True, "error": "",
+        "matches": [
+            {
+                "bucket": 1, "element_kind": "pub-id", "in_ref": True,
+                "under_comment": False, "doi_org_in_href": False, "doi_org_in_text": False,
+                "line": 1, "text": "10.1/A", "href": "", "html": "<pub-id>10.1/A</pub-id>",
+            },
+            {
+                "bucket": 5, "element_kind": "uri", "in_ref": True,
+                "under_comment": True, "doi_org_in_href": True, "doi_org_in_text": True,
+                "line": 2, "text": "see doi.org", "href": "https://doi.org/10.1/x",
+                "html": "<a href='https://doi.org/10.1/x'>see doi.org</a>",
+            },
+        ],
+    })
+    store.write_partial({
+        "id": "empty", "path": str(tmp_path / "empty.xml"), "name": "empty.xml",
+        "doc_type": "Journals", "client": "Other", "link_info": "", "identifier": "DOC2",
+        "ok": True, "error": "", "matches": [],
+    })
+    data_path = store.finalize(status="complete", stats={"files_scanned": 2})
+    html_out = shell.read_text(encoding="utf-8")
+    # Compat helper still returns shell with controls
+    assert "filterUnderComment" in generate_doi_pubid_by_ref_html([], str(tmp_path))
     assert 'class="controls-panel"' in html_out
     assert "Collapse All" in html_out
     assert "Copy Markup" in html_out
@@ -122,12 +128,13 @@ def test_html_omits_empty_files_and_has_controls(tmp_path):
     assert 'id="filterUnderComment"' in html_out
     assert 'id="filterDoiOrgHref"' in html_out
     assert 'id="filterDoiOrgText"' in html_out
-    assert 'data-under-comment="true"' in html_out
-    assert 'data-doi-org-href="true"' in html_out
-    assert 'data-doi-org-text="true"' in html_out
-    assert 'data-under-comment="false"' in html_out
-    assert "hit.xml" in html_out
-    assert "empty.xml" not in html_out
-    assert "Books" in html_out
-    assert "TNF" in html_out
-    assert "DOC1" in html_out
+    assert 'src="report-data.js"' in html_out
+    payload = json.loads(data_path.read_text(encoding="utf-8").split("=", 1)[1].strip().rstrip(";"))
+    names = [f.get("name") for f in payload["files"]]
+    assert "hit.xml" in names
+    assert "empty.xml" in names  # stored in data; shell UI omits empty matches when rendering
+    hit = next(f for f in payload["files"] if f["name"] == "hit.xml")
+    assert hit["matches"][1]["under_comment"] is True
+    assert "Books" in json.dumps(payload)
+    assert "TNF" in json.dumps(payload)
+    assert "DOC1" in json.dumps(payload)
