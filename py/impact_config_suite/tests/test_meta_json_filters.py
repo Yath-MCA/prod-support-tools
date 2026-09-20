@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
-from core.meta_json_filters import load_meta_map, lookup_meta_entry
+from core.meta_json_filters import (
+    load_meta_map,
+    load_meta_for_scan_root,
+    lookup_meta_entry,
+    matching_docids,
+    resolve_doc_dir,
+)
 
 
 def test_load_meta_map_caches_by_mtime(tmp_path):
@@ -62,6 +68,70 @@ def test_lookup_returns_none_when_no_meta(tmp_path):
     html = doc / "x.html"
     html.write_text("<p/>", encoding="utf-8")
     assert lookup_meta_entry(html, {}) is None
+
+
+def test_load_meta_for_scan_root_prefers_folder_meta(tmp_path):
+    jats = tmp_path / "JATS"
+    jats.mkdir()
+    (jats / "meta.json").write_text(
+        json.dumps({"N1": {"client": "TNF", "dtd": "JATS"}}), encoding="utf-8"
+    )
+    (tmp_path / "meta.json").write_text(
+        json.dumps({"N1": {"client": "OTHER", "dtd": "BITS"}}), encoding="utf-8"
+    )
+    data = load_meta_for_scan_root(jats, {})
+    assert data["N1"]["client"] == "TNF"
+
+
+def test_matching_docids_filters_client_and_dtd():
+    meta = {
+        "Na": {"client": "TNF", "dtd": "BITS"},
+        "Nb": {"client": "PLOS", "dtd": "JATS"},
+        "Nc": {"client": "tnf", "dtd": "bits"},
+    }
+    assert matching_docids(meta, "BITS", "TNF") == ["Na", "Nc"]
+    assert matching_docids(meta, "JATS", "") == ["Nb"]
+    assert matching_docids(meta, "", "PLOS") == ["Nb"]
+
+
+def test_resolve_doc_dir_under_dtd_folder_and_root(tmp_path):
+    jats = tmp_path / "JATS"
+    doc = jats / "Nabc"
+    doc.mkdir(parents=True)
+    entry = {"client": "TNF", "dtd": "JATS"}
+    assert resolve_doc_dir(jats, "Nabc", entry) == doc
+    assert resolve_doc_dir(tmp_path, "Nabc", entry) == doc
+
+
+def test_collect_matching_files_uses_meta_fast_path(tmp_path):
+    from core.element_extractor import ElementExtractor
+
+    jats = tmp_path / "JATS"
+    keep = jats / "Nkeep"
+    skip = jats / "Nskip"
+    keep.mkdir(parents=True)
+    skip.mkdir(parents=True)
+    (keep / "a.html").write_text("<p>keep</p>", encoding="utf-8")
+    (skip / "b.html").write_text("<p>skip</p>", encoding="utf-8")
+    (jats / "meta.json").write_text(
+        json.dumps({
+            "Nkeep": {"client": "TNF", "dtd": "JATS"},
+            "Nskip": {"client": "PLOS", "dtd": "JATS"},
+        }),
+        encoding="utf-8",
+    )
+    ee = ElementExtractor()
+    files = ee.collect_matching_files(
+        jats,
+        recursive=False,
+        extensions=[".html"],
+        dtd_filter="JATS",
+        client_filter="TNF",
+        use_index=False,
+        discover_new=True,
+    )
+    assert [p.name for p in files] == ["a.html"]
+    assert all("Nkeep" in str(p) for p in files)
 
 
 def test_matches_filters_via_bits_meta_without_impact_config(tmp_path):

@@ -1582,6 +1582,7 @@ class ElementExtractorTab(ttk.Frame):
                 log_callback=self._log,
                 cancel_check=lambda: self.cancelled,
             )
+            self._log(f"Files to scan after filters: {len(file_list)}")
 
         file_results = []
         total = len(file_list)

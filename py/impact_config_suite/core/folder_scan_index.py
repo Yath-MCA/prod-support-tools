@@ -225,6 +225,69 @@ def collect_matching_files(extractor, dir_path, *, recursive=False, extensions=N
     apply_name = bool(normalized_filter and normalized_filter.lower() != "none")
     dtd_norm = extractor._normalize_named_filter(dtd_filter or "")
     client_norm = extractor._normalize_named_filter(client_filter or "")
+
+    # Fast path: client/DTD set + meta.json present → only walk matching doc folders.
+    if dtd_norm or client_norm:
+        try:
+            from core.meta_json_filters import (
+                load_meta_for_scan_root,
+                matching_docids,
+                resolve_doc_dir,
+            )
+            cache = getattr(extractor, "_meta_json_cache", None)
+            if cache is None:
+                cache = {}
+                try:
+                    extractor._meta_json_cache = cache
+                except Exception:
+                    pass
+            meta_map = load_meta_for_scan_root(dir_path, cache)
+        except Exception:
+            meta_map = None
+        if meta_map:
+            docids = matching_docids(meta_map, dtd_norm, client_norm)
+            _log(
+                "Using meta.json fast path (%d matching docid(s); skipped full tree walk)"
+                % len(docids)
+            )
+            matched_files = []
+            seen_keys = set()
+            # Always search within each matching doc folder; filters already
+            # narrowed the docid set (non-recursive at DTD root would miss
+            # JATS/<docid>/*.html).
+            for docid in docids:
+                if _cancelled():
+                    break
+                entry = meta_map.get(docid) if isinstance(meta_map.get(docid), dict) else {}
+                doc_dir = resolve_doc_dir(dir_path, docid, entry)
+                if doc_dir is None:
+                    continue
+                try:
+                    candidates = doc_dir.rglob("*")
+                except OSError:
+                    continue
+                for file_path in candidates:
+                    if _cancelled():
+                        break
+                    if not file_path.is_file():
+                        continue
+                    if file_path.suffix.lower() not in extensions:
+                        continue
+                    if apply_name and not extractor._matches_filename_filter(
+                        file_path.name, normalized_filter
+                    ):
+                        continue
+                    if not extractor._matches_month_filter(
+                        file_path, month_filter, custom_month
+                    ):
+                        continue
+                    key = path_key(file_path)
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    matched_files.append(file_path)
+            return sorted(set(matched_files), key=lambda p: str(p).lower())
+
     index_data = None; indexed = {}
     if use_index:
         index_data = load_index(source_root=dir_path)
