@@ -78,3 +78,56 @@ def test_write_csv(tmp_path):
     assert len(rows) == 2
     assert rows[1][6] == "5"
     assert rows[1][9] == "True"
+
+
+def test_html_omits_empty_files_and_has_controls(tmp_path):
+    from core.doi_pubid_by_ref import generate_doi_pubid_by_ref_html
+
+    results = [
+        {
+            "path": str(tmp_path / "hit.xml"),
+            "doc_type": "Books", "client": "TNF", "link_info": "pub", "identifier": "DOC1",
+            "ok": True,
+            "buckets": [
+                {
+                    "bucket": 1, "element_kind": "pub-id", "in_ref": True,
+                    "under_comment": False, "doi_org_in_href": False, "doi_org_in_text": False,
+                    "line": 1, "text": "10.1/A", "href": "", "html": "<pub-id>10.1/A</pub-id>",
+                },
+                {
+                    "bucket": 5, "element_kind": "uri", "in_ref": True,
+                    "under_comment": True, "doi_org_in_href": True, "doi_org_in_text": True,
+                    "line": 2, "text": "see doi.org", "href": "https://doi.org/10.1/x",
+                    "html": "<a href='https://doi.org/10.1/x'>see doi.org</a>",
+                },
+            ],
+        },
+        {
+            "path": str(tmp_path / "empty.xml"),
+            "doc_type": "Journals", "client": "Other", "link_info": "", "identifier": "DOC2",
+            "ok": True,
+            "buckets": [],
+        },
+    ]
+    html_out = generate_doi_pubid_by_ref_html(results, str(tmp_path))
+    assert 'class="controls-panel"' in html_out
+    assert "Collapse All" in html_out
+    assert "Copy Markup" in html_out
+    assert "Open HTML" in html_out
+    assert "Copy Path" in html_out
+    assert "Outer HTML/XML Markup" in html_out
+    assert 'id="filterDocType"' in html_out
+    assert 'id="filterClient"' in html_out
+    assert 'id="filterIdentifier"' in html_out
+    assert 'id="filterUnderComment"' in html_out
+    assert 'id="filterDoiOrgHref"' in html_out
+    assert 'id="filterDoiOrgText"' in html_out
+    assert 'data-under-comment="true"' in html_out
+    assert 'data-doi-org-href="true"' in html_out
+    assert 'data-doi-org-text="true"' in html_out
+    assert 'data-under-comment="false"' in html_out
+    assert "hit.xml" in html_out
+    assert "empty.xml" not in html_out
+    assert "Books" in html_out
+    assert "TNF" in html_out
+    assert "DOC1" in html_out
