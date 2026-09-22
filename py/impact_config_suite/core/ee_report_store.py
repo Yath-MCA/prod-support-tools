@@ -1,10 +1,11 @@
-"""Progressive Element Extractor report artifacts (partials → report-data.js)."""
+"""Progressive Element Extractor report artifacts (by_docid + index.js)."""
 from __future__ import annotations
 
 import html as html_lib
 import json
 import re
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -15,12 +16,30 @@ def _safe_id(raw: str) -> str:
 
 
 class EEReportStore:
-    def __init__(self, run_folder: Path, *, kind: str, source_path: str):
+    def __init__(
+        self,
+        run_folder: Path,
+        *,
+        kind: str,
+        source_path: str,
+        flush_every: int = 10,
+        flush_interval_s: float = 1.5,
+    ):
         self.run_folder = Path(run_folder)
         self.kind = kind
         self.source_path = source_path
+        self.flush_every = max(1, int(flush_every))
+        self.flush_interval_s = float(flush_interval_s)
         self.run_folder.mkdir(parents=True, exist_ok=True)
+        self.by_docid_dir = self.run_folder / "by_docid"
+        # Legacy alias — P0 no longer uses partials/
         self.partials_dir = self.run_folder / "partials"
+        self._files: list[dict] = []
+        self._writes_since_flush = 0
+        self._last_flush_monotonic = time.monotonic()
+        self._dirty = False
+        self._last_status = "running"
+        self._last_stats: dict = {}
 
     def snapshot_run_meta(self, scan_root: Path) -> Path | None:
         scan_root = Path(scan_root)
@@ -42,48 +61,91 @@ class EEReportStore:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return path
 
-    def write_partial(self, file_record: dict) -> Path:
-        self.partials_dir.mkdir(parents=True, exist_ok=True)
+    def match_stats(self) -> tuple[int, int]:
+        """Return (files_with_hits, bucket_rows) from in-memory records."""
+        files_with = sum(1 for r in self._files if r.get("ok") and r.get("matches"))
+        bucket_rows = sum(len(r.get("matches") or []) for r in self._files if r.get("ok"))
+        return files_with, bucket_rows
+
+    def write_result(self, file_record: dict) -> Path:
+        """Write by_docid/<id>.js once; keep record in memory. Does not flush index."""
+        self.by_docid_dir.mkdir(parents=True, exist_ok=True)
         fid = _safe_id(str(file_record.get("id") or file_record.get("path") or "file"))
-        path = self.partials_dir / f"{fid}.json"
-        path.write_text(json.dumps(file_record, ensure_ascii=False), encoding="utf-8")
+        record = dict(file_record)
+        record["result_ref"] = f"by_docid/{fid}.js"
+        path = self.by_docid_dir / f"{fid}.js"
+        body = json.dumps(record, ensure_ascii=False)
+        path.write_text(
+            "window.__EE_DOC__ = window.__EE_DOC__ || {};\n"
+            f"window.__EE_DOC__[{json.dumps(fid)}] = {body};\n",
+            encoding="utf-8",
+        )
+        replaced = False
+        for i, existing in enumerate(self._files):
+            existing_id = _safe_id(str(existing.get("id") or existing.get("path") or "file"))
+            if existing_id == fid:
+                self._files[i] = record
+                replaced = True
+                break
+        if not replaced:
+            self._files.append(record)
+        self._writes_since_flush += 1
+        self._dirty = True
         return path
 
-    def _load_partials(self) -> list[dict]:
-        if not self.partials_dir.is_dir():
-            return []
-        rows = []
-        for p in sorted(self.partials_dir.glob("*.json")):
-            try:
-                rows.append(json.loads(p.read_text(encoding="utf-8")))
-            except (OSError, json.JSONDecodeError):
-                continue
-        return rows
+    # Compat for older call sites / tests during transition
+    def write_partial(self, file_record: dict) -> Path:
+        return self.write_result(file_record)
 
-    def _write_report_data_js(self, payload: dict) -> Path:
-        path = self.run_folder / "report-data.js"
-        body = json.dumps(payload, ensure_ascii=False)
-        path.write_text(f"window.__EE_REPORT__ = {body};\n", encoding="utf-8")
-        return path
-
-    def rebuild_report_data(self, *, status: str, stats: dict | None = None) -> Path:
-        files = self._load_partials()
-        payload = {
+    def _index_payload(self, *, status: str, stats: dict | None = None) -> dict:
+        return {
             "version": 1,
             "kind": self.kind,
             "status": status,
             "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "source_path": self.source_path,
-            "stats": stats or {},
-            "files": files,
+            "stats": stats if stats is not None else self._last_stats,
+            "files": list(self._files),
         }
-        return self._write_report_data_js(payload)
+
+    def _write_index_js(self, payload: dict) -> Path:
+        path = self.run_folder / "index.js"
+        body = json.dumps(payload, ensure_ascii=False)
+        path.write_text(
+            f"window.__EE_INDEX__ = {body};\n"
+            "window.__EE_REPORT__ = window.__EE_INDEX__;\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def flush_index(self, *, status: str, stats: dict | None = None) -> Path:
+        """Always write index.js from in-memory records (no disk reload)."""
+        if stats is not None:
+            self._last_stats = dict(stats)
+        self._last_status = status
+        path = self._write_index_js(self._index_payload(status=status, stats=self._last_stats))
+        self._writes_since_flush = 0
+        self._last_flush_monotonic = time.monotonic()
+        self._dirty = False
+        return path
+
+    def maybe_flush_index(self, *, status: str, stats: dict | None = None) -> Path | None:
+        """Flush when dirty and (N writes since last flush or interval elapsed)."""
+        if not self._dirty:
+            return None
+        due_n = self._writes_since_flush >= self.flush_every
+        due_t = (time.monotonic() - self._last_flush_monotonic) >= self.flush_interval_s
+        if not (due_n or due_t):
+            return None
+        return self.flush_index(status=status, stats=stats)
+
+    def rebuild_report_data(self, *, status: str, stats: dict | None = None) -> Path:
+        """Force flush index (compat name used by DOI coordinator)."""
+        return self.flush_index(status=status, stats=stats)
 
     def finalize(self, *, status: str, stats: dict | None = None) -> Path:
-        path = self.rebuild_report_data(status=status, stats=stats)
-        if self.partials_dir.exists():
-            shutil.rmtree(self.partials_dir, ignore_errors=True)
-        return path
+        """Final index flush; retain by_docid/."""
+        return self.flush_index(status=status, stats=stats)
 
     def write_shell_html(self, html_name: str, title: str) -> Path:
         return self.write_doi_shell_html(html_name, title)
@@ -95,7 +157,7 @@ class EEReportStore:
 
 
 def doi_shell_html(title: str) -> str:
-    """Thin DOI/pub-id report shell; data comes from report-data.js."""
+    """Thin DOI/pub-id report shell; data comes from index.js."""
     safe_title = html_lib.escape(title)
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -248,12 +310,16 @@ header {{ display:flex; justify-content:space-between; gap:16px; margin-bottom:2
 
 <div id="toast" class="toast"><span id="toastMsg">Copied!</span></div>
 
-<script src="report-data.js"></script>
+<script src="index.js"></script>
 <script>
 function esc(s) {{
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
+}}
+
+function reportData() {{
+  return window.__EE_INDEX__ || window.__EE_REPORT__;
 }}
 
 function fillSelect(id, values, blankLabel) {{
@@ -278,7 +344,7 @@ function fileUri(path) {{
 }}
 
 function renderReport() {{
-  const d = window.__EE_REPORT__;
+  const d = reportData();
   if (!d) {{
     document.getElementById('resultsList').innerHTML = '<div class="no-results">No data</div>';
     return;
@@ -481,10 +547,10 @@ function applyFilters() {{
 
 renderReport();
 setInterval(function() {{
-  const d = window.__EE_REPORT__;
+  const d = reportData();
   if (!d || d.status !== 'running') return;
   const s = document.createElement('script');
-  s.src = 'report-data.js?t=' + Date.now();
+  s.src = 'index.js?t=' + Date.now();
   s.onload = function() {{ renderReport(); }};
   document.body.appendChild(s);
 }}, 1500);

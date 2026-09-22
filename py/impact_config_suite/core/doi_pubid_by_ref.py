@@ -204,7 +204,7 @@ def generate_doi_pubid_by_ref_html(
     target_path: str,
     ts: str | None = None,
 ) -> str:
-    """Return thin DOI shell HTML (data loaded from sibling report-data.js at runtime)."""
+    """Return thin DOI shell HTML (data loaded from sibling index.js at runtime)."""
     from core.ee_report_store import doi_shell_html
 
     target_name = os.path.basename(target_path)

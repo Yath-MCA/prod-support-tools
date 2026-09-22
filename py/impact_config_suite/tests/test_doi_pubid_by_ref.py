@@ -89,7 +89,7 @@ def test_html_omits_empty_files_and_has_controls(tmp_path):
     run.mkdir()
     store = EEReportStore(run, kind="doi_pubid_by_ref", source_path=str(tmp_path))
     shell = store.write_doi_shell_html("DOI_report.html", "DOI / pub-id by ref — test")
-    store.write_partial({
+    store.write_result({
         "id": "hit", "path": str(tmp_path / "hit.xml"), "name": "hit.xml",
         "doc_type": "Books", "client": "TNF", "link_info": "pub", "identifier": "DOC1",
         "ok": True, "error": "",
@@ -107,7 +107,7 @@ def test_html_omits_empty_files_and_has_controls(tmp_path):
             },
         ],
     })
-    store.write_partial({
+    store.write_result({
         "id": "empty", "path": str(tmp_path / "empty.xml"), "name": "empty.xml",
         "doc_type": "Journals", "client": "Other", "link_info": "", "identifier": "DOC2",
         "ok": True, "error": "", "matches": [],
@@ -130,9 +130,12 @@ def test_html_omits_empty_files_and_has_controls(tmp_path):
     assert 'id="filterDoiOrgText"' in html_out
     assert 'id="filterProjectShortcode"' in html_out
     assert 'id="filterElementKind"' in html_out
-    assert 'src="report-data.js"' in html_out
+    assert 'src="index.js"' in html_out
     assert 'class="file-path"' not in html_out
-    payload = json.loads(data_path.read_text(encoding="utf-8").split("=", 1)[1].strip().rstrip(";"))
+    assert (run / "by_docid").is_dir()
+    payload = json.loads(
+        data_path.read_text(encoding="utf-8").split("window.__EE_INDEX__ =", 1)[1].split(";", 1)[0].strip()
+    )
     names = [f.get("name") for f in payload["files"]]
     assert "hit.xml" in names
     assert "empty.xml" in names  # stored in data; shell UI omits empty matches when rendering

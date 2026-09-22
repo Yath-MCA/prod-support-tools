@@ -1549,7 +1549,7 @@ class ElementExtractorTab(ttk.Frame):
         ts: str,
         settings: dict | None = None,
     ) -> str:
-        """Scan DOI/pub-id by-ref buckets; progressive report-data.js + shell HTML + CSV."""
+        """Scan DOI/pub-id by-ref buckets; progressive index.js + by_docid + shell HTML + CSV."""
         settings = settings or {}
         self._set_status("Scanning DOI / pub-id by ref…")
         self._log("\nScanning pub-id / ext-link doi|uri (in vs out of .ref)…")
@@ -1615,7 +1615,7 @@ class ElementExtractorTab(ttk.Frame):
         report_path = store.write_doi_shell_html(
             report_name, f"DOI / pub-id by ref — {safe_target_name}"
         )
-        store.rebuild_report_data(
+        store.flush_index(
             status="running",
             stats={"files_done": 0, "files_total": len(file_list)},
         )
@@ -1665,19 +1665,14 @@ class ElementExtractorTab(ttk.Frame):
                 "error": parsed.get("error", ""),
                 "matches": matches,
             }
-            store.write_partial(record)
-            partials = store._load_partials()
-            bucket_rows = sum(len(r.get("matches") or []) for r in partials if r.get("ok"))
-            files_with = sum(1 for r in partials if r.get("ok") and r.get("matches"))
-            store.rebuild_report_data(
-                status="running",
-                stats={
-                    "files_done": i,
-                    "files_total": total,
-                    "files_with_hits": files_with,
-                    "bucket_rows": bucket_rows,
-                },
-            )
+            store.write_result(record)
+            files_with, bucket_rows = store.match_stats()
+            running_stats = {
+                "files_done": i,
+                "files_total": total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            }
             file_results.append({
                 "path": str(fp.absolute()),
                 "doc_type": record["doc_type"],
@@ -1689,8 +1684,12 @@ class ElementExtractorTab(ttk.Frame):
                 "buckets": buckets,
             })
             if open_report and not self._doi_report_opened_early:
+                # Force flush so file:// shell is not opened against empty index.js
+                store.flush_index(status="running", stats=running_stats)
                 webbrowser.open(f"file:///{report_path}")
                 self._doi_report_opened_early = True
+            else:
+                store.maybe_flush_index(status="running", stats=running_stats)
 
         status = "cancelled" if self.cancelled else "complete"
         if self.cancelled and not file_results:
