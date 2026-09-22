@@ -1,7 +1,7 @@
 # Recommended design — progressive EE results (JSON index + by_docid)
 
 **Date:** 2026-09-22  
-**Status:** P0 implemented (index.js + retained by_docid/; periodic flush; shell filters unchanged)  
+**Status:** P0+P1+P2 implemented (slim index + lazy by_docid load; optional ee_cache)  
 **Applies to:** Element Extractor reports (start: DOI/pub-id; then general XPath/CSS extract)  
 **Supersedes (for I/O strategy):** full rewrite of `report-data.js` after every file; delete-all-partials-on-finish as the only retention model
 
