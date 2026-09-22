@@ -342,6 +342,10 @@ header {{ display:flex; justify-content:space-between; gap:16px; margin-bottom:2
 
 <script src="index.js"></script>
 <script>
+window.__EE_DOC__ = window.__EE_DOC__ || {{}};
+window.__EE_LOADED__ = window.__EE_LOADED__ || {{}};
+window.__EE_EXPANDED__ = window.__EE_EXPANDED__ || {{}};
+
 function esc(s) {{
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -373,6 +377,89 @@ function fileUri(path) {{
   }} catch (e) {{ return ''; }}
 }}
 
+function matchCount(item) {{
+  if (typeof item.match_count === 'number') return item.match_count;
+  return (item.matches && item.matches.length) || 0;
+}}
+
+function filterHints(item) {{
+  const h = item.filter_hints || {{}};
+  return {{
+    kinds: h.kinds || [],
+    under_comment: !!h.under_comment,
+    doi_org_href: !!h.doi_org_href,
+    doi_org_text: !!h.doi_org_text
+  }};
+}}
+
+function renderMatchesHtml(matches) {{
+  let matchHtml = '';
+  (matches || []).forEach((m, mi) => {{
+    const kind = m.element_kind || m.kind || '';
+    const flags = [];
+    if (m.in_ref) flags.push('in-ref');
+    if (m.under_comment) flags.push('under-comment');
+    if (m.doi_org_in_href) flags.push('doi.org@href');
+    if (m.doi_org_in_text) flags.push('doi.org@text');
+    const flagHtml = flags.map(f => '<span class="match-badge">' + esc(f) + '</span>').join(' ');
+    matchHtml += '<div class="match-item" data-tag="' + esc(kind) + '" data-text="' + esc(m.text||'') +
+      '" data-under-comment="' + (m.under_comment ? 'true' : 'false') +
+      '" data-doi-org-href="' + (m.doi_org_in_href ? 'true' : 'false') +
+      '" data-doi-org-text="' + (m.doi_org_in_text ? 'true' : 'false') + '">' +
+      '<div class="match-header"><div class="match-meta">' +
+      '<span class="match-number">#' + (mi+1) + '</span>' +
+      '<span class="match-badge">Bucket ' + esc(m.bucket) + '</span>' +
+      '<span class="match-tag-badge">' + esc(kind) + '</span>' +
+      '<span class="match-badge">Line ' + esc(m.line) + '</span>' + flagHtml +
+      '</div><button class="copy-btn" onclick="copySnippet(this)">Copy Markup</button></div>' +
+      '<div class="text-section"><span class="section-lbl">Href:</span><div class="text-box"><code>' + esc(m.href||'') +
+      '</code></div></div>' +
+      '<div class="text-section"><span class="section-lbl">Inner Text Content:</span><div class="text-box">' +
+      esc(m.text||'') + '</div></div>' +
+      '<div class="code-section"><span class="section-lbl">Outer HTML/XML Markup:</span>' +
+      '<div class="code-wrapper"><pre><code>' + esc(m.html||'') + '</code></pre></div></div></div>';
+  }});
+  return matchHtml;
+}}
+
+function fillCardMatches(card, doc) {{
+  const list = card.querySelector('.matches-list');
+  if (!list) return;
+  const matches = (doc && doc.matches) || [];
+  list.innerHTML = renderMatchesHtml(matches);
+  const badge = card.querySelector('.file-badge.badge-success');
+  if (badge) badge.textContent = matches.length + ' Match(es)';
+  card.setAttribute('data-loaded', '1');
+}}
+
+function loadDoc(docKey, resultRef, onDone) {{
+  window.__EE_DOC__ = window.__EE_DOC__ || {{}};
+  window.__EE_LOADED__ = window.__EE_LOADED__ || {{}};
+  if (window.__EE_LOADED__[docKey]) {{
+    window.__EE_DOC__[docKey] = window.__EE_LOADED__[docKey];
+    if (onDone) onDone(window.__EE_LOADED__[docKey]);
+    return;
+  }}
+  if (window.__EE_DOC__[docKey]) {{
+    window.__EE_LOADED__[docKey] = window.__EE_DOC__[docKey];
+    if (onDone) onDone(window.__EE_DOC__[docKey]);
+    return;
+  }}
+  if (!resultRef) {{
+    if (onDone) onDone(null);
+    return;
+  }}
+  const s = document.createElement('script');
+  s.src = resultRef + (resultRef.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+  s.onload = function() {{
+    const doc = (window.__EE_DOC__ && window.__EE_DOC__[docKey]) || null;
+    if (doc) window.__EE_LOADED__[docKey] = doc;
+    if (onDone) onDone(doc);
+  }};
+  s.onerror = function() {{ if (onDone) onDone(null); }};
+  document.body.appendChild(s);
+}}
+
 function renderReport() {{
   const d = reportData();
   if (!d) {{
@@ -380,9 +467,9 @@ function renderReport() {{
     return;
   }}
   const files = d.files || [];
-  const visible = files.filter(f => !f.ok || (f.matches && f.matches.length));
-  const hits = visible.filter(f => f.ok && f.matches && f.matches.length);
-  const buckets = hits.reduce((n, f) => n + (f.matches || []).length, 0);
+  const visible = files.filter(f => !f.ok || matchCount(f) > 0);
+  const hits = visible.filter(f => f.ok && matchCount(f) > 0);
+  const buckets = hits.reduce((n, f) => n + matchCount(f), 0);
   const stats = d.stats || {{}};
   document.getElementById('targetName').textContent = (d.source_path || '').split(/[/\\\\]/).pop() || '';
   document.getElementById('runStatus').textContent = d.status ? '(' + d.status + ')' : '';
@@ -413,57 +500,47 @@ function renderReport() {{
     const metaLine = [item.doc_type, item.client, item.link_info, item.identifier, item.project_shortcode]
       .filter(Boolean).join(' | ');
     const uri = fileUri(item.path);
+    const docKey = item.doc_key || item.id || ('idx-' + idx);
     if (!item.ok) {{
+      const expanded = !!window.__EE_EXPANDED__[docKey];
       html += '<div class="file-card error-card" data-filename="' + esc(name) + '" data-doc-type="' + esc(item.doc_type||'') +
         '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') +
-        '" data-project-shortcode="' + esc(item.project_shortcode||'') + '">' +
+        '" data-project-shortcode="' + esc(item.project_shortcode||'') +
+        '" data-doc-key="' + esc(docKey) + '" data-result-ref="" data-loaded="1" data-kinds="">' +
         '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-header-main"><div class="file-title">' +
-        '<span class="toggle-icon">▶</span><span class="file-badge badge-error">Error</span><strong>' + esc(name) + '</strong></div>' +
+        '<span class="toggle-icon">' + (expanded ? '▼' : '▶') + '</span><span class="file-badge badge-error">Error</span><strong>' + esc(name) + '</strong></div>' +
         '<div class="file-actions">' +
         (uri ? '<a class="file-action-btn" href="' + esc(uri) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>' : '') +
         '<button class="file-action-btn" onclick=\\'copyFilePath(' + JSON.stringify(item.path||'') + ', this, event)\\'>Copy Path</button></div></div>' +
         '<div class="file-metadata">' + esc(metaLine) + '</div></div>' +
-        '<div id="' + fileId + '" class="file-content" style="display:none;"><div class="error-box"><strong>Parsing Failed:</strong> ' +
+        '<div id="' + fileId + '" class="file-content" style="display:' + (expanded ? 'block' : 'none') + ';"><div class="error-box"><strong>Parsing Failed:</strong> ' +
         esc(item.error||'') + '</div></div></div>';
       return;
     }}
-    const matches = item.matches || [];
-    let matchHtml = '';
-    matches.forEach((m, mi) => {{
-      const kind = m.element_kind || m.kind || '';
-      const flags = [];
-      if (m.in_ref) flags.push('in-ref');
-      if (m.under_comment) flags.push('under-comment');
-      if (m.doi_org_in_href) flags.push('doi.org@href');
-      if (m.doi_org_in_text) flags.push('doi.org@text');
-      const flagHtml = flags.map(f => '<span class="match-badge">' + esc(f) + '</span>').join(' ');
-      matchHtml += '<div class="match-item" data-tag="' + esc(kind) + '" data-text="' + esc(m.text||'') +
-        '" data-under-comment="' + (m.under_comment ? 'true' : 'false') +
-        '" data-doi-org-href="' + (m.doi_org_in_href ? 'true' : 'false') +
-        '" data-doi-org-text="' + (m.doi_org_in_text ? 'true' : 'false') + '">' +
-        '<div class="match-header"><div class="match-meta">' +
-        '<span class="match-number">#' + (mi+1) + '</span>' +
-        '<span class="match-badge">Bucket ' + esc(m.bucket) + '</span>' +
-        '<span class="match-tag-badge">' + esc(kind) + '</span>' +
-        '<span class="match-badge">Line ' + esc(m.line) + '</span>' + flagHtml +
-        '</div><button class="copy-btn" onclick="copySnippet(this)">Copy Markup</button></div>' +
-        '<div class="text-section"><span class="section-lbl">Href:</span><div class="text-box"><code>' + esc(m.href||'') +
-        '</code></div></div>' +
-        '<div class="text-section"><span class="section-lbl">Inner Text Content:</span><div class="text-box">' +
-        esc(m.text||'') + '</div></div>' +
-        '<div class="code-section"><span class="section-lbl">Outer HTML/XML Markup:</span>' +
-        '<div class="code-wrapper"><pre><code>' + esc(m.html||'') + '</code></pre></div></div></div>';
-    }});
+    const count = matchCount(item);
+    const hints = filterHints(item);
+    const kindsAttr = (hints.kinds || []).join(',');
+    const resultRef = item.result_ref || '';
+    const loadedDoc = window.__EE_LOADED__[docKey] || (window.__EE_DOC__ && window.__EE_DOC__[docKey]) || null;
+    const isLoaded = !!loadedDoc;
+    if (loadedDoc) window.__EE_LOADED__[docKey] = loadedDoc;
+    const expanded = !!window.__EE_EXPANDED__[docKey];
+    const matchHtml = isLoaded ? renderMatchesHtml(loadedDoc.matches || []) : '';
     html += '<div class="file-card" data-filename="' + esc(name) + '" data-doc-type="' + esc(item.doc_type||'') +
       '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') +
-      '" data-project-shortcode="' + esc(item.project_shortcode||'') + '">' +
+      '" data-project-shortcode="' + esc(item.project_shortcode||'') +
+      '" data-doc-key="' + esc(docKey) + '" data-result-ref="' + esc(resultRef) +
+      '" data-loaded="' + (isLoaded ? '1' : '0') + '" data-kinds="' + esc(kindsAttr) +
+      '" data-under-comment="' + (hints.under_comment ? 'true' : 'false') +
+      '" data-doi-org-href="' + (hints.doi_org_href ? 'true' : 'false') +
+      '" data-doi-org-text="' + (hints.doi_org_text ? 'true' : 'false') + '">' +
       '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-header-main"><div class="file-title">' +
-      '<span class="toggle-icon">▼</span><span class="file-badge badge-success">' + matches.length + ' Match(es)</span><strong>' +
+      '<span class="toggle-icon">' + (expanded ? '▼' : '▶') + '</span><span class="file-badge badge-success">' + count + ' Match(es)</span><strong>' +
       esc(name) + '</strong></div><div class="file-actions">' +
       (uri ? '<a class="file-action-btn" href="' + esc(uri) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>' : '') +
       '<button class="file-action-btn" onclick=\\'copyFilePath(' + JSON.stringify(item.path||'') + ', this, event)\\'>Copy Path</button></div></div>' +
       '<div class="file-metadata">' + esc(metaLine) + '</div></div>' +
-      '<div id="' + fileId + '" class="file-content"><div class="matches-list">' + matchHtml + '</div></div></div>';
+      '<div id="' + fileId + '" class="file-content" style="display:' + (expanded ? 'block' : 'none') + ';"><div class="matches-list">' + matchHtml + '</div></div></div>';
   }});
   document.getElementById('resultsList').innerHTML = html;
   applyFilters();
@@ -474,23 +551,62 @@ function toggleCard(id) {{
   if (!content) return;
   const card = content.parentElement;
   const icon = card.querySelector('.toggle-icon');
-  if (content.style.display === 'none') {{
-    content.style.display = 'block';
-    if (icon) icon.textContent = '▼';
-  }} else {{
+  const docKey = card.getAttribute('data-doc-key') || '';
+  const expanding = content.style.display === 'none';
+  if (!expanding) {{
     content.style.display = 'none';
     if (icon) icon.textContent = '▶';
+    if (docKey) delete window.__EE_EXPANDED__[docKey];
+    return;
   }}
+  const ensureShow = function() {{
+    content.style.display = 'block';
+    if (icon) icon.textContent = '▼';
+    if (docKey) window.__EE_EXPANDED__[docKey] = true;
+    applyFilters();
+  }};
+  if (card.classList.contains('error-card') || card.getAttribute('data-loaded') === '1') {{
+    ensureShow();
+    return;
+  }}
+  const resultRef = card.getAttribute('data-result-ref') || '';
+  loadDoc(docKey, resultRef, function(doc) {{
+    if (doc) fillCardMatches(card, doc);
+    ensureShow();
+  }});
 }}
 
 function toggleAll(expand) {{
-  document.querySelectorAll('.file-card').forEach(card => {{
-    if (card.style.display === 'none') return;
+  const cards = Array.from(document.querySelectorAll('.file-card')).filter(c => c.style.display !== 'none');
+  if (!expand) {{
+    cards.forEach(card => {{
+      const content = card.querySelector('.file-content');
+      const icon = card.querySelector('.toggle-icon');
+      const docKey = card.getAttribute('data-doc-key') || '';
+      if (content) content.style.display = 'none';
+      if (icon) icon.textContent = '▶';
+      if (docKey) delete window.__EE_EXPANDED__[docKey];
+    }});
+    return;
+  }}
+  cards.forEach(card => {{
     const content = card.querySelector('.file-content');
     const icon = card.querySelector('.toggle-icon');
-    if (!content) return;
-    content.style.display = expand ? 'block' : 'none';
-    if (icon) icon.textContent = expand ? '▼' : '▶';
+    const docKey = card.getAttribute('data-doc-key') || '';
+    const show = function() {{
+      if (content) content.style.display = 'block';
+      if (icon) icon.textContent = '▼';
+      if (docKey) window.__EE_EXPANDED__[docKey] = true;
+    }};
+    if (card.classList.contains('error-card') || card.getAttribute('data-loaded') === '1') {{
+      show();
+      return;
+    }}
+    loadDoc(docKey, card.getAttribute('data-result-ref') || '', function(doc) {{
+      if (doc) fillCardMatches(card, doc);
+      show();
+      applyFilters();
+    }});
   }});
 }}
 
@@ -552,6 +668,18 @@ function applyFilters() {{
     const filename = (card.getAttribute('data-filename') || '').toLowerCase();
     if (card.classList.contains('error-card')) {{
       card.style.display = (!searchVal || filename.includes(searchVal)) ? 'block' : 'none';
+      return;
+    }}
+
+    if (card.getAttribute('data-loaded') !== '1') {{
+      const kinds = (card.getAttribute('data-kinds') || '').split(',').map(s => s.trim()).filter(Boolean);
+      const kindOk = !elementKind || kinds.indexOf(elementKind) >= 0;
+      const flagOk = (!underComment || card.getAttribute('data-under-comment') === underComment)
+        && (!doiOrgHref || card.getAttribute('data-doi-org-href') === doiOrgHref)
+        && (!doiOrgText || card.getAttribute('data-doi-org-text') === doiOrgText);
+      const searchOk = !searchVal || filename.includes(searchVal)
+        || kinds.some(k => k.toLowerCase().includes(searchVal));
+      card.style.display = (kindOk && flagOk && searchOk) ? 'block' : 'none';
       return;
     }}
 

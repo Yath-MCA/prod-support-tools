@@ -206,3 +206,16 @@ def test_doi_shell_html_loads_index_js(tmp_path):
     assert 'class="file-path"' not in text
     assert 'class="file-metadata"' in text
     assert "__EE_INDEX__" in text or "__EE_REPORT__" in text
+
+
+def test_doi_shell_has_lazy_load_hooks(tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    store = EEReportStore(run, kind="doi_pubid_by_ref", source_path=str(tmp_path))
+    text = store.write_doi_shell_html("r.html", "DOI").read_text(encoding="utf-8")
+    assert "function loadDoc(" in text
+    assert "window.__EE_DOC__" in text
+    assert "data-result-ref" in text
+    assert "data-doc-key" in text
+    assert "data-loaded" in text
+    assert "data-kinds" in text
