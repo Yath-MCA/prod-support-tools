@@ -18,6 +18,7 @@ from core.doi_pubid_by_ref import (
 )
 from core.element_extractor import ElementExtractor
 from core.ee_report_store import EEReportStore
+from core.ee_docid_cache import build_cache_payload, try_load_cache, write_cache
 from core.extraction_run_paths import format_extraction_run_folder_name
 from core.match_uniqueness import annotate_selector_results
 from core.mixed_citation_direct_hits import (
@@ -564,15 +565,26 @@ class ElementExtractorTab(ttk.Frame):
         )
         self.open_report_chk.grid(row=8, column=1, columnspan=2, sticky="w", pady=5)
 
+        self.ee_docid_cache_var = tk.BooleanVar(value=False)
+        self.ee_docid_cache_chk = tk.Checkbutton(
+            settings_frame,
+            text="Cache DOI/pub-id results next to docid (ee_cache) for same-query reuse",
+            variable=self.ee_docid_cache_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9),
+        )
+        self.ee_docid_cache_chk.grid(row=9, column=1, columnspan=2, sticky="w", pady=(0, 5))
+
         # 8. Report Content Options
         tk.Label(
             settings_frame,
             text="Report Content:",
             bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
-        ).grid(row=9, column=0, sticky="w", pady=5)
+        ).grid(row=10, column=0, sticky="w", pady=5)
 
         report_options_outer = tk.Frame(settings_frame, bg="#1e293b")
-        report_options_outer.grid(row=9, column=1, columnspan=2, sticky="ew", pady=5)
+        report_options_outer.grid(row=10, column=1, columnspan=2, sticky="ew", pady=5)
 
         report_options_frame = tk.Frame(report_options_outer, bg="#1e293b")
         report_options_frame.pack(anchor="w")
@@ -697,10 +709,10 @@ class ElementExtractorTab(ttk.Frame):
             settings_frame,
             text="Report Organization:",
             bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
-        ).grid(row=10, column=0, sticky="w", pady=5)
+        ).grid(row=11, column=0, sticky="w", pady=5)
 
         org_frame = tk.Frame(settings_frame, bg="#1e293b")
-        org_frame.grid(row=10, column=1, columnspan=2, sticky="w", pady=5)
+        org_frame.grid(row=11, column=1, columnspan=2, sticky="w", pady=5)
 
         self.org_by_month_var = tk.BooleanVar(value=False)
         tk.Checkbutton(
@@ -1094,6 +1106,7 @@ class ElementExtractorTab(ttk.Frame):
             "batch_size": self.batch_size_var.get().strip() or "50",
             "batch_offset_ui": self.batch_offset_var.get(),
             "open_report": bool(self.open_report_var.get()),
+            "ee_docid_cache": bool(self.ee_docid_cache_var.get()),
             "show_outer_xml": bool(self.show_outer_xml_var.get()),
             "show_inner_text": bool(self.show_inner_text_var.get()),
             "generate_csv": bool(self.generate_csv_var.get()),
@@ -1243,6 +1256,7 @@ class ElementExtractorTab(ttk.Frame):
         self._on_month_filter_change()  # Update custom entry state
         self.output_dir_var.set(str(entry.get("output_dir", str(self._default_output_dir()))).strip() or str(self._default_output_dir()))
         self.open_report_var.set(bool(entry.get("open_report", True)))
+        self.ee_docid_cache_var.set(bool(entry.get("ee_docid_cache", False)))
         # Restore new report content options
         self.show_outer_xml_var.set(bool(entry.get("show_outer_xml", True)))
         self.show_inner_text_var.set(bool(entry.get("show_inner_text", True)))
@@ -1340,6 +1354,7 @@ class ElementExtractorTab(ttk.Frame):
             "batch_offset": batch_offset,
             "output_dir": output_dir,
             "open_report": bool(s.get("open_report", True)),
+            "ee_docid_cache": bool(s.get("ee_docid_cache", False)),
             "report_path": report_path,
             "summary": f"{s.get('mode', '')} | {s.get('query_type', '')}: {query_val}",
             "show_outer_xml": bool(s.get("show_outer_xml", True)),
@@ -1566,6 +1581,8 @@ class ElementExtractorTab(ttk.Frame):
         if not extensions:
             extensions = [".xml", ".html", ".htm", ".xhtml"]
         open_report = bool(settings.get("open_report", True))
+        use_docid_cache = bool(settings.get("ee_docid_cache", False))
+        cache_hits = 0
         dtd_norm = dtd_filter if dtd_filter != "None" else ""
         client_norm = client_filter if client_filter != "None" else ""
 
@@ -1628,7 +1645,19 @@ class ElementExtractorTab(ttk.Frame):
             percent = int((i / total) * 100) if total else 0
             self._ui(lambda p=percent: self.progress_bar.config(value=p))
             self._set_status(f"DOI/pub-id by ref ({i}/{total}): {fp.name}")
-            parsed = extract_buckets_from_file(fp)
+            buckets = None
+            parsed = None
+            if use_docid_cache:
+                cached = try_load_cache(fp)
+                if cached is not None:
+                    buckets = cached["buckets"]
+                    parsed = {"ok": True, "error": "", "buckets": buckets}
+                    cache_hits += 1
+            if buckets is None:
+                parsed = extract_buckets_from_file(fp)
+                buckets = parsed.get("buckets") or []
+                if use_docid_cache and parsed.get("ok"):
+                    write_cache(fp, build_cache_payload(fp, buckets=buckets))
             meta = self.extractor.get_file_metadata(fp)
             docid = fp.parent.name
             meta_entry = run_meta_map.get(docid) if isinstance(run_meta_map.get(docid), dict) else {}
@@ -1637,7 +1666,6 @@ class ElementExtractorTab(ttk.Frame):
                 or meta_entry.get("project_shortcode")
                 or ""
             ).strip()
-            buckets = parsed.get("buckets") or []
             matches = []
             for b in buckets:
                 matches.append({
@@ -1721,6 +1749,8 @@ class ElementExtractorTab(ttk.Frame):
             f"({bucket_rows} bucket row(s) in {files_with}/{len(file_results)} file(s))"
         )
         self._log(f"DOI/pub-id by-ref CSV saved: {run_folder_name}/{csv_name}")
+        if use_docid_cache:
+            self._log(f"ee_cache hits: {cache_hits}/{len(file_results)}")
         return str(Path(report_path).absolute())
 
     def _write_mixed_citation_direct_hits_outputs(
