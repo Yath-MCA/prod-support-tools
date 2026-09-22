@@ -215,6 +215,12 @@ header {{ display:flex; justify-content:space-between; gap:16px; margin-bottom:2
       <select id="filterProjectShortcode" class="filter-select" onchange="applyFilters()">
         <option value="">All project-shortcodes</option>
       </select>
+      <select id="filterElementKind" class="filter-select" onchange="applyFilters()">
+        <option value="">All kinds (doi / uri / pub-id)</option>
+        <option value="doi">doi</option>
+        <option value="uri">uri</option>
+        <option value="pub-id">pub-id</option>
+      </select>
       <select id="filterUnderComment" class="filter-select" onchange="applyFilters()">
         <option value="">All — Under comment</option>
         <option value="true">Yes</option>
@@ -428,6 +434,7 @@ function applyFilters() {{
   const client = document.getElementById('filterClient').value;
   const identifier = document.getElementById('filterIdentifier').value;
   const projectShortcode = document.getElementById('filterProjectShortcode').value;
+  const elementKind = document.getElementById('filterElementKind').value;
   const underComment = document.getElementById('filterUnderComment').value;
   const doiOrgHref = document.getElementById('filterDoiOrgHref').value;
   const doiOrgText = document.getElementById('filterDoiOrgText').value;
@@ -463,7 +470,8 @@ function applyFilters() {{
       const flagOk = (!underComment || item.getAttribute('data-under-comment') === underComment)
         && (!doiOrgHref || item.getAttribute('data-doi-org-href') === doiOrgHref)
         && (!doiOrgText || item.getAttribute('data-doi-org-text') === doiOrgText);
-      const isMatch = searchOk && flagOk;
+      const kindOk = !elementKind || item.getAttribute('data-tag') === elementKind;
+      const isMatch = searchOk && flagOk && kindOk;
       item.style.display = isMatch ? 'block' : 'none';
       if (isMatch) fileVisible = true;
     }});

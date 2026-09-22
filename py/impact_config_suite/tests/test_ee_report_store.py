@@ -80,6 +80,10 @@ def test_doi_shell_html_loads_report_data_js(tmp_path):
     assert 'src="report-data.js"' in text
     assert "filterUnderComment" in text
     assert 'id="filterProjectShortcode"' in text
+    assert 'id="filterElementKind"' in text
+    assert 'value="doi"' in text
+    assert 'value="uri"' in text
+    assert 'value="pub-id"' in text
     assert "Outer HTML/XML Markup" in text
     assert "Copy Markup" in text
     assert "Copy Path" in text
