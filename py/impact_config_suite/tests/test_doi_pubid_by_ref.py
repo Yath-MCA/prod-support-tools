@@ -140,7 +140,12 @@ def test_html_omits_empty_files_and_has_controls(tmp_path):
     assert "hit.xml" in names
     assert "empty.xml" in names  # stored in data; shell UI omits empty matches when rendering
     hit = next(f for f in payload["files"] if f["name"] == "hit.xml")
-    assert hit["matches"][1]["under_comment"] is True
+    assert "matches" not in hit
+    assert hit["match_count"] == 2
+    assert hit["filter_hints"]["under_comment"] is True
+    assert hit["result_ref"].startswith("by_docid/")
+    doc_js = (run / "by_docid" / "hit.js").read_text(encoding="utf-8")
+    assert "under_comment" in doc_js
     assert "Books" in json.dumps(payload)
     assert "TNF" in json.dumps(payload)
     assert "DOC1" in json.dumps(payload)

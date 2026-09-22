@@ -67,6 +67,36 @@ class EEReportStore:
         bucket_rows = sum(len(r.get("matches") or []) for r in self._files if r.get("ok"))
         return files_with, bucket_rows
 
+    def _slim_file_entry(self, record: dict) -> dict:
+        matches = record.get("matches") or []
+        kinds = sorted({
+            str(m.get("element_kind") or m.get("kind") or "")
+            for m in matches
+            if (m.get("element_kind") or m.get("kind"))
+        })
+        fid = _safe_id(str(record.get("id") or record.get("path") or "file"))
+        return {
+            "id": record.get("id"),
+            "doc_key": fid,
+            "path": record.get("path", ""),
+            "name": record.get("name", ""),
+            "doc_type": record.get("doc_type", ""),
+            "client": record.get("client", ""),
+            "link_info": record.get("link_info", ""),
+            "identifier": record.get("identifier", ""),
+            "project_shortcode": record.get("project_shortcode", ""),
+            "ok": bool(record.get("ok")),
+            "error": record.get("error", ""),
+            "match_count": len(matches) if record.get("ok") else 0,
+            "result_ref": record.get("result_ref") or f"by_docid/{fid}.js",
+            "filter_hints": {
+                "kinds": kinds,
+                "under_comment": any(bool(m.get("under_comment")) for m in matches),
+                "doi_org_href": any(bool(m.get("doi_org_in_href")) for m in matches),
+                "doi_org_text": any(bool(m.get("doi_org_in_text")) for m in matches),
+            },
+        }
+
     def write_result(self, file_record: dict) -> Path:
         """Write by_docid/<id>.js once; keep record in memory. Does not flush index."""
         self.by_docid_dir.mkdir(parents=True, exist_ok=True)
@@ -105,7 +135,7 @@ class EEReportStore:
             "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "source_path": self.source_path,
             "stats": stats if stats is not None else self._last_stats,
-            "files": list(self._files),
+            "files": [self._slim_file_entry(r) for r in self._files],
         }
 
     def _write_index_js(self, payload: dict) -> Path:
