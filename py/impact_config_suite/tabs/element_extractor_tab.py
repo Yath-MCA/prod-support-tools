@@ -16,8 +16,13 @@ from core.doi_pubid_by_ref import (
     generate_doi_pubid_by_ref_html,
     write_doi_pubid_by_ref_csv,
 )
-from core.element_extractor import ElementExtractor
-from core.ee_report_store import EEReportStore
+from core.element_extractor import EE_SCAN_BATCH_SIZE, ElementExtractor
+from core.ee_report_store import (
+    EEReportStore,
+    _safe_id as _safe_id_local,
+    normalize_source_key,
+    docid_from_file_path,
+)
 from core.ee_docid_cache import build_cache_payload, try_load_cache, write_cache
 from core.extraction_run_paths import format_extraction_run_folder_name
 from core.match_uniqueness import annotate_selector_results
@@ -1538,21 +1543,431 @@ class ElementExtractorTab(ttk.Frame):
         all_files: list,
         all_selector_results: list,
     ) -> list:
-        """Reuse files already discovered during selector extract (avoid a second tree walk)."""
+        """Reuse files already discovered during selector extract (avoid a second tree walk).
+
+        Prefer the explicit ``all_files`` enumeration when present. Otherwise union
+        keys from all selector ``scan_results`` (parallel mode records every scanned
+        file, including zero-match). Returns [] only when nothing was discovered;
+        callers should treat [] as "do not pass file_paths" only if they intend a
+        fresh walk — prefer passing the list whenever non-empty.
+        """
         if is_single:
             return [Path(source_path)]
-        if all_files:
-            return [Path(p) for p in all_files]
         paths = []
         seen = set()
+
+        def _add(raw):
+            fp = Path(raw)
+            try:
+                key = str(fp.resolve())
+            except Exception:
+                key = str(fp.absolute())
+            if key in seen:
+                return
+            seen.add(key)
+            paths.append(fp)
+
+        if all_files:
+            for p in all_files:
+                _add(p)
+            return paths
         for sel in all_selector_results or []:
             for fp in (sel.get("scan_results") or {}):
-                key = str(fp)
-                if key in seen:
-                    continue
-                seen.add(key)
-                paths.append(Path(fp))
+                _add(fp)
         return paths
+
+    def _extract_match_payload(self, m: dict, query_val: str, query_type: str) -> dict:
+        tag = str(m.get("tag") or "")
+        return {
+            "line": m.get("line", ""),
+            "tag": tag,
+            "element_kind": tag,
+            "attributes": m.get("attributes") or {},
+            "text": m.get("text", ""),
+            "html": m.get("html", ""),
+            "query_val": query_val,
+            "query_type": query_type,
+            "is_unique": m.get("is_unique"),
+            "unique_group_size": m.get("unique_group_size"),
+        }
+
+    def _filter_extract_paths_for_resume(self, file_paths, query_val: str):
+        """Drop paths whose by_docid JSON already has this source+query. Log skip count."""
+        store = getattr(self, "_extract_live_store", None)
+        if store is None or not file_paths:
+            return list(file_paths or [])
+        to_scan, skipped = store.filter_paths_needing_scan(list(file_paths), query_val)
+        if skipped:
+            self._log(f"Skipping {skipped} already-processed docid/source/query")
+        return to_scan
+
+    def _extract_live_on_batch_done(self, batch_index, batch_files, batch_summary) -> None:
+        """Write partials/batch_NNNN.json + flush index after each parallel file chunk."""
+        store = getattr(self, "_extract_live_store", None)
+        if store is None:
+            return
+        summary = dict(batch_summary or {})
+        try:
+            total = int(summary.get("files_total") or 0)
+            if total:
+                self._extract_live_files_total = total
+        except Exception:
+            pass
+        # Attach result_ref for hits already written to by_docid
+        try:
+            path = store.write_batch_partial(int(batch_index), summary)
+            self._log(
+                f"  Partial batch JSON: {path.name} "
+                f"({summary.get('files_in_batch', '?')} files, "
+                f"{summary.get('matches_in_batch', 0)} hits)"
+            )
+        except Exception as exc:
+            self._log(f"  Warning: failed to write batch partial: {exc}")
+            return
+        files_with, bucket_rows = store.match_stats()
+        done = int(getattr(store, "_files_scanned", 0) or summary.get("files_completed_total") or 0)
+        ft = int(getattr(self, "_extract_live_files_total", 0) or summary.get("files_total") or 0)
+        store.flush_index(
+            status="running",
+            stats={
+                "files_done": done,
+                "files_total": max(ft, done),
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+                "batches_completed": int(summary.get("batch_index") or batch_index or 0),
+            },
+        )
+
+    def _extract_live_upsert_file(
+        self,
+        store: EEReportStore,
+        file_path_str: str,
+        data: dict,
+        query_val: str,
+        query_type: str,
+        *,
+        open_report: bool = False,
+        report_path: str | Path | None = None,
+        files_total: int = 0,
+    ) -> None:
+        """Merge one extract file result into the live store (main thread).
+
+        Always upserts ``by_docid/<docid>.json`` under sources[source][query]
+        (empty list = scanned, zero hits). Hit bodies still write legacy
+        ``by_docid/<docid>_<file>.js`` for thin-shell lazy load + index.
+        """
+        if store is None:
+            return
+        fp = Path(file_path_str)
+        abs_path = str(fp.absolute())
+        docid = docid_from_file_path(fp)
+        source_key = normalize_source_key(fp)
+        fid = f"{docid}_{fp.name}"
+        matches_out = [
+            self._extract_match_payload(m, query_val, query_type)
+            for m in (data.get("matches") or [])
+        ]
+        ok = bool(data.get("ok", True))
+        err = str(data.get("error", "") or "")
+
+        # Source-of-truth JSON: always write for this docid/source/query
+        try:
+            store.upsert_docid_source_query(
+                docid,
+                source_key,
+                query_val,
+                matches_out,
+                ok=ok,
+                error=err,
+            )
+        except Exception as exc:
+            self._log(f"  Warning: failed to write by_docid JSON for {docid}/{source_key}: {exc}")
+
+        # Always advance scanned count (including zero-hit successes)
+        done = store.note_file_scanned()
+        ft = int(files_total or 0) or int(getattr(self, "_extract_live_files_total", 0) or 0)
+
+        # Zero-hit / empty: progress only (no lazy-load .js body)
+        if ok and not matches_out:
+            files_with, bucket_rows = store.match_stats()
+            running_stats = {
+                "files_done": done,
+                "files_total": max(ft, done),
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            }
+            store.maybe_flush_progress(status="running", stats=running_stats)
+            return
+
+        existing = None
+        for rec in store._files:
+            if _safe_id_local(str(rec.get("id") or "")) == _safe_id_local(fid) or rec.get("id") == fid:
+                existing = rec
+                break
+        if existing is None:
+            for rec in store._files:
+                if str(rec.get("path") or "") == abs_path:
+                    existing = rec
+                    break
+
+        if existing is not None:
+            if not ok:
+                existing["ok"] = False
+                existing["error"] = err or existing.get("error", "")
+            existing.setdefault("matches", []).extend(matches_out)
+            breakdown = {}
+            for m in existing["matches"]:
+                qv = str(m.get("query_val") or "")
+                breakdown[qv] = breakdown.get(qv, 0) + 1
+            existing["query_breakdown"] = breakdown
+            lines = [m.get("line") for m in existing["matches"] if m.get("line") not in (None, "")]
+            existing["lines_preview"] = lines[:10]
+            store.write_result(existing)
+        else:
+            try:
+                meta = self.extractor.get_file_metadata(fp)
+            except Exception:
+                meta = {}
+            breakdown = {}
+            for m in matches_out:
+                qv = str(m.get("query_val") or "")
+                breakdown[qv] = breakdown.get(qv, 0) + 1
+            record = {
+                "id": fid,
+                "path": abs_path,
+                "name": fp.name,
+                "doc_type": meta.get("doc_type", ""),
+                "client": meta.get("client", ""),
+                "link_info": meta.get("link_info", ""),
+                "identifier": meta.get("identifier", ""),
+                "project_shortcode": "",
+                "ok": ok,
+                "error": err,
+                "matches": matches_out,
+                "query_breakdown": breakdown,
+                "lines_preview": [m.get("line") for m in matches_out if m.get("line") not in (None, "")][:10],
+            }
+            store.write_result(record)
+
+        files_with, bucket_rows = store.match_stats()
+        running_stats = {
+            "files_done": done,
+            "files_total": max(ft, done),
+            "files_with_hits": files_with,
+            "bucket_rows": bucket_rows,
+        }
+        if open_report and report_path and not getattr(self, "_extract_report_opened_early", False):
+            store.flush_index(status="running", stats=running_stats)
+            webbrowser.open(f"file:///{report_path}")
+            self._extract_report_opened_early = True
+        else:
+            store.maybe_flush_index(status="running", stats=running_stats)
+
+    def _write_extract_progressive_report(
+        self,
+        *,
+        source_path: Path,
+        is_single: bool,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        query_slug: str,
+        queries: list,
+        query_type: str,
+        attr_name: str,
+        attr_val: str,
+        all_selector_results: list,
+        grand_total_matches: int,
+        total_files_scanned: int,
+        show_outer_xml: bool,
+        show_inner_text: bool,
+        open_report: bool,
+        settings: dict | None = None,
+        all_files: list | None = None,
+    ) -> str:
+        """Write thin extract shell + by_docid + index via EEReportStore (no giant HTML)."""
+        settings = settings or {}
+        self._extract_report_opened_early = False
+        self._set_status("Preparing progressive HTML report...")
+
+        dtd_filter = str(settings.get("dtd_filter", "None") or "None").strip()
+        client_filter = str(settings.get("client_filter", "None") or "None").strip()
+        dtd_norm = dtd_filter if dtd_filter != "None" else ""
+        client_norm = client_filter if client_filter != "None" else ""
+
+        detailed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+        query_label = f"{query_type}: {', '.join(queries)}"
+        if query_type == "Tag Name" and str(attr_name or "").strip():
+            query_label += f" (Filter: {attr_name}"
+            if str(attr_val or "").strip():
+                query_label += f" = {attr_val}"
+            query_label += ")"
+
+        live = getattr(self, "_extract_live_store", None)
+        if live is not None and Path(live.run_folder) == Path(run_folder) and live.kind == "extract":
+            store = live
+        else:
+            store = EEReportStore(run_folder, kind="extract", source_path=str(source_path))
+            self._extract_live_store = store
+        meta_root = source_path if source_path.is_dir() else source_path.parent
+        if store.snapshot_run_meta(meta_root):
+            self._log("Copied meta.json -> run_meta.json")
+
+        manifest_paths: list[dict] = []
+        seen_paths: set[str] = set()
+        if all_files:
+            for fp in all_files:
+                key = str(Path(fp).absolute())
+                if key in seen_paths:
+                    continue
+                seen_paths.add(key)
+                p = Path(fp)
+                manifest_paths.append({"docid": p.parent.name, "path": key})
+        for sel in all_selector_results or []:
+            for fp_str in (sel.get("scan_results") or {}):
+                key = str(Path(fp_str).absolute())
+                if key in seen_paths:
+                    continue
+                seen_paths.add(key)
+                p = Path(fp_str)
+                manifest_paths.append({"docid": p.parent.name, "path": key})
+
+        store.write_manifest(dtd_norm, client_norm, manifest_paths)
+        report_path = store.write_extract_shell_html(
+            detailed_report_name,
+            f"Element Extraction - {safe_target_name}",
+            show_outer_xml=show_outer_xml,
+            show_inner_text=show_inner_text,
+            query_label=query_label,
+        )
+        files_total = total_files_scanned if not is_single else 1
+        store.flush_index(
+            status="running",
+            stats={
+                "files_done": 0,
+                "files_total": files_total,
+                "files_with_hits": 0,
+                "bucket_rows": 0,
+            },
+        )
+        self.last_report_path = str(Path(report_path).absolute())
+        self._log(
+            f"\nProgressive report shell ready: {run_folder_name}/{detailed_report_name}"
+        )
+
+        # Merge per-file records across selectors
+        records: dict[str, dict] = {}
+        for sel in all_selector_results or []:
+            qv = sel.get("query_val", "")
+            qt = sel.get("query_type", query_type)
+            for fp_str, data in (sel.get("scan_results") or {}).items():
+                fp = Path(fp_str)
+                abs_path = str(fp.absolute())
+                docid = fp.parent.name
+                fid = f"{docid}_{fp.name}"
+                matches_out = []
+                for m in (data.get("matches") or []):
+                    tag = str(m.get("tag") or "")
+                    matches_out.append({
+                        "line": m.get("line", ""),
+                        "tag": tag,
+                        "element_kind": tag,
+                        "attributes": m.get("attributes") or {},
+                        "text": m.get("text", ""),
+                        "html": m.get("html", ""),
+                        "query_val": qv,
+                        "query_type": qt,
+                        "is_unique": m.get("is_unique"),
+                        "unique_group_size": m.get("unique_group_size"),
+                    })
+                ok = bool(data.get("ok", True))
+                err = str(data.get("error", "") or "")
+                if fid in records:
+                    rec = records[fid]
+                    if not ok:
+                        rec["ok"] = False
+                        rec["error"] = err or rec.get("error", "")
+                    rec["matches"].extend(matches_out)
+                    breakdown = rec.get("query_breakdown") or {}
+                    for m in matches_out:
+                        qvx = str(m.get("query_val") or "")
+                        breakdown[qvx] = breakdown.get(qvx, 0) + 1
+                    rec["query_breakdown"] = breakdown
+                    rec["lines_preview"] = [
+                        m.get("line") for m in rec["matches"] if m.get("line") not in (None, "")
+                    ][:10]
+                else:
+                    try:
+                        meta = self.extractor.get_file_metadata(fp)
+                    except Exception:
+                        meta = {}
+                    breakdown = {}
+                    for m in matches_out:
+                        qvx = str(m.get("query_val") or "")
+                        breakdown[qvx] = breakdown.get(qvx, 0) + 1
+                    records[fid] = {
+                        "id": fid,
+                        "path": abs_path,
+                        "name": fp.name,
+                        "doc_type": meta.get("doc_type", ""),
+                        "client": meta.get("client", ""),
+                        "link_info": meta.get("link_info", ""),
+                        "identifier": meta.get("identifier", ""),
+                        "project_shortcode": "",
+                        "ok": ok,
+                        "error": err,
+                        "matches": matches_out,
+                        "query_breakdown": breakdown,
+                        "lines_preview": [m.get("line") for m in matches_out if m.get("line") not in (None, "")][:10],
+                    }
+
+        # Prefer files with hits or errors (matches old detailed report focus)
+        to_write = [
+            rec for rec in records.values()
+            if (not rec.get("ok")) or (rec.get("matches"))
+        ]
+        total_write = len(to_write)
+        for i, record in enumerate(to_write, 1):
+            if self.cancelled:
+                break
+            self._set_status(
+                f"Writing report artifacts ({i}/{total_write}): {record.get('name', '')}"
+            )
+            percent = int((i / total_write) * 100) if total_write else 100
+            self._ui(lambda p=percent: self.progress_bar.config(value=p))
+            store.write_result(record)
+            files_with, bucket_rows = store.match_stats()
+            running_stats = {
+                "files_done": i,
+                "files_total": files_total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            }
+            if open_report and not self._extract_report_opened_early:
+                store.flush_index(status="running", stats=running_stats)
+                webbrowser.open(f"file:///{report_path}")
+                self._extract_report_opened_early = True
+            else:
+                store.maybe_flush_index(status="running", stats=running_stats)
+
+        status = "cancelled" if self.cancelled else "complete"
+        files_with, bucket_rows = store.match_stats()
+        store.finalize(
+            status=status,
+            stats={
+                "files_scanned": files_total,
+                "files_total": files_total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows if bucket_rows else grand_total_matches,
+                "selector_count": len(all_selector_results or []),
+            },
+        )
+        self._log(
+            f"Detailed progressive report saved: {run_folder_name}/{detailed_report_name} "
+            f"({bucket_rows or grand_total_matches} match(es) in {files_with} file(s))"
+        )
+        return str(Path(report_path).absolute())
+
 
     def _write_doi_pubid_by_ref_outputs(
         self,
@@ -1753,6 +2168,207 @@ class ElementExtractorTab(ttk.Frame):
             self._log(f"ee_cache hits: {cache_hits}/{len(file_results)}")
         return str(Path(report_path).absolute())
 
+    def _write_citation_progressive_reports(
+        self,
+        *,
+        source_path: Path,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        ts: str,
+        cite_type: str,
+        type_slug: str,
+        type_scan: dict,
+        type_matches: int,
+        type_files: int,
+    ) -> tuple[str, str]:
+        """Write citation-type + entire-citation progressive shells (no giant HTML)."""
+        cite_label = ""
+        try:
+            cite_label = self.extractor.cite_type_selector_label(cite_type)
+        except Exception:
+            cite_label = f"cite type: {cite_type}"
+
+        # --- Citation type (per-file matches) ---
+        cite_dir = run_folder / f"citation_type_{type_slug}"
+        cite_store = EEReportStore(
+            cite_dir, kind="citation_type", source_path=str(source_path)
+        )
+        cite_name = f"Citation_Type_Report_{type_slug}_{safe_target_name}_{ts}.html"
+        cite_path = cite_store.write_citation_type_shell_html(
+            cite_name,
+            f"Citation Type Report - {safe_target_name}",
+            cite_label=cite_label,
+        )
+        cite_store.write_manifest("", "", [
+            {"docid": Path(fp).parent.name, "path": fp} for fp in (type_scan or {})
+        ])
+        cite_store.flush_index(
+            status="running",
+            stats={"files_done": 0, "files_total": len(type_scan or {})},
+        )
+
+        # Prefer deduped rows for display consistency with legacy report
+        try:
+            deduped = self.extractor.dedupe_scan_results_per_file_pattern(type_scan)
+        except Exception:
+            deduped = type_scan
+
+        for i, (file_path_str, data) in enumerate((deduped or {}).items(), 1):
+            if self.cancelled:
+                break
+            fp = Path(file_path_str)
+            matches_out = []
+            for m in (data.get("matches") or []):
+                sub = m.get("subcategory") or m.get("classification") or m.get("pattern_key") or ""
+                matches_out.append({
+                    "line": m.get("line", ""),
+                    "tag": m.get("tag", ""),
+                    "element_kind": str(sub),
+                    "classification": m.get("classification") or "",
+                    "subcategory": sub,
+                    "pattern_key": m.get("pattern_key") or "",
+                    "pattern_count": m.get("pattern_count", 1),
+                    "cite_type": (m.get("cite_type") or cite_type or "").strip().lower(),
+                    "text": m.get("text", ""),
+                    "html": m.get("html", "") or "",
+                    "snippet": m.get("snippet", "") or m.get("html", "") or "",
+                    "entire_citation": m.get("entire_citation", "") or "",
+                })
+            ok = bool(data.get("ok", True))
+            if ok and not matches_out:
+                continue
+            record = {
+                "id": f"{fp.parent.name}_{fp.name}",
+                "path": file_path_str,
+                "name": fp.name,
+                "doc_type": "",
+                "client": "",
+                "link_info": "",
+                "identifier": "",
+                "project_shortcode": "",
+                "ok": ok,
+                "error": str(data.get("error", "") or ""),
+                "matches": matches_out,
+            }
+            cite_store.write_result(record)
+            files_with, bucket_rows = cite_store.match_stats()
+            cite_store.maybe_flush_index(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": len(deduped or {}),
+                    "files_with_hits": files_with,
+                    "bucket_rows": bucket_rows,
+                },
+            )
+
+        files_with, bucket_rows = cite_store.match_stats()
+        cite_store.finalize(
+            status="cancelled" if self.cancelled else "complete",
+            stats={
+                "files_scanned": type_files,
+                "files_total": type_files,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows or type_matches,
+            },
+        )
+        citation_report_path = str(Path(cite_path).absolute())
+        self._log(
+            f"Citation type report saved: {run_folder_name}/citation_type_{type_slug}/{cite_name} "
+            f"({type_matches} citation(s) in {type_files} file(s), type={cite_type})"
+        )
+
+        # --- Entire citation (one record per pattern_key) ---
+        self._set_status(f"Writing entire citation report ({cite_type})...")
+        entire_dir = run_folder / f"entire_citation_{type_slug}"
+        entire_store = EEReportStore(
+            entire_dir, kind="entire_citation", source_path=str(source_path)
+        )
+        entire_name = f"Entire_Citation_Report_{type_slug}_{safe_target_name}_{ts}.html"
+        entire_path = entire_store.write_entire_citation_shell_html(
+            entire_name,
+            f"Entire Citation Report - {safe_target_name}",
+            cite_label=cite_label,
+        )
+        entire_store.flush_index(status="running", stats={"files_done": 0, "files_total": 0})
+
+        pattern_map: dict[str, dict] = {}
+        for file_path_str, data in (type_scan or {}).items():
+            if not data.get("ok", True):
+                continue
+            for m in (data.get("matches") or []):
+                pk = m.get("pattern_key") or "Bare Link Text"
+                ct = (m.get("cite_type") or cite_type or "").strip().lower() or "unknown"
+                key = f"{ct}::{pk}"
+                bucket = pattern_map.get(key)
+                example = m.get("entire_citation") or m.get("html") or m.get("snippet") or ""
+                if bucket is None:
+                    pattern_map[key] = {
+                        "id": _safe_id_local(key),
+                        "name": pk,
+                        "pattern_key": pk,
+                        "cite_type": ct,
+                        "path": "",
+                        "doc_type": "",
+                        "client": "",
+                        "link_info": "",
+                        "identifier": "",
+                        "project_shortcode": "",
+                        "ok": True,
+                        "error": "",
+                        "pattern_count": 1,
+                        "match_count": 1,
+                        "matches": [{
+                            "entire_citation": example,
+                            "html": m.get("html", "") or "",
+                            "snippet": m.get("snippet", "") or "",
+                            "pattern_key": pk,
+                            "cite_type": ct,
+                            "element_kind": pk,
+                        }],
+                    }
+                else:
+                    bucket["pattern_count"] = int(bucket.get("pattern_count") or 0) + 1
+                    bucket["match_count"] = bucket["pattern_count"]
+                    if example and not (bucket["matches"][0].get("entire_citation") or ""):
+                        bucket["matches"][0]["entire_citation"] = example
+
+        entire_store.write_manifest("", "", [
+            {"docid": rec["id"], "path": rec.get("pattern_key") or rec["id"]}
+            for rec in pattern_map.values()
+        ])
+        for i, rec in enumerate(pattern_map.values(), 1):
+            if self.cancelled:
+                break
+            entire_store.write_result(rec)
+            entire_store.maybe_flush_index(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": len(pattern_map),
+                    "pattern_count": len(pattern_map),
+                    "bucket_rows": sum(int(r.get("pattern_count") or 0) for r in pattern_map.values()),
+                },
+            )
+
+        occ = sum(int(r.get("pattern_count") or 0) for r in pattern_map.values())
+        entire_store.finalize(
+            status="cancelled" if self.cancelled else "complete",
+            stats={
+                "files_scanned": len(pattern_map),
+                "files_total": len(pattern_map),
+                "files_with_hits": len(pattern_map),
+                "pattern_count": len(pattern_map),
+                "bucket_rows": occ,
+            },
+        )
+        entire_citation_report_path = str(Path(entire_path).absolute())
+        self._log(
+            f"Entire citation report saved: {run_folder_name}/entire_citation_{type_slug}/{entire_name}"
+        )
+        return citation_report_path, entire_citation_report_path
+
     def _write_mixed_citation_direct_hits_outputs(
         self,
         source_path: Path,
@@ -1816,26 +2432,90 @@ class ElementExtractorTab(ttk.Frame):
             self._set_status("Extraction cancelled.")
             return ""
 
+        artifact_dir = run_folder / "mixed_citation"
+        store = EEReportStore(
+            artifact_dir, kind="mixed_citation", source_path=str(source_path)
+        )
+        mixed_report_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.html"
+        report_path = store.write_mixed_citation_shell_html(
+            mixed_report_name,
+            f"Mixed-citation Direct Hits - {safe_target_name}",
+        )
+        store.write_manifest("", "", [
+            {"docid": Path(fp).parent.name, "path": fp}
+            for fp in (mixed_scan_results or {})
+        ])
+        store.flush_index(
+            status="running",
+            stats={"files_done": 0, "files_total": len(mixed_scan_results or {})},
+        )
+
         file_results = []
-        for file_path_str, data in (mixed_scan_results or {}).items():
+        total = len(mixed_scan_results or {})
+        for i, (file_path_str, data) in enumerate((mixed_scan_results or {}).items(), 1):
+            hits = list(data.get("hits") or [])
+            ok = bool(data.get("ok", True))
+            client = data.get("client", "") or ""
             file_results.append({
                 "path": file_path_str,
-                "client": data.get("client", "") or "",
-                "ok": bool(data.get("ok", True)),
-                "hits": list(data.get("hits") or []),
+                "client": client,
+                "ok": ok,
+                "hits": hits,
             })
+            if ok and not hits:
+                continue
+            fp = Path(file_path_str)
+            matches = []
+            for h in hits:
+                kind = str(h.get("kind") or "")
+                matches.append({
+                    "kind": kind,
+                    "element_kind": kind,
+                    "value": h.get("value", ""),
+                    "text": h.get("value", ""),
+                    "line": h.get("line", ""),
+                    "html": h.get("html", "") or "",
+                })
+            record = {
+                "id": f"{fp.parent.name}_{fp.name}",
+                "path": str(fp.absolute()) if fp.exists() else file_path_str,
+                "name": fp.name,
+                "client": client,
+                "doc_type": "",
+                "link_info": "",
+                "identifier": "",
+                "project_shortcode": "",
+                "ok": ok,
+                "error": str(data.get("error", "") or ""),
+                "matches": matches,
+            }
+            store.write_result(record)
+            files_with, bucket_rows = store.match_stats()
+            store.maybe_flush_index(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": total,
+                    "files_with_hits": files_with,
+                    "bucket_rows": bucket_rows,
+                },
+            )
 
         rollup_rows = rollup_by_client(file_results)
-        mixed_html = generate_mixed_citation_direct_hits_report_html(
-            str(source_path), file_results, rollup_rows
+        total_mixed_hits = sum(len(r.get("hits") or []) for r in file_results)
+        files_with_mixed = sum(1 for r in file_results if r.get("hits"))
+        store.finalize(
+            status="cancelled" if self.cancelled else "complete",
+            stats={
+                "files_scanned": len(file_results),
+                "files_total": len(file_results),
+                "files_with_hits": files_with_mixed,
+                "bucket_rows": total_mixed_hits,
+                "rollup": rollup_rows,
+            },
         )
-        mixed_report_name = (
-            f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.html"
-        )
-        mixed_report_file = run_folder / mixed_report_name
-        with open(mixed_report_file, "w", encoding="utf-8") as f:
-            f.write(mixed_html)
-        mixed_citation_report_path = str(mixed_report_file.absolute())
+
+        mixed_citation_report_path = str(Path(report_path).absolute())
         self.last_mixed_citation_report_path = mixed_citation_report_path
 
         mixed_csv_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.csv"
@@ -1844,10 +2524,8 @@ class ElementExtractorTab(ttk.Frame):
             mixed_csv_file, file_results, rollup_rows
         )
 
-        total_mixed_hits = sum(len(r.get("hits") or []) for r in file_results)
-        files_with_mixed = sum(1 for r in file_results if r.get("hits"))
         self._log(
-            f"Mixed-citation report saved: {run_folder_name}/{mixed_report_name} "
+            f"Mixed-citation report saved: {run_folder_name}/mixed_citation/{mixed_report_name} "
             f"({total_mixed_hits} hit(s) in {files_with_mixed}/{len(file_results)} file(s))"
         )
         self._log(f"Mixed-citation CSV saved: {run_folder_name}/{mixed_csv_name}")
@@ -2065,6 +2743,49 @@ class ElementExtractorTab(ttk.Frame):
             grand_total_matches = 0
             total_files_scanned = 0
 
+            # Create run folder early so progressive artifacts appear before scan finishes
+            safe_target_name = self._slugify(source_path.stem, "selected_file")
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if len(queries) == 1:
+                query_slug = self._slugify(queries[0][:60], "selector")
+            else:
+                query_slug = f"{self._slugify(queries[0][:30], 'selector')}_and_{len(queries)-1}_more"
+            run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
+            if org_by_month:
+                month_folder = datetime.now().strftime("%Y-%m")
+                run_folder = output_dir / month_folder / run_folder_name
+            else:
+                run_folder = output_dir / run_folder_name
+            run_folder.mkdir(parents=True, exist_ok=True)
+            self._log(f"Run folder ready: {run_folder}")  # run_folder created before classic scan
+            # Seed thin shell + empty index so folder is never empty during long scans
+            self._extract_report_opened_early = False
+            self._extract_live_files_total = 0
+            _seed_store = EEReportStore(run_folder, kind="extract", source_path=str(source_path))
+            self._extract_live_store = _seed_store
+            _query_label = f"{query_type}: {', '.join(queries)}"
+            if query_type == "Tag Name" and str(attr_name or "").strip():
+                _query_label += f" (Filter: {attr_name}"
+                if str(attr_val or "").strip():
+                    _query_label += f" = {attr_val}"
+                _query_label += ")"
+            _seed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+            _seed_path = _seed_store.write_extract_shell_html(
+                _seed_report_name,
+                f"Element Extraction - {safe_target_name}",
+                show_outer_xml=show_outer_xml,
+                show_inner_text=show_inner_text,
+                query_label=_query_label,
+            )
+            _seed_store.flush_index(
+                status="running",
+                stats={"files_done": 0, "files_total": 0, "files_with_hits": 0, "bucket_rows": 0},
+            )
+            self.last_report_path = str(Path(_seed_path).absolute())
+            self._extract_seed_report_path = self.last_report_path
+            # Browser opens on first by_docid write (same pattern as DOI), not at empty seed
+            self._log(f"Progressive shell seeded: {run_folder_name}/{_seed_report_name}")
+
             # Pre-scan file list for sequential folder mode only.
             # Parallel mode rediscovers files inside scan_directory_parallel, so
             # a full silent glob here is redundant and freezes the UI status.
@@ -2146,6 +2867,17 @@ class ElementExtractorTab(ttk.Frame):
                         "matches": matches
                     }
                     total_matches = len(matches)
+                    if getattr(self, "_extract_live_store", None) is not None:
+                        self._extract_live_upsert_file(
+                            self._extract_live_store,
+                            str(source_path.absolute()),
+                            scan_results[str(source_path.absolute())],
+                            query_val,
+                            query_type,
+                            open_report=open_report,
+                            report_path=getattr(self, "_extract_seed_report_path", None),
+                            files_total=1,
+                        )
                     self._log(f"  ✔ Found {total_matches} matching element(s)")
 
                 elif is_batch_mode:
@@ -2165,6 +2897,8 @@ class ElementExtractorTab(ttk.Frame):
                         extensions = ['.xml', '.html', '.htm', '.xhtml']
 
                     def progress_update(current, total, file_name):
+                        if total:
+                            self._extract_live_files_total = int(total)
                         percent = int((current / total) * 100) if total > 0 else 0
                         mode_str = "Parallel" if use_parallel else "Batch"
                         def _update(p=percent, ms=mode_str, c=current, t=total, n=file_name, qi=query_idx, ql=len(queries)):
@@ -2174,6 +2908,20 @@ class ElementExtractorTab(ttk.Frame):
 
                     # Use parallel or batch scanning
                     if use_parallel:
+                        def _on_extract_file_done_batch(file_path_str, result_dict, qv=query_val, qt=query_type):
+                            if getattr(self, "_extract_live_store", None) is None:
+                                return
+                            self._extract_live_upsert_file(
+                                self._extract_live_store,
+                                file_path_str,
+                                result_dict,
+                                qv,
+                                qt,
+                                open_report=open_report,
+                                report_path=getattr(self, "_extract_seed_report_path", None),
+                                files_total=int(getattr(self, "_extract_live_files_total", 0) or 0),
+                            )
+
                         scan_results, total_matches, total_files, has_more, next_offset = \
                             self.extractor.scan_directory_parallel(
                                 source_path, query_type, query_val,
@@ -2187,7 +2935,25 @@ class ElementExtractorTab(ttk.Frame):
                                 recursive=recursive,
                                 use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
                                 log_callback=self._log,
+                                file_result_callback=_on_extract_file_done_batch,
+                                file_batch_size=EE_SCAN_BATCH_SIZE,
+                                batch_done_callback=self._extract_live_on_batch_done,
+                                skip_file_predicate=lambda fp, qv=query_val: (
+                                    getattr(self, '_extract_live_store', None) is not None
+                                    and self._extract_live_store.has_source_query(
+                                        docid_from_file_path(fp),
+                                        normalize_source_key(fp),
+                                        qv,
+                                    )
+                                ),
                             )
+                        if scan_results:
+                            seen_af = {str(Path(p).absolute()) for p in all_files}
+                            for fp_str in scan_results:
+                                key = str(Path(fp_str).absolute())
+                                if key not in seen_af:
+                                    all_files.append(Path(fp_str))
+                                    seen_af.add(key)
                     else:
                         scan_results, total_matches, total_files, has_more, next_offset = \
                             self.extractor.scan_directory_batch(
@@ -2217,6 +2983,8 @@ class ElementExtractorTab(ttk.Frame):
                         raise ValueError("Folder Scan mode selected, but a file path was provided.")
 
                     def progress_update(current, total, file_name):
+                        if total:
+                            self._extract_live_files_total = int(total)
                         percent = int((current / total) * 100) if total > 0 else 0
                         mode_str = "Parallel" if use_parallel else "Query"
                         def _update(p=percent, ms=mode_str, c=current, t=total, n=file_name, qi=query_idx, ql=len(queries)):
@@ -2237,6 +3005,20 @@ class ElementExtractorTab(ttk.Frame):
                         if not extensions:
                             extensions = ['.xml', '.html', '.htm', '.xhtml']
 
+                        def _on_extract_file_done(file_path_str, result_dict, qv=query_val, qt=query_type):
+                            if getattr(self, "_extract_live_store", None) is None:
+                                return
+                            self._extract_live_upsert_file(
+                                self._extract_live_store,
+                                file_path_str,
+                                result_dict,
+                                qv,
+                                qt,
+                                open_report=open_report,
+                                report_path=getattr(self, "_extract_seed_report_path", None),
+                                files_total=int(getattr(self, "_extract_live_files_total", 0) or 0),
+                            )
+
                         scan_results, total_matches, total_files, _, _ = \
                             self.extractor.scan_directory_parallel(
                                 source_path, query_type, query_val,
@@ -2250,11 +3032,35 @@ class ElementExtractorTab(ttk.Frame):
                                 recursive=recursive,
                                 use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
                                 log_callback=self._log,
+                                file_result_callback=_on_extract_file_done,
+                                file_batch_size=EE_SCAN_BATCH_SIZE,
+                                batch_done_callback=self._extract_live_on_batch_done,
+                                skip_file_predicate=lambda fp, qv=query_val: (
+                                    getattr(self, '_extract_live_store', None) is not None
+                                    and self._extract_live_store.has_source_query(
+                                        docid_from_file_path(fp),
+                                        normalize_source_key(fp),
+                                        qv,
+                                    )
+                                ),
                             )
                         total_files_scanned = max(total_files_scanned, total_files)
+                        # Capture discovered paths so mixed/citation can skip a second tree walk
+                        if scan_results:
+                            seen_af = {str(Path(p).absolute()) for p in all_files}
+                            for fp_str in scan_results:
+                                key = str(Path(fp_str).absolute())
+                                if key not in seen_af:
+                                    all_files.append(Path(fp_str))
+                                    seen_af.add(key)
                     else:
                         # Process each file with caching (sequential mode)
                         total_files = total_files_scanned
+
+                        # Resume: skip docid/source/query already present in by_docid JSON
+                        all_files = self._filter_extract_paths_for_resume(all_files, query_val)
+                        total_files = len(all_files)
+                        total_files_scanned = max(total_files_scanned, total_files)
 
                         for i, file_path in enumerate(all_files):
                             if self.cancelled:
@@ -2269,18 +3075,40 @@ class ElementExtractorTab(ttk.Frame):
                                     matches = self.extractor.parse_and_extract(file_path, query_type, query_val, attr_name, attr_val)
                                     self.extractor._set_cache(file_path, query_type, query_val, attr_name, attr_val, matches)
 
+                                scan_results[str(file_path.absolute())] = {
+                                    "ok": True,
+                                    "matches": matches or [],
+                                }
                                 if matches:
-                                    scan_results[str(file_path.absolute())] = {
-                                        "ok": True,
-                                        "matches": matches
-                                    }
                                     total_matches += len(matches)
+                                if getattr(self, "_extract_live_store", None) is not None:
+                                    self._extract_live_upsert_file(
+                                        self._extract_live_store,
+                                        str(file_path.absolute()),
+                                        scan_results[str(file_path.absolute())],
+                                        query_val,
+                                        query_type,
+                                        open_report=open_report,
+                                        report_path=getattr(self, "_extract_seed_report_path", None),
+                                        files_total=total_files_scanned or total_files,
+                                    )
                             except Exception as e:
                                 scan_results[str(file_path.absolute())] = {
                                     "ok": False,
                                     "error": str(e),
                                     "matches": []
                                 }
+                                if getattr(self, "_extract_live_store", None) is not None:
+                                    self._extract_live_upsert_file(
+                                        self._extract_live_store,
+                                        str(file_path.absolute()),
+                                        scan_results[str(file_path.absolute())],
+                                        query_val,
+                                        query_type,
+                                        open_report=open_report,
+                                        report_path=getattr(self, "_extract_seed_report_path", None),
+                                        files_total=total_files_scanned or total_files,
+                                    )
 
                     # Log summary for this query
                     files_with_matches = sum(1 for data in scan_results.values() if data.get("matches"))
@@ -2305,67 +3133,67 @@ class ElementExtractorTab(ttk.Frame):
             self._log("\n---------------------------------------------------------------------")
             self._log(f"All queries complete! Total Files Checked: {total_files_scanned if not is_single else 1}")
             self._log(f"Total Matching Elements Found: {grand_total_matches} across {len(queries)} selector(s)")
+            # run_folder / names already created before scan
 
-            # Generate timestamp for file names
-            safe_target_name = self._slugify(source_path.stem, "selected_file")
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-            # Build query slug (use first query + count if multiple)
-            if len(queries) == 1:
-                query_slug = self._slugify(queries[0][:60], "selector")
+            # Progressive detailed report (EEReportStore) — skip giant in-memory HTML by default
+            use_legacy_giant = bool(settings.get("legacy_giant_html_report", False))
+            if use_legacy_giant:
+                self._set_status("Generating detailed HTML report...")
+                report_html = self.extractor.generate_html_report(
+                    str(source_path), query_type, ", ".join(queries), attr_name, attr_val,
+                    all_selector_results, grand_total_matches, total_files_scanned if not is_single else 1, is_single,
+                    show_outer_xml=show_outer_xml, show_inner_text=show_inner_text
+                )
+                detailed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+                detailed_report_path = run_folder / detailed_report_name
+                with open(detailed_report_path, "w", encoding="utf-8") as f:
+                    f.write(report_html)
+                self.last_report_path = str(detailed_report_path.absolute())
+                self._log(f"\nDetailed report saved: {run_folder_name}/{detailed_report_name}")
             else:
-                query_slug = f"{self._slugify(queries[0][:30], 'selector')}_and_{len(queries)-1}_more"
+                self.last_report_path = self._write_extract_progressive_report(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    query_slug=query_slug,
+                    queries=queries,
+                    query_type=query_type,
+                    attr_name=attr_name,
+                    attr_val=attr_val,
+                    all_selector_results=all_selector_results,
+                    grand_total_matches=grand_total_matches,
+                    total_files_scanned=total_files_scanned,
+                    show_outer_xml=show_outer_xml,
+                    show_inner_text=show_inner_text,
+                    open_report=open_report,
+                    settings=settings,
+                    all_files=all_files if not is_single else [source_path],
+                )
 
-            # Create run folder for all outputs (reports, CSV, copied files)
-            run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
-
-            # Create month-based subfolder if enabled
-            if org_by_month:
-                month_folder = datetime.now().strftime("%Y-%m")
-                run_folder = output_dir / month_folder / run_folder_name
-            else:
-                run_folder = output_dir / run_folder_name
-            run_folder.mkdir(parents=True, exist_ok=True)
-
-            # Generate and save detailed report (with display flags)
-            self._set_status("Generating detailed HTML report...")
-            report_html = self.extractor.generate_html_report(
-                str(source_path), query_type, ", ".join(queries), attr_name, attr_val,
-                all_selector_results, grand_total_matches, total_files_scanned if not is_single else 1, is_single,
-                show_outer_xml=show_outer_xml, show_inner_text=show_inner_text
-            )
-
-            detailed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
-            detailed_report_path = run_folder / detailed_report_name
-
-            with open(detailed_report_path, "w", encoding="utf-8") as f:
-                f.write(report_html)
-
-            self.last_report_path = str(detailed_report_path.absolute())
-            self._log(f"\n📄 Detailed report saved: {run_folder_name}/{detailed_report_name}")
-
-            # Generate and save consolidated summary report
-            self._set_status("Generating consolidated summary report...")
-            summary_html = self.extractor.generate_consolidated_summary_report(
-                all_selector_results, str(source_path), ts, is_single
-            )
-
+            # Progressive summary shell (same extract index.js + by_docid; no giant HTML)
+            self._set_status("Writing consolidated summary shell...")
             summary_report_name = f"Element_Extraction_Summary_{safe_target_name}_{query_slug}.html"
-            summary_report_path = run_folder / summary_report_name
+            summary_store = getattr(self, "_extract_live_store", None)
+            if summary_store is None:
+                summary_store = EEReportStore(run_folder, kind="extract", source_path=str(source_path))
+            summary_path = summary_store.write_summary_shell_html(
+                summary_report_name,
+                f"Element Extraction Summary - {safe_target_name}",
+                query_label=f"{query_type}: {', '.join(queries)}",
+                index_src="index.js",
+            )
+            self.last_summary_report_path = str(Path(summary_path).absolute())
+            self._log(f"Summary report saved: {run_folder_name}/{summary_report_name}")
 
-            with open(summary_report_path, "w", encoding="utf-8") as f:
-                f.write(summary_html)
-
-            self.last_summary_report_path = str(summary_report_path.absolute())
-            self._log(f"📊 Summary report saved: {run_folder_name}/{summary_report_name}")
-
-            # Generate citation type (direct/indirect) report if enabled
+            # Generate citation type (direct/indirect) report if enabled (progressive store)
             citation_report_path = ""
             entire_citation_report_path = ""
             if citation_type_report:
                 self._set_status("Generating citation type report...")
                 self._log(
-                    f"\n📑 Scanning citations for cite type '{citation_cite_type}' "
+                    f"\nScanning citations for cite type '{citation_cite_type}' "
                     f"(ref-type | object-type | data-role)..."
                 )
 
@@ -2389,6 +3217,9 @@ class ElementExtractorTab(ttk.Frame):
                         f"Citation-type scan ({current}/{total}): {file_name}"
                     )
 
+                reused_cite_paths = self._collect_paths_for_mixed_scan(
+                    source_path, is_single, all_files, all_selector_results
+                )
                 bibr_scan_results, bibr_total_matches, bibr_total_files = self.extractor.scan_bibr_citations(
                     source_path,
                     recursive=recursive,
@@ -2400,9 +3231,12 @@ class ElementExtractorTab(ttk.Frame):
                     custom_month=custom_month if not is_single else "",
                     progress_callback=citation_progress_update,
                     cite_type=citation_cite_type,
+                    file_paths=reused_cite_paths if reused_cite_paths else None,
+                    use_index=(bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True) and not is_single and not reused_cite_paths,
+                    log_callback=self._log,
+                    cancel_check=lambda: self.cancelled,
                 )
 
-                # Always write one Citation Type + Entire Citation report per cite type
                 cite_types_to_write = self.extractor.discover_cite_types(bibr_scan_results)
                 if not cite_types_to_write:
                     cite_types_to_write = (
@@ -2420,37 +3254,17 @@ class ElementExtractorTab(ttk.Frame):
                     if type_matches == 0:
                         continue
                     type_slug = re.sub(r"[^\w\-]+", "_", ct.lower()) or "cite"
-
-                    citation_html = self.extractor.generate_citation_type_report(
-                        str(source_path), type_scan, type_matches, type_files,
+                    citation_report_path, entire_citation_report_path = self._write_citation_progressive_reports(
+                        source_path=source_path,
+                        run_folder=run_folder,
+                        run_folder_name=run_folder_name,
+                        safe_target_name=safe_target_name,
+                        ts=ts,
                         cite_type=ct,
-                    )
-                    citation_report_name = (
-                        f"Citation_Type_Report_{type_slug}_{safe_target_name}_{ts}.html"
-                    )
-                    citation_report_file = run_folder / citation_report_name
-                    with open(citation_report_file, "w", encoding="utf-8") as f:
-                        f.write(citation_html)
-                    citation_report_path = str(citation_report_file.absolute())
-                    self._log(
-                        f"📑 Citation type report saved: {run_folder_name}/{citation_report_name} "
-                        f"({type_matches} citation(s) in {type_files} file(s), type={ct})"
-                    )
-
-                    self._set_status(f"Generating entire citation report ({ct})...")
-                    entire_html = self.extractor.generate_entire_citation_report(
-                        str(source_path), type_scan, type_matches, type_files,
-                        cite_type=ct,
-                    )
-                    entire_report_name = (
-                        f"Entire_Citation_Report_{type_slug}_{safe_target_name}_{ts}.html"
-                    )
-                    entire_report_file = run_folder / entire_report_name
-                    with open(entire_report_file, "w", encoding="utf-8") as f:
-                        f.write(entire_html)
-                    entire_citation_report_path = str(entire_report_file.absolute())
-                    self._log(
-                        f"📑 Entire citation report saved: {run_folder_name}/{entire_report_name}"
+                        type_slug=type_slug,
+                        type_scan=type_scan,
+                        type_matches=type_matches,
+                        type_files=type_files,
                     )
 
                 if citation_report_path:
@@ -2459,7 +3273,7 @@ class ElementExtractorTab(ttk.Frame):
                     self.last_entire_citation_report_path = entire_citation_report_path
                 if not cite_types_to_write:
                     self._log(
-                        f"📑 No citations found for cite type '{citation_cite_type}' "
+                        f"No citations found for cite type '{citation_cite_type}' "
                         f"({bibr_total_matches} match(es) in {bibr_total_files} file(s))"
                     )
 
@@ -2593,9 +3407,10 @@ class ElementExtractorTab(ttk.Frame):
                 # Disable Next Batch button in non-batch mode
                 self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
 
-            # Auto-open detailed report if checked
+            # Auto-open detailed report if checked (skip if progressive path already opened)
             if open_report:
-                webbrowser.open(f"file:///{self.last_report_path}")
+                if self.last_report_path and not getattr(self, "_extract_report_opened_early", False):
+                    webbrowser.open(f"file:///{self.last_report_path}")
                 if citation_type_report and citation_report_path:
                     webbrowser.open(f"file:///{citation_report_path}")
                 if citation_type_report and entire_citation_report_path:

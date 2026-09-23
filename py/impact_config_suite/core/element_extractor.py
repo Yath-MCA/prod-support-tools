@@ -19,6 +19,9 @@ try:
 except ImportError:
     pass
 
+# File-chunk size for progressive parallel scans (by_docid / partials cadence).
+EE_SCAN_BATCH_SIZE = 250
+
 class ElementExtractor:
     """
     Core engine for parsing HTML/XML files, extracting specific elements based on
@@ -747,9 +750,17 @@ class ElementExtractor:
                                month_filter: str = "All Time", custom_month: str = "",
                                batch_size: int = 0, batch_offset: int = 0,
                                max_workers: int = None, progress_callback=None,
-                               recursive: bool = True, use_index: bool = True, log_callback=None):
+                               recursive: bool = True, use_index: bool = True, log_callback=None,
+                               file_result_callback=None,
+                               file_batch_size: int = None,
+                               batch_done_callback=None,
+                               skip_file_predicate=None):
         """
         Parallel directory scanning using ProcessPoolExecutor for 3-4x speedup on multi-core machines.
+
+        When more than ``file_batch_size`` files are collected (default
+        ``EE_SCAN_BATCH_SIZE`` = 250), work is submitted and completed in
+        file-chunks so callers can flush progressive artifacts after each chunk.
 
         Args:
             dir_path: Root directory path to scan
@@ -768,6 +779,14 @@ class ElementExtractor:
             max_workers: Number of parallel processes (default: min(CPU count, 8))
             progress_callback: Optional callback(current, total, filename) for progress updates
             recursive: Whether to scan subdirectories recursively (default: True)
+            file_result_callback: Optional callback(file_path_str, result_dict) on main thread
+                as each worker result arrives (for progressive by_docid writes).
+            file_batch_size: Max files per parallel chunk (default EE_SCAN_BATCH_SIZE).
+                Use 0 to submit all files in one shot (legacy behaviour).
+            batch_done_callback: Optional callback(batch_index, batch_files, batch_results_summary)
+                invoked on the main thread after each file chunk completes.
+            skip_file_predicate: Optional callback(file_path) -> bool; when True, the file is
+                omitted from parallel extract (already-processed docid/source/query resume).
 
         Returns:
             Tuple of (scan_results, total_matches, total_files, has_more, next_offset)
@@ -833,42 +852,168 @@ class ElementExtractor:
             )
         total_files = len(all_files)
 
-        # Process files in parallel
+        if skip_file_predicate is not None and all_files:
+            kept = []
+            skipped_n = 0
+            for fp in all_files:
+                try:
+                    if skip_file_predicate(fp):
+                        skipped_n += 1
+                        continue
+                except Exception:
+                    kept.append(fp)
+                    continue
+                kept.append(fp)
+            all_files = kept
+            total_files = len(all_files)
+            if log_callback and skipped_n:
+                try:
+                    log_callback(
+                        f"Skipping {skipped_n} already-processed docid/source/query"
+                    )
+                except Exception:
+                    pass
+
+        # Process files in parallel (chunked when file count exceeds file_batch_size)
         scan_results = {}
         total_matches = 0
         processed_count = 0
+        callback_error_logged = False
+        batch_callback_error_logged = False
 
-        # Use ProcessPoolExecutor for parallel processing
+        if file_batch_size is None:
+            file_batch_size = EE_SCAN_BATCH_SIZE
+        try:
+            file_batch_size = int(file_batch_size)
+        except (TypeError, ValueError):
+            file_batch_size = EE_SCAN_BATCH_SIZE
+        # 0 => legacy single-submit of the entire file list
+        if file_batch_size <= 0:
+            chunk_size = total_files or 1
+        else:
+            chunk_size = file_batch_size
+
+        if log_callback and total_files > chunk_size:
+            try:
+                log_callback(
+                    f"  Parallel file batching: {total_files} file(s) in chunks of {chunk_size}"
+                )
+            except Exception:
+                pass
+
+        def _invoke_file_callback(abs_key, result_dict):
+            nonlocal callback_error_logged
+            if file_result_callback is None:
+                return
+            try:
+                file_result_callback(abs_key, result_dict)
+            except Exception as exc:
+                if not callback_error_logged:
+                    callback_error_logged = True
+                    msg = f"file_result_callback error (further errors suppressed): {exc}"
+                    if log_callback:
+                        try:
+                            log_callback(msg)
+                        except Exception:
+                            pass
+                    else:
+                        print(msg)
+
+        def _invoke_batch_done(batch_index, batch_files, summary):
+            nonlocal batch_callback_error_logged
+            if batch_done_callback is None:
+                return
+            try:
+                batch_done_callback(batch_index, batch_files, summary)
+            except Exception as exc:
+                if not batch_callback_error_logged:
+                    batch_callback_error_logged = True
+                    msg = f"batch_done_callback error (further errors suppressed): {exc}"
+                    if log_callback:
+                        try:
+                            log_callback(msg)
+                        except Exception:
+                            pass
+                    else:
+                        print(msg)
+
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
-            future_to_file = {
-                executor.submit(self._process_single_file,
-                              file_path, query_type, query_val,
-                              attr_name, attr_val): file_path
-                for file_path in all_files
-            }
+            batch_index = 0
+            for chunk_start in range(0, len(all_files), chunk_size):
+                batch_files = all_files[chunk_start:chunk_start + chunk_size]
+                if not batch_files:
+                    break
+                batch_index += 1
+                batch_hit_files = 0
+                batch_matches = 0
+                batch_file_summaries = []
 
-            # Collect results as they complete
-            for future in as_completed(future_to_file):
-                file_path = future_to_file[future]
-                processed_count += 1
+                future_to_file = {
+                    executor.submit(
+                        self._process_single_file,
+                        file_path, query_type, query_val,
+                        attr_name, attr_val,
+                    ): file_path
+                    for file_path in batch_files
+                }
 
-                try:
-                    result = future.result()  # No timeout - allow slow files to complete
-                    if result:
-                        scan_results[str(file_path.absolute())] = result
-                        if result.get("ok") and result.get("matches"):
-                            total_matches += len(result["matches"])
-                except Exception as e:
-                    scan_results[str(file_path.absolute())] = {
-                        "ok": False,
-                        "error": str(e),
-                        "matches": []
-                    }
+                for future in as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    processed_count += 1
+                    abs_key = str(file_path.absolute())
 
-                # Report progress every 5 files
-                if progress_callback and processed_count % 5 == 0:
-                    progress_callback(processed_count, total_files, file_path.name)
+                    try:
+                        result = future.result()  # No timeout - allow slow files to complete
+                        if result:
+                            scan_results[abs_key] = result
+                            if result.get("ok") and result.get("matches"):
+                                total_matches += len(result["matches"])
+                        else:
+                            result = {"ok": False, "error": "empty worker result", "matches": []}
+                            scan_results[abs_key] = result
+                    except Exception as e:
+                        result = {
+                            "ok": False,
+                            "error": str(e),
+                            "matches": []
+                        }
+                        scan_results[abs_key] = result
+
+                    hit_count = 0
+                    if result.get("ok") and result.get("matches"):
+                        hit_count = len(result["matches"])
+                        batch_matches += hit_count
+                        batch_hit_files += 1
+
+                    batch_file_summaries.append({
+                        "path": abs_key,
+                        "docid": file_path.parent.name,
+                        "name": file_path.name,
+                        "ok": bool(result.get("ok", True)),
+                        "hit_count": hit_count,
+                        "error": str(result.get("error", "") or ""),
+                    })
+
+                    _invoke_file_callback(abs_key, scan_results[abs_key])
+
+                    if progress_callback and processed_count % 5 == 0:
+                        progress_callback(processed_count, total_files, file_path.name)
+
+                summary = {
+                    "batch_index": batch_index,
+                    "chunk_size": chunk_size,
+                    "files_in_batch": len(batch_files),
+                    "files_completed_total": processed_count,
+                    "files_total": total_files,
+                    "matches_in_batch": batch_matches,
+                    "files_with_hits": batch_hit_files,
+                    "files": batch_file_summaries,
+                }
+                _invoke_batch_done(
+                    batch_index,
+                    [str(p) for p in batch_files],
+                    summary,
+                )
 
         # Final progress callback if not already reported
         if progress_callback and total_files > 0 and processed_count % 5 != 0:
@@ -3267,29 +3412,81 @@ class ElementExtractor:
                             extensions: list = None, filename_filter: str = None,
                             dtd_filter: str = None, client_filter: str = None,
                             month_filter: str = "All Time", custom_month: str = "",
-                            progress_callback=None, cite_type: str = "bibr"):
+                            progress_callback=None, cite_type: str = "bibr",
+                            file_paths: list | None = None,
+                            use_index: bool = True, log_callback=None,
+                            cancel_check=None, file_result_callback=None):
         """
         Scan a file or directory for citations matching cite_type and classify each.
         Returns (scan_results, total_matches, total_files) in the same shape
         as scan_directory.
+
+        When ``file_paths`` is provided, skip rediscovery and scan that list.
+        ``file_result_callback(file_path_str, result_dict)`` runs after each file
+        (main thread) for progressive report writes.
         """
         path = Path(path)
+
+        def _scan_list(files: list):
+            unique = []
+            seen = set()
+            for raw in files:
+                fp = Path(raw)
+                try:
+                    key = str(fp.resolve())
+                except Exception:
+                    key = str(fp.absolute())
+                if key in seen:
+                    continue
+                if not fp.is_file():
+                    continue
+                seen.add(key)
+                unique.append(fp)
+            unique = sorted(unique, key=lambda p: str(p).lower())
+            total_files = len(unique)
+            scan_results = {}
+            total_matches = 0
+            for i, file_path in enumerate(unique):
+                if cancel_check is not None and cancel_check():
+                    break
+                if progress_callback:
+                    progress_callback(i + 1, total_files, file_path.name)
+                abs_key = str(file_path.absolute())
+                try:
+                    matches = self.extract_bibr_citations(file_path, cite_type=cite_type)
+                    result = {"ok": True, "matches": matches}
+                    if matches:
+                        scan_results[abs_key] = result
+                        total_matches += len(matches)
+                    elif file_result_callback is not None:
+                        # Still notify progressive writers for empty results when requested
+                        scan_results.setdefault(abs_key, result)
+                except Exception as e:
+                    result = {"ok": False, "error": str(e), "matches": []}
+                    scan_results[abs_key] = result
+                else:
+                    result = scan_results.get(abs_key, result)
+                if file_result_callback is not None and abs_key in scan_results:
+                    try:
+                        file_result_callback(abs_key, scan_results[abs_key])
+                    except Exception as exc:
+                        # Log once so progressive writers are not silently broken
+                        if not getattr(_scan_list, "_cb_err_logged", False):
+                            _scan_list._cb_err_logged = True
+                            if log_callback:
+                                try:
+                                    log_callback(
+                                        f"file_result_callback error (further errors suppressed): {exc}"
+                                    )
+                                except Exception:
+                                    pass
+            return scan_results, total_matches, total_files
+
+        if file_paths is not None:
+            return _scan_list(list(file_paths))
+
         if path.is_file():
-            try:
-                matches = self.extract_bibr_citations(path, cite_type=cite_type)
-                scan_results = {
-                    str(path.absolute()): {"ok": True, "matches": matches}
-                }
-                return scan_results, len(matches), 1
-            except Exception as e:
-                scan_results = {
-                    str(path.absolute()): {
-                        "ok": False,
-                        "error": str(e),
-                        "matches": [],
-                    }
-                }
-                return scan_results, 0, 1
+            return _scan_list([path])
 
         if not path.is_dir():
             raise NotADirectoryError(f"'{path}' is not a valid file or directory.")
@@ -3305,29 +3502,7 @@ class ElementExtractor:
             discover_new=True, log_callback=log_callback,
             cancel_check=cancel_check,
         )
-        total_files = len(all_files)
-        scan_results = {}
-        total_matches = 0
-
-        for i, file_path in enumerate(all_files):
-            if progress_callback:
-                progress_callback(i + 1, total_files, file_path.name)
-            try:
-                matches = self.extract_bibr_citations(file_path, cite_type=cite_type)
-                if matches:
-                    scan_results[str(file_path.absolute())] = {
-                        "ok": True,
-                        "matches": matches,
-                    }
-                    total_matches += len(matches)
-            except Exception as e:
-                scan_results[str(file_path.absolute())] = {
-                    "ok": False,
-                    "error": str(e),
-                    "matches": [],
-                }
-
-        return scan_results, total_matches, total_files
+        return _scan_list(all_files)
 
 
     def extract_mixed_citation_direct_hits(self, file_path: Path) -> list:

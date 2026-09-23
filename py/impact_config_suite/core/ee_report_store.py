@@ -1,4 +1,4 @@
-"""Progressive Element Extractor report artifacts (by_docid + index.js)."""
+"""Progressive Element Extractor report artifacts (by_docid JSON + index.js)."""
 from __future__ import annotations
 
 import html as html_lib
@@ -13,6 +13,17 @@ from pathlib import Path
 def _safe_id(raw: str) -> str:
     s = re.sub(r"[^A-Za-z0-9._-]+", "_", (raw or "").strip())[:120]
     return s or "item"
+
+
+def normalize_source_key(path_or_name: str | Path) -> str:
+    """Basename used as the sources{} key (e.g. N1_original.xml, updated.html)."""
+    return Path(path_or_name).name
+
+
+def docid_from_file_path(file_path: str | Path) -> str:
+    """Doc folder name: parent of the scanned file (IMPACT layout)."""
+    return Path(file_path).parent.name
+
 
 
 class EEReportStore:
@@ -32,7 +43,7 @@ class EEReportStore:
         self.flush_interval_s = float(flush_interval_s)
         self.run_folder.mkdir(parents=True, exist_ok=True)
         self.by_docid_dir = self.run_folder / "by_docid"
-        # Legacy alias — P0 no longer uses partials/
+        # Used again for progressive scan batch JSON (partials/batch_NNNN.json)
         self.partials_dir = self.run_folder / "partials"
         self._files: list[dict] = []
         self._writes_since_flush = 0
@@ -40,6 +51,15 @@ class EEReportStore:
         self._dirty = False
         self._last_status = "running"
         self._last_stats: dict = {}
+        # Files observed by progressive upsert (includes zero-hit skips)
+        self._files_scanned = 0
+        self._batch_manifest: dict = {
+            "batches_completed": 0,
+            "files_completed": 0,
+            "batches": [],
+        }
+        # In-memory cache for by_docid/<docid>.json during a run (resume + upsert)
+        self._docid_json_cache: dict[str, dict] = {}
 
     def snapshot_run_meta(self, scan_root: Path) -> Path | None:
         scan_root = Path(scan_root)
@@ -67,15 +87,98 @@ class EEReportStore:
         bucket_rows = sum(len(r.get("matches") or []) for r in self._files if r.get("ok"))
         return files_with, bucket_rows
 
+    def note_file_scanned(self) -> int:
+        """Increment processed-file counter (including zero-hit files). Return new count."""
+        self._files_scanned = int(getattr(self, "_files_scanned", 0) or 0) + 1
+        return self._files_scanned
+
+    def maybe_flush_progress(self, *, status: str, stats: dict | None = None) -> Path | None:
+        """Flush index for progress visibility even when no new by_docid writes occurred.
+
+        Flushes when dirty and (N writes or interval), OR when ``files_done`` is a
+        multiple of ``flush_every``, OR when the flush interval elapsed since last flush.
+        """
+        if stats is not None:
+            self._last_stats = dict(stats)
+        due_writes = self._dirty and self._writes_since_flush >= self.flush_every
+        due_t = (time.monotonic() - self._last_flush_monotonic) >= self.flush_interval_s
+        done = int((stats or self._last_stats or {}).get("files_done") or 0)
+        due_scanned = done > 0 and (done % self.flush_every == 0)
+        if due_writes or (self._dirty and due_t) or due_scanned or (due_t and stats is not None):
+            return self.flush_index(status=status, stats=stats if stats is not None else self._last_stats)
+        return None
+
+    def write_batch_partial(self, batch_index: int, summary: dict) -> Path:
+        """Write ``partials/batch_NNNN.json`` for one completed file chunk."""
+        self.partials_dir.mkdir(parents=True, exist_ok=True)
+        idx = int(batch_index)
+        path = self.partials_dir / f"batch_{idx:04d}.json"
+        payload = dict(summary or {})
+        payload.setdefault("batch_index", idx)
+        # Enrich hit rows with result_ref when the by_docid record already exists
+        path_to_ref = {
+            str(r.get("path") or ""): r.get("result_ref")
+            for r in self._files
+            if r.get("result_ref")
+        }
+        files_out = []
+        for entry in list(payload.get("files") or []):
+            row = dict(entry)
+            ref = path_to_ref.get(str(row.get("path") or ""))
+            if ref and int(row.get("hit_count") or 0) > 0:
+                row["result_ref"] = ref
+            files_out.append(row)
+        payload["files"] = files_out
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        # Keep a slim running manifest of completed batches (no mega merged matches)
+        batches = list(self._batch_manifest.get("batches") or [])
+        batches = [b for b in batches if int(b.get("index") or 0) != idx]
+        batches.append({
+            "index": idx,
+            "path": f"partials/batch_{idx:04d}.json",
+            "files": int(payload.get("files_in_batch") or len(files_out)),
+            "hits": int(payload.get("matches_in_batch") or 0),
+            "files_with_hits": int(payload.get("files_with_hits") or 0),
+        })
+        batches.sort(key=lambda b: int(b.get("index") or 0))
+        self._batch_manifest = {
+            "source_path": self.source_path,
+            "kind": self.kind,
+            "scan_batch_size": int(payload.get("chunk_size") or 0) or None,
+            "batches_completed": len(batches),
+            "files_completed": int(payload.get("files_completed_total") or 0),
+            "files_total": int(payload.get("files_total") or 0),
+            "batches": batches,
+        }
+        manifest_path = self.run_folder / "manifest.json"
+        # Preserve any pre-existing keys (e.g. dtd_filter) when present
+        existing: dict = {}
+        if manifest_path.is_file():
+            try:
+                existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if not isinstance(existing, dict):
+                    existing = {}
+            except Exception:
+                existing = {}
+        existing.update(self._batch_manifest)
+        manifest_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
+        return path
+
     def _slim_file_entry(self, record: dict) -> dict:
         matches = record.get("matches") or []
         kinds = sorted({
-            str(m.get("element_kind") or m.get("kind") or "")
+            str(m.get("element_kind") or m.get("kind") or m.get("tag") or "")
             for m in matches
-            if (m.get("element_kind") or m.get("kind"))
+            if (m.get("element_kind") or m.get("kind") or m.get("tag"))
         })
         fid = _safe_id(str(record.get("id") or record.get("path") or "file"))
-        return {
+        queries = sorted({
+            str(m.get("query_val") or "")
+            for m in matches
+            if m.get("query_val")
+        })
+        entry = {
             "id": record.get("id"),
             "doc_key": fid,
             "path": record.get("path", ""),
@@ -87,15 +190,198 @@ class EEReportStore:
             "project_shortcode": record.get("project_shortcode", ""),
             "ok": bool(record.get("ok")),
             "error": record.get("error", ""),
-            "match_count": len(matches) if record.get("ok") else 0,
+            "match_count": len(matches) if record.get("ok") else int(record.get("match_count") or 0),
             "result_ref": record.get("result_ref") or f"by_docid/{fid}.js",
             "filter_hints": {
                 "kinds": kinds,
+                "queries": queries,
                 "under_comment": any(bool(m.get("under_comment")) for m in matches),
                 "doi_org_href": any(bool(m.get("doi_org_in_href")) for m in matches),
                 "doi_org_text": any(bool(m.get("doi_org_in_text")) for m in matches),
             },
         }
+        # Optional slim fields for summary / citation / mixed shells (never embed match HTML)
+        for key in (
+            "cite_type",
+            "pattern_key",
+            "classification",
+            "subcategory",
+            "pattern_count",
+            "rollup",
+            "lines_preview",
+            "query_breakdown",
+        ):
+            if key in record and record.get(key) is not None:
+                entry[key] = record.get(key)
+        return entry
+
+
+    # --- Always-write per-docid JSON (sources -> query -> matches) ---
+
+    def docid_json_path(self, docid: str) -> Path:
+        return self.by_docid_dir / f"{_safe_id(str(docid or 'item'))}.json"
+
+    def load_docid_json(self, docid: str) -> dict:
+        """Load by_docid/<docid>.json; migrate legacy hit-only .js when needed."""
+        key = _safe_id(str(docid or "item"))
+        cached = getattr(self, "_docid_json_cache", None)
+        if isinstance(cached, dict) and key in cached:
+            return cached[key]
+        self.by_docid_dir.mkdir(parents=True, exist_ok=True)
+        path = self.docid_json_path(docid)
+        data = None
+        if path.is_file():
+            try:
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    loaded.setdefault("docid", str(docid))
+                    loaded.setdefault("sources", {})
+                    if not isinstance(loaded.get("sources"), dict):
+                        loaded["sources"] = {}
+                    data = loaded
+            except Exception:
+                data = None
+        if data is None:
+            migrated = self._migrate_legacy_js_for_docid(docid)
+            data = migrated if migrated is not None else {"docid": str(docid), "sources": {}}
+        if not isinstance(getattr(self, "_docid_json_cache", None), dict):
+            self._docid_json_cache = {}
+        self._docid_json_cache[key] = data
+        return data
+
+    def _migrate_legacy_js_for_docid(self, docid: str) -> dict | None:
+        """Best-effort convert legacy by_docid/<docid>_*.js hit files into nested JSON."""
+        safe = _safe_id(str(docid or "item"))
+        if not self.by_docid_dir.is_dir():
+            return None
+        candidates = sorted(
+            [
+                p
+                for p in self.by_docid_dir.glob("*.js")
+                if p.stem == safe or p.stem.startswith(safe + "_")
+            ]
+        )
+        if not candidates:
+            return None
+        sources: dict = {}
+        for js_path in candidates:
+            try:
+                text = js_path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            # Expect: window.__EE_DOC__[<key>] = <json>;
+            if "window.__EE_DOC__" not in text:
+                continue
+            try:
+                m = re.search(
+                    r"window\.__EE_DOC__\s*\[[^\]]*\]\s*=\s*(\{.*\})\s*;?\s*\Z",
+                    text,
+                    flags=re.S,
+                )
+                if not m:
+                    # Fallback: first JSON object after last "] ="
+                    idx = text.rfind("] =")
+                    if idx < 0:
+                        continue
+                    blob = text[idx + 3:].strip()
+                    if blob.endswith(";"):
+                        blob = blob[:-1].strip()
+                    record = json.loads(blob)
+                else:
+                    record = json.loads(m.group(1))
+            except Exception:
+                continue
+            if not isinstance(record, dict):
+                continue
+            source_key = normalize_source_key(
+                record.get("name") or record.get("path") or js_path.stem
+            )
+            matches = list(record.get("matches") or [])
+            by_query: dict = sources.setdefault(source_key, {})
+            if matches:
+                for m in matches:
+                    q = str(m.get("query_val") or "")
+                    by_query.setdefault(q, []).append(m)
+            else:
+                # legacy empty hit file — mark unknown query only if none yet
+                by_query.setdefault("", [])
+        if not sources:
+            return None
+        out = {"docid": str(docid), "sources": sources}
+        # Persist migration so resume sees JSON next time
+        try:
+            self.docid_json_path(docid).write_text(
+                json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception:
+            pass
+        return out
+
+    def has_source_query(self, docid: str, source_key: str, query: str) -> bool:
+        """True when sources[source_key][query] is already present (even if [])."""
+        rec = self.load_docid_json(docid)
+        src = (rec.get("sources") or {}).get(str(source_key))
+        if not isinstance(src, dict):
+            return False
+        return str(query) in src
+
+    def upsert_docid_source_query(
+        self,
+        docid: str,
+        source_key: str,
+        query: str,
+        matches: list | None,
+        *,
+        ok: bool = True,
+        error: str = "",
+    ) -> Path:
+        """Always write/update by_docid/<docid>.json for this source+query (hits or [])."""
+        self.by_docid_dir.mkdir(parents=True, exist_ok=True)
+        rec = self.load_docid_json(docid)
+        rec["docid"] = str(docid)
+        sources = rec.setdefault("sources", {})
+        if not isinstance(sources, dict):
+            sources = {}
+            rec["sources"] = sources
+        src_map = sources.setdefault(str(source_key), {})
+        if not isinstance(src_map, dict):
+            src_map = {}
+            sources[str(source_key)] = src_map
+        # Empty list = scanned, zero hits. Errors still record the list provided.
+        src_map[str(query)] = list(matches or [])
+        if not ok and error:
+            # Keep a light error breadcrumb without breaking the schema
+            err_map = rec.setdefault("errors", {})
+            if not isinstance(err_map, dict):
+                err_map = {}
+                rec["errors"] = err_map
+            err_map.setdefault(str(source_key), {})[str(query)] = str(error)
+        path = self.docid_json_path(docid)
+        path.write_text(json.dumps(rec, indent=2, ensure_ascii=False), encoding="utf-8")
+        if not isinstance(getattr(self, "_docid_json_cache", None), dict):
+            self._docid_json_cache = {}
+        self._docid_json_cache[_safe_id(str(docid or "item"))] = rec
+        return path
+
+    def filter_paths_needing_scan(
+        self,
+        file_paths: list,
+        query: str,
+    ) -> tuple[list, int]:
+        """Return (paths_to_scan, skipped_count) based on existing docid JSON."""
+        to_scan = []
+        skipped = 0
+        q = str(query)
+        for raw in file_paths or []:
+            fp = Path(raw)
+            docid = docid_from_file_path(fp)
+            source_key = normalize_source_key(fp)
+            if self.has_source_query(docid, source_key, q):
+                skipped += 1
+                continue
+            to_scan.append(fp)
+        return to_scan, skipped
+
 
     def write_result(self, file_record: dict) -> Path:
         """Write by_docid/<id>.js once; keep record in memory. Does not flush index."""
@@ -177,13 +463,77 @@ class EEReportStore:
         """Final index flush; retain by_docid/."""
         return self.flush_index(status=status, stats=stats)
 
-    def write_shell_html(self, html_name: str, title: str) -> Path:
+    def write_shell_html(self, html_name: str, title: str, **kwargs) -> Path:
+        if self.kind == "extract":
+            return self.write_extract_shell_html(html_name, title, **kwargs)
+        if self.kind == "extract_summary":
+            return self.write_summary_shell_html(html_name, title, **kwargs)
+        if self.kind == "citation_type":
+            return self.write_citation_type_shell_html(html_name, title, **kwargs)
+        if self.kind == "entire_citation":
+            return self.write_entire_citation_shell_html(html_name, title, **kwargs)
+        if self.kind == "mixed_citation":
+            return self.write_mixed_citation_shell_html(html_name, title, **kwargs)
         return self.write_doi_shell_html(html_name, title)
 
     def write_doi_shell_html(self, html_name: str, title: str) -> Path:
         path = self.run_folder / html_name
         path.write_text(doi_shell_html(title), encoding="utf-8")
         return path
+
+    def write_extract_shell_html(
+        self,
+        html_name: str,
+        title: str,
+        *,
+        show_outer_xml: bool = True,
+        show_inner_text: bool = True,
+        query_label: str = "",
+    ) -> Path:
+        path = self.run_folder / html_name
+        path.write_text(
+            extract_shell_html(
+                title,
+                show_outer_xml=show_outer_xml,
+                show_inner_text=show_inner_text,
+                query_label=query_label,
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+
+
+    def write_summary_shell_html(
+        self,
+        html_name: str,
+        title: str,
+        *,
+        query_label: str = "",
+        index_src: str = "index.js",
+    ) -> Path:
+        path = self.run_folder / html_name
+        path.write_text(
+            summary_shell_html(title, query_label=query_label, index_src=index_src),
+            encoding="utf-8",
+        )
+        return path
+
+    def write_citation_type_shell_html(self, html_name: str, title: str, **kwargs) -> Path:
+        path = self.run_folder / html_name
+        path.write_text(citation_type_shell_html(title, **kwargs), encoding="utf-8")
+        return path
+
+    def write_entire_citation_shell_html(self, html_name: str, title: str, **kwargs) -> Path:
+        path = self.run_folder / html_name
+        path.write_text(entire_citation_shell_html(title, **kwargs), encoding="utf-8")
+        return path
+
+    def write_mixed_citation_shell_html(self, html_name: str, title: str, **kwargs) -> Path:
+        path = self.run_folder / html_name
+        path.write_text(mixed_citation_shell_html(title, **kwargs), encoding="utf-8")
+        return path
+
 
 
 def doi_shell_html(title: str) -> str:
@@ -716,3 +1066,1298 @@ setInterval(function() {{
 </body>
 </html>
 """
+
+def extract_shell_html(
+    title: str,
+    *,
+    show_outer_xml: bool = True,
+    show_inner_text: bool = True,
+    query_label: str = "",
+) -> str:
+    """Thin classic Element Extractor shell; data from index.js + by_docid/*.js."""
+    safe_title = html_lib.escape(title)
+    safe_query = html_lib.escape(query_label or "")
+    cfg_json = json.dumps(
+        {
+            "kind": "extract",
+            "show_outer_xml": bool(show_outer_xml),
+            "show_inner_text": bool(show_inner_text),
+            "query_label": query_label or "",
+        },
+        ensure_ascii=False,
+    )
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{safe_title}</title>
+<style>
+:root {{
+  --bg-main:#0b0f19; --bg-card:#111827; --bg-code:#030712; --bg-input:#1f2937;
+  --border:#374151; --text:#f3f4f6; --muted:#9ca3af; --primary:#6366f1;
+  --success:#10b981; --error:#ef4444; --tag:#38bdf8;
+}}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; font-family:Segoe UI,sans-serif; background:var(--bg-main); color:var(--text); }}
+.container {{ max-width:1200px; margin:0 auto; padding:24px; }}
+header {{ display:flex; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }}
+.stats-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }}
+.stat-card {{ background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:14px; }}
+.stat-card .lbl {{ display:block; color:var(--muted); font-size:0.8rem; }}
+.stat-card .val {{ font-size:1.4rem; font-weight:700; color:var(--primary); }}
+.controls-panel {{
+  display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:16px;
+}}
+.filter-row {{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; width:100%; }}
+.search-container {{ position:relative; flex:1; min-width:220px; }}
+.search-icon {{ position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); }}
+.search-input {{
+  width:100%; padding:10px 12px 10px 36px; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg-input); color:var(--text);
+}}
+.filter-select {{
+  background:var(--bg-input); color:var(--text); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; min-width:140px;
+}}
+.button-group {{ display:flex; gap:8px; }}
+.action-btn, .file-action-btn, .copy-btn {{
+  background:rgba(99,102,241,0.15); color:var(--text); border:1px solid var(--primary);
+  border-radius:6px; padding:8px 12px; cursor:pointer; font-size:0.85rem;
+}}
+.copy-btn.copied, .file-action-btn.copied {{ background:rgba(16,185,129,0.2); border-color:var(--success); }}
+.file-card {{
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; margin-bottom:14px; overflow:hidden;
+}}
+.file-card.error-card {{ border-color:var(--error); }}
+.file-header {{ padding:14px 16px; cursor:pointer; }}
+.file-header-main {{ display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
+.file-title {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }}
+.file-metadata {{ color:var(--muted); font-size:0.85rem; margin-top:6px; word-break:break-all; }}
+.file-badge {{ font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; }}
+.badge-success {{ background:rgba(16,185,129,0.2); color:var(--success); }}
+.badge-error {{ background:rgba(239,68,68,0.2); color:var(--error); }}
+.file-content {{ padding:0 16px 16px; }}
+.match-item {{
+  border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:10px; background:#0f172a;
+}}
+.match-header {{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; }}
+.match-meta {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }}
+.match-number, .match-badge, .match-tag-badge {{
+  font-size:0.75rem; padding:2px 8px; border-radius:4px; background:rgba(99,102,241,0.2);
+}}
+.match-tag-badge {{ color:var(--tag); }}
+.section-lbl {{ display:block; color:var(--muted); font-size:0.75rem; margin:8px 0 4px; }}
+.text-box, .code-wrapper {{
+  background:var(--bg-code); border:1px solid var(--border); border-radius:6px; padding:10px; overflow:auto;
+}}
+.code-wrapper pre {{ margin:0; white-space:pre-wrap; word-break:break-word; color:#cbd5e1; font-size:0.8rem; }}
+.attr-table {{ width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:4px; }}
+.attr-table th, .attr-table td {{ border:1px solid var(--border); padding:6px 8px; text-align:left; }}
+.attr-table th {{ color:var(--muted); background:#0b1220; }}
+.attr-name {{ color:var(--tag); white-space:nowrap; }}
+.error-box {{ color:#fecaca; background:rgba(239,68,68,0.1); padding:12px; border-radius:8px; }}
+.no-results {{ color:var(--muted); padding:24px; text-align:center; }}
+.status-pill {{ font-size:0.8rem; color:var(--muted); }}
+.query-label {{ color:var(--muted); font-size:0.9rem; margin-top:4px; }}
+.toast {{
+  position:fixed; bottom:24px; right:24px; background:var(--bg-card); border:1px solid var(--primary);
+  color:var(--text); padding:12px 20px; border-radius:8px; opacity:0; transform:translateY(40px);
+  transition:all .25s ease; z-index:1000;
+}}
+.toast.show {{ opacity:1; transform:translateY(0); }}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Element Extraction</h1>
+      <p>Target: <strong id="targetName"></strong>
+        <span class="status-pill" id="runStatus"></span></p>
+      <p class="query-label" id="queryLabel">{safe_query}</p>
+    </div>
+    <div style="color:var(--muted)" id="generatedAt"></div>
+  </header>
+
+  <div class="stats-grid">
+    <div class="stat-card"><span class="lbl">Files scanned</span><span class="val" id="statScanned">0</span></div>
+    <div class="stat-card"><span class="lbl">Files with hits</span><span class="val" id="statHits">0</span></div>
+    <div class="stat-card"><span class="lbl">Matches</span><span class="val" id="statBuckets">0</span></div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="filter-row">
+      <div class="search-container">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="searchInput" class="search-input"
+               placeholder="Search by tag, text, filename, query, or markup..."
+               oninput="applyFilters()"/>
+      </div>
+      <select id="filterDocType" class="filter-select" onchange="applyFilters()">
+        <option value="">All types (Books/Journals…)</option>
+      </select>
+      <select id="filterClient" class="filter-select" onchange="applyFilters()">
+        <option value="">All clients</option>
+      </select>
+      <select id="filterIdentifier" class="filter-select" onchange="applyFilters()">
+        <option value="">All identifiers</option>
+      </select>
+      <select id="filterProjectShortcode" class="filter-select" onchange="applyFilters()">
+        <option value="">All project-shortcodes</option>
+      </select>
+      <select id="filterElementKind" class="filter-select" onchange="applyFilters()">
+        <option value="">All tags</option>
+      </select>
+      <select id="filterQuery" class="filter-select" onchange="applyFilters()">
+        <option value="">All selectors</option>
+      </select>
+      <div class="button-group">
+        <button class="action-btn" onclick="toggleAll(true)">Expand all</button>
+        <button class="action-btn" onclick="toggleAll(false)">Collapse all</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="resultsList" class="no-results">Loading report data…</div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+<script>window.__EE_CFG__ = {cfg_json};</script>
+<script src="index.js"></script>
+<script>
+window.__EE_LOADED__ = window.__EE_LOADED__ || {{}};
+window.__EE_EXPANDED__ = window.__EE_EXPANDED__ || {{}};
+
+function cfg() {{ return window.__EE_CFG__ || {{ show_outer_xml: true, show_inner_text: true }}; }}
+function reportData() {{ return window.__EE_INDEX__ || window.__EE_REPORT__ || null; }}
+function esc(s) {{
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}}
+function matchCount(item) {{
+  if (item.match_count != null) return item.match_count;
+  return (item.matches || []).length;
+}}
+function filterHints(item) {{
+  return item.filter_hints || {{ kinds: [], under_comment: false, doi_org_href: false, doi_org_text: false }};
+}}
+function pathUri(p) {{
+  if (!p) return '';
+  const s = String(p).replace(/\\\\/g, '/');
+  if (/^[A-Za-z]:/.test(s)) return 'file:///' + s;
+  if (s.startsWith('/')) return 'file://' + s;
+  return '';
+}}
+function metaLineFor(item) {{
+  const bits = [];
+  if (item.doc_type) bits.push(item.doc_type);
+  if (item.client) bits.push(item.client);
+  if (item.identifier) bits.push(item.identifier);
+  if (item.project_shortcode) bits.push(item.project_shortcode);
+  if (item.path) bits.push(item.path);
+  return bits.join(' · ');
+}}
+
+function renderAttrTable(attrs) {{
+  if (!attrs || typeof attrs !== 'object') return '';
+  const keys = Object.keys(attrs);
+  if (!keys.length) return '';
+  let rows = '';
+  keys.forEach(k => {{
+    rows += '<tr><td class="attr-name">' + esc(k) + '</td><td class="attr-val">' + esc(attrs[k]) + '</td></tr>';
+  }});
+  return '<div class="attr-section"><span class="section-lbl">Attributes:</span>' +
+    '<table class="attr-table"><thead><tr><th>Attribute Name</th><th>Value</th></tr></thead><tbody>' +
+    rows + '</tbody></table></div>';
+}}
+
+function renderMatchesHtml(matches) {{
+  const c = cfg();
+  let matchHtml = '';
+  (matches || []).forEach((m, mi) => {{
+    const tag = m.tag || m.element_kind || m.kind || '';
+    const qv = m.query_val || '';
+    const text = m.text || '';
+    const outer = m.html || '';
+    let body = renderAttrTable(m.attributes || {{}});
+    if (c.show_inner_text && text) {{
+      body += '<div class="text-section"><span class="section-lbl">Inner Text Content:</span>' +
+        '<div class="text-box">' + esc(text) + '</div></div>';
+    }}
+    if (c.show_outer_xml) {{
+      body += '<div class="code-section"><span class="section-lbl">Outer HTML/XML Markup:</span>' +
+        '<div class="code-wrapper"><pre><code>' + esc(outer) + '</code></pre></div></div>';
+    }}
+    matchHtml += '<div class="match-item" data-tag="' + esc(tag) + '" data-text="' + esc(text) +
+      '" data-query="' + esc(qv) + '">' +
+      '<div class="match-header"><div class="match-meta">' +
+      '<span class="match-number">#' + (mi+1) + '</span>' +
+      (qv ? '<span class="match-badge">' + esc(qv) + '</span>' : '') +
+      '<span class="match-tag-badge">' + esc(tag) + '</span>' +
+      '<span class="match-badge">Line ' + esc(m.line) + '</span>' +
+      '</div><button class="copy-btn" onclick="copySnippet(this)">Copy Markup</button></div>' +
+      body + '</div>';
+  }});
+  return matchHtml;
+}}
+
+function fillCardMatches(card, doc) {{
+  const list = card.querySelector('.matches-list');
+  if (!list) return;
+  const matches = (doc && doc.matches) || [];
+  list.innerHTML = renderMatchesHtml(matches);
+  const badge = card.querySelector('.file-badge.badge-success');
+  if (badge) badge.textContent = matches.length + ' Match(es)';
+  card.setAttribute('data-loaded', '1');
+}}
+
+function loadDoc(docKey, resultRef, onDone) {{
+  window.__EE_DOC__ = window.__EE_DOC__ || {{}};
+  window.__EE_LOADED__ = window.__EE_LOADED__ || {{}};
+  if (window.__EE_LOADED__[docKey]) {{
+    window.__EE_DOC__[docKey] = window.__EE_LOADED__[docKey];
+    if (onDone) onDone(window.__EE_LOADED__[docKey]);
+    return;
+  }}
+  if (window.__EE_DOC__[docKey]) {{
+    window.__EE_LOADED__[docKey] = window.__EE_DOC__[docKey];
+    if (onDone) onDone(window.__EE_DOC__[docKey]);
+    return;
+  }}
+  if (!resultRef) {{
+    if (onDone) onDone(null);
+    return;
+  }}
+  const s = document.createElement('script');
+  s.src = resultRef + (resultRef.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+  s.onload = function() {{
+    const doc = window.__EE_DOC__ && window.__EE_DOC__[docKey];
+    if (doc) window.__EE_LOADED__[docKey] = doc;
+    if (onDone) onDone(doc || null);
+  }};
+  s.onerror = function() {{ if (onDone) onDone(null); }};
+  document.body.appendChild(s);
+}}
+
+function renderReport() {{
+  const d = reportData();
+  if (!d) {{
+    document.getElementById('resultsList').innerHTML = '<div class="no-results">No data</div>';
+    return;
+  }}
+  const files = d.files || [];
+  const visible = files.filter(f => !f.ok || matchCount(f) > 0);
+  const hits = visible.filter(f => f.ok && matchCount(f) > 0);
+  const buckets = hits.reduce((n, f) => n + matchCount(f), 0);
+  const stats = d.stats || {{}};
+  document.getElementById('targetName').textContent = (d.source_path || '').split(/[/\\\\]/).pop() || '';
+  document.getElementById('runStatus').textContent = d.status ? '(' + d.status + ')' : '';
+  document.getElementById('generatedAt').textContent = 'Generated: ' + (d.generated || '');
+  document.getElementById('statScanned').textContent = stats.files_total || stats.files_scanned || files.length;
+  document.getElementById('statHits').textContent = stats.files_with_hits != null ? stats.files_with_hits : hits.length;
+  document.getElementById('statBuckets').textContent = stats.bucket_rows != null ? stats.bucket_rows : buckets;
+  const ql = document.getElementById('queryLabel');
+  if (ql && !(ql.textContent || '').trim()) {{
+    ql.textContent = (cfg().query_label || '');
+  }}
+
+  const docTypes = [...new Set(visible.map(f => f.doc_type).filter(Boolean))].sort();
+  const clients = [...new Set(visible.map(f => f.client).filter(Boolean))].sort();
+  const identifiers = [...new Set(visible.map(f => f.identifier).filter(Boolean))].sort();
+  const shortcodes = [...new Set(visible.map(f => f.project_shortcode).filter(Boolean))].sort();
+  const kinds = [...new Set(visible.flatMap(f => (filterHints(f).kinds || [])).filter(Boolean))].sort();
+  const queries = [...new Set(visible.flatMap(f => (filterHints(f).queries || [])).filter(Boolean))].sort();
+
+  function fillSelect(id, values, allLabel) {{
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = '<option value="">' + allLabel + '</option>' +
+      values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+    if (values.indexOf(cur) >= 0) el.value = cur;
+  }}
+  fillSelect('filterDocType', docTypes, 'All types (Books/Journals…)');
+  fillSelect('filterClient', clients, 'All clients');
+  fillSelect('filterIdentifier', identifiers, 'All identifiers');
+  fillSelect('filterProjectShortcode', shortcodes, 'All project-shortcodes');
+  fillSelect('filterElementKind', kinds, 'All tags');
+  fillSelect('filterQuery', queries, 'All selectors');
+
+  let html = '';
+  if (!visible.length) {{
+    html = '<div class="no-results">No matching files yet' +
+      (d.status === 'running' ? ' (scan in progress…)' : '') + '</div>';
+  }}
+  visible.forEach((item, idx) => {{
+    const name = item.name || (item.path || '').split(/[/\\\\]/).pop() || 'file';
+    const fileId = 'file-' + idx;
+    const docKey = item.doc_key || item.id || String(idx);
+    const metaLine = metaLineFor(item);
+    const uri = pathUri(item.path);
+    if (!item.ok) {{
+      const expanded = !!window.__EE_EXPANDED__[docKey];
+      html += '<div class="file-card error-card" data-filename="' + esc(name) +
+        '" data-doc-type="' + esc(item.doc_type||'') + '" data-client="' + esc(item.client||'') +
+        '" data-identifier="' + esc(item.identifier||'') +
+        '" data-project-shortcode="' + esc(item.project_shortcode||'') +
+        '" data-doc-key="' + esc(docKey) + '" data-loaded="1">' +
+        '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-header-main"><div class="file-title">' +
+        '<span class="toggle-icon">' + (expanded ? '▾' : '▸') + '</span><span class="file-badge badge-error">Error</span><strong>' +
+        esc(name) + '</strong></div><div class="file-actions">' +
+        (uri ? '<a class="file-action-btn" href="' + esc(uri) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>' : '') +
+        '<button class="file-action-btn" onclick=\\'copyFilePath(' + JSON.stringify(item.path||'') + ', this, event)\\'>Copy Path</button></div></div>' +
+        '<div class="file-metadata">' + esc(metaLine) + '</div></div>' +
+        '<div id="' + fileId + '" class="file-content" style="display:' + (expanded ? 'block' : 'none') + ';"><div class="error-box"><strong>Parsing Failed:</strong> ' +
+        esc(item.error||'') + '</div></div></div>';
+      return;
+    }}
+    const count = matchCount(item);
+    const hints = filterHints(item);
+    const kindsAttr = (hints.kinds || []).join(',');
+    const queriesAttr = (hints.queries || []).join('|');
+    const resultRef = item.result_ref || '';
+    const loadedDoc = window.__EE_LOADED__[docKey] || (window.__EE_DOC__ && window.__EE_DOC__[docKey]) || null;
+    const isLoaded = !!loadedDoc;
+    if (loadedDoc) window.__EE_LOADED__[docKey] = loadedDoc;
+    const expanded = !!window.__EE_EXPANDED__[docKey];
+    const matchHtml = isLoaded ? renderMatchesHtml(loadedDoc.matches || []) : '';
+    html += '<div class="file-card" data-filename="' + esc(name) + '" data-doc-type="' + esc(item.doc_type||'') +
+      '" data-client="' + esc(item.client||'') + '" data-identifier="' + esc(item.identifier||'') +
+      '" data-project-shortcode="' + esc(item.project_shortcode||'') +
+      '" data-doc-key="' + esc(docKey) + '" data-result-ref="' + esc(resultRef) +
+      '" data-loaded="' + (isLoaded ? '1' : '0') + '" data-kinds="' + esc(kindsAttr) +
+      '" data-queries="' + esc(queriesAttr) + '">' +
+      '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-header-main"><div class="file-title">' +
+      '<span class="toggle-icon">' + (expanded ? '▾' : '▸') + '</span><span class="file-badge badge-success">' + count + ' Match(es)</span><strong>' +
+      esc(name) + '</strong></div><div class="file-actions">' +
+      (uri ? '<a class="file-action-btn" href="' + esc(uri) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open HTML</a>' : '') +
+      '<button class="file-action-btn" onclick=\\'copyFilePath(' + JSON.stringify(item.path||'') + ', this, event)\\'>Copy Path</button></div></div>' +
+      '<div class="file-metadata">' + esc(metaLine) + '</div></div>' +
+      '<div id="' + fileId + '" class="file-content" style="display:' + (expanded ? 'block' : 'none') + ';"><div class="matches-list">' + matchHtml + '</div></div></div>';
+  }});
+  document.getElementById('resultsList').innerHTML = html;
+  applyFilters();
+}}
+
+function toggleCard(id) {{
+  const content = document.getElementById(id);
+  if (!content) return;
+  const card = content.parentElement;
+  const icon = card.querySelector('.toggle-icon');
+  const docKey = card.getAttribute('data-doc-key') || '';
+  const expanding = content.style.display === 'none';
+  if (!expanding) {{
+    content.style.display = 'none';
+    if (icon) icon.textContent = '▸';
+    if (docKey) delete window.__EE_EXPANDED__[docKey];
+    return;
+  }}
+  const ensureShow = function() {{
+    content.style.display = 'block';
+    if (icon) icon.textContent = '▾';
+    if (docKey) window.__EE_EXPANDED__[docKey] = true;
+    applyFilters();
+  }};
+  if (card.classList.contains('error-card') || card.getAttribute('data-loaded') === '1') {{
+    ensureShow();
+    return;
+  }}
+  const resultRef = card.getAttribute('data-result-ref') || '';
+  loadDoc(docKey, resultRef, function(doc) {{
+    if (doc) fillCardMatches(card, doc);
+    ensureShow();
+  }});
+}}
+
+function toggleAll(expand) {{
+  const cards = Array.from(document.querySelectorAll('.file-card')).filter(c => c.style.display !== 'none');
+  if (!expand) {{
+    cards.forEach(card => {{
+      const content = card.querySelector('.file-content');
+      const icon = card.querySelector('.toggle-icon');
+      const docKey = card.getAttribute('data-doc-key') || '';
+      if (content) content.style.display = 'none';
+      if (icon) icon.textContent = '▸';
+      if (docKey) delete window.__EE_EXPANDED__[docKey];
+    }});
+    return;
+  }}
+  cards.forEach(card => {{
+    const content = card.querySelector('.file-content');
+    const icon = card.querySelector('.toggle-icon');
+    const docKey = card.getAttribute('data-doc-key') || '';
+    const show = function() {{
+      if (content) content.style.display = 'block';
+      if (icon) icon.textContent = '▾';
+      if (docKey) window.__EE_EXPANDED__[docKey] = true;
+    }};
+    if (card.classList.contains('error-card') || card.getAttribute('data-loaded') === '1') {{
+      show();
+      return;
+    }}
+    loadDoc(docKey, card.getAttribute('data-result-ref') || '', function(doc) {{
+      if (doc) fillCardMatches(card, doc);
+      show();
+      applyFilters();
+    }});
+  }});
+}}
+
+function copySnippet(btn) {{
+  const matchItem = btn.closest('.match-item');
+  const codeEl = matchItem && matchItem.querySelector('.code-wrapper code');
+  if (!codeEl) return;
+  navigator.clipboard.writeText(codeEl.textContent).then(() => {{
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    showToast('Markup copied to clipboard!');
+    setTimeout(() => {{ btn.textContent = 'Copy Markup'; btn.classList.remove('copied'); }}, 2000);
+  }}).catch(() => showToast('Failed to copy markup.'));
+}}
+
+function copyFilePath(filePath, btn, event) {{
+  if (event) event.stopPropagation();
+  navigator.clipboard.writeText(filePath).then(() => {{
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    showToast('File path copied to clipboard!');
+    setTimeout(() => {{ btn.textContent = original; btn.classList.remove('copied'); }}, 2000);
+  }}).catch(() => showToast('Failed to copy file path.'));
+}}
+
+function showToast(msg) {{
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}}
+
+function applyFilters() {{
+  const searchVal = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const docType = document.getElementById('filterDocType').value;
+  const client = document.getElementById('filterClient').value;
+  const identifier = document.getElementById('filterIdentifier').value;
+  const projectShortcode = document.getElementById('filterProjectShortcode').value;
+  const elementKind = document.getElementById('filterElementKind').value;
+  const queryFilter = (document.getElementById('filterQuery') || {{ value: '' }}).value;
+
+  document.querySelectorAll('.file-card').forEach(card => {{
+    if (docType && card.getAttribute('data-doc-type') !== docType) {{
+      card.style.display = 'none'; return;
+    }}
+    if (client && card.getAttribute('data-client') !== client) {{
+      card.style.display = 'none'; return;
+    }}
+    if (identifier && card.getAttribute('data-identifier') !== identifier) {{
+      card.style.display = 'none'; return;
+    }}
+    if (projectShortcode && card.getAttribute('data-project-shortcode') !== projectShortcode) {{
+      card.style.display = 'none'; return;
+    }}
+
+    const filename = (card.getAttribute('data-filename') || '').toLowerCase();
+    if (card.classList.contains('error-card')) {{
+      card.style.display = (!searchVal || filename.includes(searchVal)) ? 'block' : 'none';
+      return;
+    }}
+
+    if (card.getAttribute('data-loaded') !== '1') {{
+      const kinds = (card.getAttribute('data-kinds') || '').split(',').map(s => s.trim()).filter(Boolean);
+      const queries = (card.getAttribute('data-queries') || '').split('|').map(s => s.trim()).filter(Boolean);
+      const kindOk = !elementKind || kinds.indexOf(elementKind) >= 0;
+      const queryOk = !queryFilter || queries.indexOf(queryFilter) >= 0;
+      const searchOk = !searchVal || filename.includes(searchVal)
+        || kinds.some(k => k.toLowerCase().includes(searchVal))
+        || queries.some(q => q.toLowerCase().includes(searchVal));
+      card.style.display = (kindOk && queryOk && searchOk) ? 'block' : 'none';
+      return;
+    }}
+
+    let fileVisible = false;
+    card.querySelectorAll('.match-item').forEach(item => {{
+      const tag = (item.getAttribute('data-tag') || '').toLowerCase();
+      const text = (item.getAttribute('data-text') || '').toLowerCase();
+      const qv = (item.getAttribute('data-query') || '').toLowerCase();
+      const codeEl = item.querySelector('.code-wrapper code');
+      const code = codeEl ? codeEl.textContent.toLowerCase() : '';
+      const searchOk = !searchVal || tag.includes(searchVal) || text.includes(searchVal)
+        || code.includes(searchVal) || filename.includes(searchVal) || qv.includes(searchVal);
+      const kindOk = !elementKind || item.getAttribute('data-tag') === elementKind;
+      const queryOk = !queryFilter || item.getAttribute('data-query') === queryFilter;
+      const isMatch = searchOk && kindOk && queryOk;
+      item.style.display = isMatch ? 'block' : 'none';
+      if (isMatch) fileVisible = true;
+    }});
+    card.style.display = fileVisible ? 'block' : 'none';
+  }});
+}}
+
+renderReport();
+setInterval(function() {{
+  const d = reportData();
+  if (!d || d.status !== 'running') return;
+  const s = document.createElement('script');
+  s.src = 'index.js?t=' + Date.now();
+  s.onload = function() {{ renderReport(); }};
+  document.body.appendChild(s);
+}}, 1500);
+</script>
+</body>
+</html>
+"""
+
+
+
+
+def _common_shell_css() -> str:
+    return """
+:root {
+  --bg-main:#0b0f19; --bg-card:#111827; --bg-code:#030712; --bg-input:#1f2937;
+  --border:#374151; --text:#f3f4f6; --muted:#9ca3af; --primary:#6366f1;
+  --success:#10b981; --error:#ef4444; --tag:#38bdf8; --warn:#f59e0b;
+}
+* { box-sizing:border-box; }
+body { margin:0; font-family:Segoe UI,sans-serif; background:var(--bg-main); color:var(--text); }
+.container { max-width:1200px; margin:0 auto; padding:24px; }
+header { display:flex; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+.stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:14px; }
+.stat-card .lbl { display:block; color:var(--muted); font-size:0.8rem; }
+.stat-card .val { font-size:1.35rem; font-weight:700; color:var(--primary); }
+.controls-panel, .selector-card, .file-card, .pattern-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; margin-bottom:14px; overflow:hidden;
+}
+.controls-panel { padding:12px 16px; }
+.filter-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.search-input, .filter-select {
+  background:var(--bg-input); color:var(--text); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px;
+}
+.search-input { flex:1; min-width:220px; }
+.action-btn, .file-action-btn, .copy-btn {
+  background:rgba(99,102,241,0.15); color:var(--text); border:1px solid var(--primary);
+  border-radius:6px; padding:8px 12px; cursor:pointer; font-size:0.85rem;
+}
+.file-header, .selector-header, .pattern-header { padding:14px 16px; cursor:pointer; }
+.file-title, .selector-title { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.file-metadata, .query-label, .status-pill { color:var(--muted); font-size:0.85rem; }
+.file-badge, .match-badge, .match-tag-badge {
+  font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; background:rgba(99,102,241,0.2);
+}
+.badge-success { background:rgba(16,185,129,0.2); color:var(--success); }
+.badge-error { background:rgba(239,68,68,0.2); color:var(--error); }
+.file-content, .selector-content, .pattern-content { padding:0 16px 16px; }
+.match-item, .hit-row {
+  border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:10px; background:#0f172a;
+}
+.section-lbl { display:block; color:var(--muted); font-size:0.75rem; margin:8px 0 4px; }
+.text-box, .code-wrapper {
+  background:var(--bg-code); border:1px solid var(--border); border-radius:6px; padding:10px; overflow:auto;
+}
+.code-wrapper pre { margin:0; white-space:pre-wrap; word-break:break-word; color:#cbd5e1; font-size:0.8rem; }
+.no-results { color:var(--muted); padding:24px; text-align:center; }
+table.file-table, table.rollup-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+table.file-table th, table.file-table td, table.rollup-table th, table.rollup-table td {
+  border:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top;
+}
+table.file-table th, table.rollup-table th { color:var(--muted); background:#0b1220; }
+.toast {
+  position:fixed; bottom:24px; right:24px; background:var(--bg-card); border:1px solid var(--primary);
+  color:var(--text); padding:12px 20px; border-radius:8px; opacity:0; transform:translateY(40px);
+  transition:all .25s ease; z-index:1000;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+"""
+
+
+def _common_shell_js_helpers() -> str:
+    return r"""
+window.__EE_DOC__ = window.__EE_DOC__ || {};
+window.__EE_LOADED__ = window.__EE_LOADED__ || {};
+window.__EE_EXPANDED__ = window.__EE_EXPANDED__ || {};
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function reportData() { return window.__EE_INDEX__ || window.__EE_REPORT__ || null; }
+function matchCount(item) {
+  if (item.match_count != null) return item.match_count;
+  return (item.matches || []).length;
+}
+function pathUri(p) {
+  if (!p) return '';
+  const s = String(p).replace(/\\/g, '/');
+  if (/^[A-Za-z]:/.test(s)) return 'file:///' + s;
+  if (s.startsWith('/')) return 'file://' + s;
+  return '';
+}
+function loadDoc(docKey, resultRef, onDone) {
+  window.__EE_DOC__ = window.__EE_DOC__ || {};
+  window.__EE_LOADED__ = window.__EE_LOADED__ || {};
+  if (window.__EE_LOADED__[docKey]) { if (onDone) onDone(window.__EE_LOADED__[docKey]); return; }
+  if (window.__EE_DOC__[docKey]) {
+    window.__EE_LOADED__[docKey] = window.__EE_DOC__[docKey];
+    if (onDone) onDone(window.__EE_DOC__[docKey]); return;
+  }
+  if (!resultRef) { if (onDone) onDone(null); return; }
+  const s = document.createElement('script');
+  s.src = resultRef + (resultRef.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+  s.onload = function() {
+    const doc = window.__EE_DOC__ && window.__EE_DOC__[docKey];
+    if (doc) window.__EE_LOADED__[docKey] = doc;
+    if (onDone) onDone(doc || null);
+  };
+  s.onerror = function() { if (onDone) onDone(null); };
+  document.body.appendChild(s);
+}
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+function copyText(text, btn, label) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original || label || 'Copy'; }, 2000);
+    }
+    showToast('Copied to clipboard!');
+  }).catch(() => showToast('Copy failed.'));
+}
+function pollIndexWhileRunning(renderFn) {
+  setInterval(function() {
+    const d = reportData();
+    if (!d || d.status !== 'running') return;
+    const s = document.createElement('script');
+    s.src = (window.__EE_INDEX_SRC__ || 'index.js') + '?t=' + Date.now();
+    s.onload = function() { renderFn(); };
+    document.body.appendChild(s);
+  }, 1500);
+}
+"""
+
+
+def summary_shell_html(title: str, *, query_label: str = "", index_src: str = "index.js") -> str:
+    """Thin summary shell; reads extract index.js + lazy by_docid (no giant match HTML)."""
+    safe_title = html_lib.escape(title)
+    safe_query = html_lib.escape(query_label or "")
+    safe_index = html_lib.escape(index_src or "index.js")
+    css = _common_shell_css()
+    helpers = _common_shell_js_helpers()
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{safe_title}</title>
+<style>{css}
+.selector-card .card-body {{ display:flex; gap:24px; flex-wrap:wrap; padding:0 16px 16px; }}
+.card-stat .stat-value {{ font-size:1.5rem; font-weight:700; color:var(--primary); }}
+.card-stat .stat-value.highlight {{ color:var(--success); }}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Element Extraction Summary</h1>
+      <p>Target: <strong id="targetName"></strong> <span class="status-pill" id="runStatus"></span></p>
+      <p class="query-label">{safe_query}</p>
+    </div>
+    <div style="color:var(--muted)" id="generatedAt"></div>
+  </header>
+  <div class="stats-grid">
+    <div class="stat-card"><span class="lbl">Selectors</span><span class="val" id="statSelectors">0</span></div>
+    <div class="stat-card"><span class="lbl">Files with hits</span><span class="val" id="statHits">0</span></div>
+    <div class="stat-card"><span class="lbl">Matches</span><span class="val" id="statBuckets">0</span></div>
+  </div>
+  <div class="controls-panel">
+    <div class="filter-row">
+      <input id="searchInput" class="search-input" placeholder="Filter selectors or filenames..." oninput="renderSummary()"/>
+      <button class="action-btn" onclick="toggleAllSelectors(true)">Expand all</button>
+      <button class="action-btn" onclick="toggleAllSelectors(false)">Collapse all</button>
+    </div>
+  </div>
+  <div id="resultsList" class="no-results">Loading summary…</div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+<script>window.__EE_INDEX_SRC__ = {json.dumps(index_src or "index.js")};</script>
+<script src="{safe_index}"></script>
+<script>
+{helpers}
+function buildSelectorStats(files) {{
+  const map = {{}};
+  (files || []).forEach(f => {{
+    const hints = f.filter_hints || {{}};
+    const queries = hints.queries || [];
+    const count = matchCount(f);
+    if (!f.ok) return;
+    if (!queries.length && count > 0) {{
+      const q = '(unknown)';
+      map[q] = map[q] || {{ query: q, files: 0, matches: 0, fileIds: [] }};
+      map[q].files += 1; map[q].matches += count; map[q].fileIds.push(f);
+      return;
+    }}
+    const seen = {{}};
+    queries.forEach(q => {{
+      if (seen[q]) return; seen[q] = true;
+      map[q] = map[q] || {{ query: q, files: 0, matches: 0, fileIds: [] }};
+      map[q].files += 1;
+      map[q].fileIds.push(f);
+    }});
+  }});
+  // Approximate per-query match counts from slim index only when query_breakdown present
+  Object.keys(map).forEach(q => {{
+    let m = 0;
+    map[q].fileIds.forEach(f => {{
+      const br = f.query_breakdown || {{}};
+      if (br[q] != null) m += br[q];
+      else if ((f.filter_hints || {{}}).queries && (f.filter_hints.queries.length === 1)) m += matchCount(f);
+    }});
+    map[q].matches = m || map[q].matches;
+  }});
+  return Object.values(map).sort((a,b) => a.query.localeCompare(b.query));
+}}
+
+function renderFileTable(selId, files, query) {{
+  const body = document.getElementById(selId + '-body');
+  if (!body) return;
+  let rows = '';
+  files.forEach(item => {{
+    const name = item.name || (item.path || '').split(/[/\\\\]/).pop() || '';
+    const docKey = item.doc_key || item.id || name;
+    const resultRef = item.result_ref || '';
+    const loaded = window.__EE_LOADED__[docKey];
+    let lines = (item.lines_preview || []).join(', ');
+    let count = matchCount(item);
+    if (loaded && loaded.matches) {{
+      const qm = loaded.matches.filter(m => !query || m.query_val === query);
+      count = qm.length;
+      lines = qm.map(m => m.line).filter(v => v != null && v !== '').slice(0, 10).join(', ');
+      if (qm.length > 10) lines += ', …';
+    }} else if (!lines) {{
+      lines = '(expand to load lines)';
+    }}
+    rows += '<tr data-doc-key="' + esc(docKey) + '" data-result-ref="' + esc(resultRef) + '">' +
+      '<td>' + esc(item.path || '') + '</td><td>' + esc(name) + '</td><td>' + count + '</td><td>' + esc(lines) + '</td></tr>';
+  }});
+  if (!rows) rows = '<tr><td colspan="4" class="no-results">No files for this selector.</td></tr>';
+  body.innerHTML = '<table class="file-table"><thead><tr><th>File Path</th><th>File Name</th><th>Instances</th><th>Line(s)</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}}
+
+function ensureSelectorRows(selId, files, query) {{
+  const need = files.filter(f => !window.__EE_LOADED__[f.doc_key || f.id]);
+  if (!need.length) {{ renderFileTable(selId, files, query); return; }}
+  let pending = need.length;
+  need.forEach(f => {{
+    loadDoc(f.doc_key || f.id, f.result_ref || '', function() {{
+      pending -= 1;
+      if (pending <= 0) renderFileTable(selId, files, query);
+    }});
+  }});
+  renderFileTable(selId, files, query);
+}}
+
+function renderSummary() {{
+  const d = reportData();
+  const list = document.getElementById('resultsList');
+  if (!d) {{ list.innerHTML = '<div class="no-results">No data</div>'; return; }}
+  const files = (d.files || []).filter(f => !f.ok || matchCount(f) > 0);
+  const stats = d.stats || {{}};
+  document.getElementById('targetName').textContent = (d.source_path || '').split(/[/\\\\]/).pop() || '';
+  document.getElementById('runStatus').textContent = d.status ? '(' + d.status + ')' : '';
+  document.getElementById('generatedAt').textContent = 'Generated: ' + (d.generated || '');
+  const selectors = buildSelectorStats(files);
+  document.getElementById('statSelectors').textContent = stats.selector_count != null ? stats.selector_count : selectors.length;
+  document.getElementById('statHits').textContent = stats.files_with_hits != null ? stats.files_with_hits : files.filter(f => f.ok).length;
+  document.getElementById('statBuckets').textContent = stats.bucket_rows != null ? stats.bucket_rows : files.reduce((n,f) => n + matchCount(f), 0);
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  let html = '';
+  selectors.forEach((sel, idx) => {{
+    if (q && !sel.query.toLowerCase().includes(q) && !sel.fileIds.some(f => (f.name||'').toLowerCase().includes(q))) return;
+    const sid = 'sel-' + idx;
+    const expanded = !!window.__EE_EXPANDED__[sid];
+    html += '<div class="selector-card" data-sel-id="' + sid + '">' +
+      '<div class="selector-header" onclick="toggleSelector(\\'' + sid + '\\')"><div class="selector-title">' +
+      '<span class="toggle-icon">' + (expanded ? '▾' : '▸') + '</span><strong>' + esc(sel.query) + '</strong>' +
+      '<span class="file-badge badge-success">' + sel.files + ' file(s)</span>' +
+      '<span class="match-badge">' + sel.matches + ' instance(s)</span></div></div>' +
+      '<div id="' + sid + '" class="selector-content" style="display:' + (expanded ? 'block' : 'none') + '">' +
+      '<div id="' + sid + '-body"></div></div></div>';
+  }});
+  list.innerHTML = html || '<div class="no-results">No selector hits yet' + (d.status === 'running' ? ' (scan in progress…)' : '') + '</div>';
+  selectors.forEach((sel, idx) => {{
+    const sid = 'sel-' + idx;
+    if (window.__EE_EXPANDED__[sid]) ensureSelectorRows(sid, sel.fileIds, sel.query);
+  }});
+}}
+function toggleSelector(sid) {{
+  const el = document.getElementById(sid);
+  if (!el) return;
+  const card = el.parentElement;
+  const icon = card.querySelector('.toggle-icon');
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if (icon) icon.textContent = open ? '▾' : '▸';
+  if (open) {{
+    window.__EE_EXPANDED__[sid] = true;
+    const d = reportData();
+    const files = (d.files || []).filter(f => !f.ok || matchCount(f) > 0);
+    const selectors = buildSelectorStats(files);
+    const idx = parseInt(sid.split('-')[1], 10);
+    const sel = selectors[idx];
+    if (sel) ensureSelectorRows(sid, sel.fileIds, sel.query);
+  }} else {{
+    delete window.__EE_EXPANDED__[sid];
+  }}
+}}
+function toggleAllSelectors(expand) {{
+  document.querySelectorAll('.selector-card').forEach(card => {{
+    const sid = card.getAttribute('data-sel-id');
+    const el = document.getElementById(sid);
+    const icon = card.querySelector('.toggle-icon');
+    if (!el) return;
+    el.style.display = expand ? 'block' : 'none';
+    if (icon) icon.textContent = expand ? '▾' : '▸';
+    if (expand) {{
+      window.__EE_EXPANDED__[sid] = true;
+      toggleSelector(sid); // ensure load
+      window.__EE_EXPANDED__[sid] = true;
+      el.style.display = 'block';
+      if (icon) icon.textContent = '▾';
+    }} else delete window.__EE_EXPANDED__[sid];
+  }});
+}}
+renderSummary();
+pollIndexWhileRunning(renderSummary);
+</script>
+</body>
+</html>
+"""
+
+
+def citation_type_shell_html(title: str, **kwargs) -> str:
+    safe_title = html_lib.escape(title)
+    cite_label = html_lib.escape(str(kwargs.get("cite_label") or kwargs.get("query_label") or ""))
+    css = _common_shell_css()
+    helpers = _common_shell_js_helpers()
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{safe_title}</title>
+<style>{css}</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Citation Type Report</h1>
+      <p>Target: <strong id="targetName"></strong> <span class="status-pill" id="runStatus"></span></p>
+      <p class="query-label">{cite_label}</p>
+    </div>
+    <div style="color:var(--muted)" id="generatedAt"></div>
+  </header>
+  <div class="stats-grid">
+    <div class="stat-card"><span class="lbl">Files with hits</span><span class="val" id="statHits">0</span></div>
+    <div class="stat-card"><span class="lbl">Citations</span><span class="val" id="statBuckets">0</span></div>
+  </div>
+  <div class="controls-panel"><div class="filter-row">
+    <input id="searchInput" class="search-input" placeholder="Search classification, text, filename..." oninput="applyFilters()"/>
+    <select id="filterClass" class="filter-select" onchange="applyFilters()"><option value="">All classifications</option></select>
+    <button class="action-btn" onclick="toggleAll(true)">Expand all</button>
+    <button class="action-btn" onclick="toggleAll(false)">Collapse all</button>
+  </div></div>
+  <div id="resultsList" class="no-results">Loading…</div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+<script src="index.js"></script>
+<script>
+{helpers}
+function renderMatchesHtml(matches) {{
+  let html = '';
+  (matches || []).forEach((m, mi) => {{
+    const cls = m.subcategory || m.classification || m.pattern_key || '';
+    const cite = m.cite_type || '';
+    html += '<div class="match-item" data-class="' + esc(cls) + '" data-text="' + esc(m.text||'') + '">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+      '<div><span class="match-badge">#' + (mi+1) + '</span> ' +
+      '<span class="match-tag-badge">' + esc(cls) + '</span> ' +
+      (cite ? '<span class="match-badge">type:' + esc(cite) + '</span> ' : '') +
+      '<span class="match-badge">Line ' + esc(m.line) + '</span></div>' +
+      '<button class="copy-btn" onclick="copyText(this.closest(\\'.match-item\\').querySelector(\\'code\\').textContent, this, \\'Copy Markup\\')">Copy Markup</button></div>' +
+      '<span class="section-lbl">Text</span><div class="text-box">' + esc(m.text||'') + '</div>' +
+      '<span class="section-lbl">Snippet / Markup</span><div class="code-wrapper"><pre><code>' + esc(m.snippet || m.html || '') + '</code></pre></div></div>';
+  }});
+  return html;
+}}
+function fillCardMatches(card, doc) {{
+  const list = card.querySelector('.matches-list');
+  if (!list) return;
+  list.innerHTML = renderMatchesHtml((doc && doc.matches) || []);
+  card.setAttribute('data-loaded', '1');
+}}
+function renderReport() {{
+  const d = reportData();
+  const list = document.getElementById('resultsList');
+  if (!d) {{ list.innerHTML = '<div class="no-results">No data</div>'; return; }}
+  const files = (d.files || []).filter(f => !f.ok || matchCount(f) > 0);
+  const stats = d.stats || {{}};
+  document.getElementById('targetName').textContent = (d.source_path || '').split(/[/\\\\]/).pop() || '';
+  document.getElementById('runStatus').textContent = d.status ? '(' + d.status + ')' : '';
+  document.getElementById('generatedAt').textContent = 'Generated: ' + (d.generated || '');
+  document.getElementById('statHits').textContent = stats.files_with_hits != null ? stats.files_with_hits : files.filter(f=>f.ok).length;
+  document.getElementById('statBuckets').textContent = stats.bucket_rows != null ? stats.bucket_rows : files.reduce((n,f)=>n+matchCount(f),0);
+  const classes = [...new Set(files.flatMap(f => ((f.filter_hints||{{}}).kinds)||[]).filter(Boolean))].sort();
+  const sel = document.getElementById('filterClass');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All classifications</option>' + classes.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
+  if (classes.indexOf(cur) >= 0) sel.value = cur;
+  let html = '';
+  files.forEach((item, idx) => {{
+    const name = item.name || (item.path||'').split(/[/\\\\]/).pop() || '';
+    const fileId = 'file-' + idx;
+    const docKey = item.doc_key || item.id || String(idx);
+    const resultRef = item.result_ref || '';
+    const expanded = !!window.__EE_EXPANDED__[docKey];
+    const loaded = window.__EE_LOADED__[docKey];
+    const matchHtml = loaded ? renderMatchesHtml(loaded.matches||[]) : '';
+    const kinds = ((item.filter_hints||{{}}).kinds||[]).join(',');
+    if (!item.ok) {{
+      html += '<div class="file-card" data-filename="' + esc(name) + '" data-kinds=""><div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')">' +
+        '<div class="file-title"><span class="toggle-icon">' + (expanded?'▾':'▸') + '</span><span class="file-badge badge-error">Error</span><strong>' + esc(name) + '</strong></div></div>' +
+        '<div id="' + fileId + '" class="file-content" style="display:' + (expanded?'block':'none') + '"><div class="text-box">' + esc(item.error||'') + '</div></div></div>';
+      return;
+    }}
+    html += '<div class="file-card" data-filename="' + esc(name) + '" data-doc-key="' + esc(docKey) + '" data-result-ref="' + esc(resultRef) +
+      '" data-loaded="' + (loaded?'1':'0') + '" data-kinds="' + esc(kinds) + '">' +
+      '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-title">' +
+      '<span class="toggle-icon">' + (expanded?'▾':'▸') + '</span><span class="file-badge badge-success">' + matchCount(item) + ' Match(es)</span><strong>' + esc(name) + '</strong></div>' +
+      '<div class="file-metadata">' + esc(item.path||'') + '</div></div>' +
+      '<div id="' + fileId + '" class="file-content" style="display:' + (expanded?'block':'none') + '"><div class="matches-list">' + matchHtml + '</div></div></div>';
+  }});
+  list.innerHTML = html || '<div class="no-results">No citations yet</div>';
+  applyFilters();
+}}
+function toggleCard(id) {{
+  const content = document.getElementById(id); if (!content) return;
+  const card = content.parentElement;
+  const icon = card.querySelector('.toggle-icon');
+  const docKey = card.getAttribute('data-doc-key') || '';
+  const expanding = content.style.display === 'none';
+  if (!expanding) {{ content.style.display='none'; if(icon) icon.textContent='▸'; delete window.__EE_EXPANDED__[docKey]; return; }}
+  const show = function() {{ content.style.display='block'; if(icon) icon.textContent='▾'; if(docKey) window.__EE_EXPANDED__[docKey]=true; applyFilters(); }};
+  if (card.getAttribute('data-loaded') === '1' || !card.getAttribute('data-result-ref')) {{ show(); return; }}
+  loadDoc(docKey, card.getAttribute('data-result-ref'), function(doc) {{ if (doc) fillCardMatches(card, doc); show(); }});
+}}
+function toggleAll(expand) {{
+  document.querySelectorAll('.file-card').forEach(card => {{
+    const content = card.querySelector('.file-content');
+    if (!content || card.style.display === 'none') return;
+    if (!expand) {{ content.style.display='none'; const icon=card.querySelector('.toggle-icon'); if(icon) icon.textContent='▸'; return; }}
+    const id = content.id; toggleCard(id); content.style.display='block';
+  }});
+}}
+function applyFilters() {{
+  const q = (document.getElementById('searchInput').value||'').toLowerCase().trim();
+  const cls = document.getElementById('filterClass').value;
+  document.querySelectorAll('.file-card').forEach(card => {{
+    const name = (card.getAttribute('data-filename')||'').toLowerCase();
+    const kinds = (card.getAttribute('data-kinds')||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if (cls && kinds.indexOf(cls) < 0) {{ card.style.display='none'; return; }}
+    if (card.getAttribute('data-loaded') !== '1') {{
+      card.style.display = (!q || name.includes(q) || kinds.some(k=>k.toLowerCase().includes(q))) ? 'block' : 'none';
+      return;
+    }}
+    let vis = false;
+    card.querySelectorAll('.match-item').forEach(item => {{
+      const c = (item.getAttribute('data-class')||'').toLowerCase();
+      const t = (item.getAttribute('data-text')||'').toLowerCase();
+      const ok = (!cls || item.getAttribute('data-class') === cls) && (!q || name.includes(q) || c.includes(q) || t.includes(q));
+      item.style.display = ok ? 'block' : 'none';
+      if (ok) vis = true;
+    }});
+    card.style.display = vis ? 'block' : 'none';
+  }});
+}}
+renderReport();
+pollIndexWhileRunning(renderReport);
+</script>
+</body>
+</html>
+"""
+
+
+def entire_citation_shell_html(title: str, **kwargs) -> str:
+    safe_title = html_lib.escape(title)
+    cite_label = html_lib.escape(str(kwargs.get("cite_label") or kwargs.get("query_label") or ""))
+    css = _common_shell_css()
+    helpers = _common_shell_js_helpers()
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{safe_title}</title>
+<style>{css}</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Entire Citation Report</h1>
+      <p>Target: <strong id="targetName"></strong> <span class="status-pill" id="runStatus"></span></p>
+      <p class="query-label">{cite_label}</p>
+    </div>
+    <div style="color:var(--muted)" id="generatedAt"></div>
+  </header>
+  <div class="stats-grid">
+    <div class="stat-card"><span class="lbl">Patterns</span><span class="val" id="statHits">0</span></div>
+    <div class="stat-card"><span class="lbl">Occurrences</span><span class="val" id="statBuckets">0</span></div>
+  </div>
+  <div class="controls-panel"><div class="filter-row">
+    <input id="searchInput" class="search-input" placeholder="Search pattern keys..." oninput="renderReport()"/>
+    <button class="action-btn" onclick="toggleAll(true)">Expand all</button>
+    <button class="action-btn" onclick="toggleAll(false)">Collapse all</button>
+  </div></div>
+  <div id="resultsList" class="no-results">Loading…</div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+<script src="index.js"></script>
+<script>
+{helpers}
+function renderExample(doc) {{
+  const m = ((doc && doc.matches) || [])[0] || {{}};
+  return '<span class="section-lbl">Example Entire Citation</span><div class="code-wrapper"><pre><code>' +
+    esc(m.entire_citation || m.html || m.snippet || '') + '</code></pre></div>' +
+    '<button class="copy-btn" style="margin-top:8px" onclick="copyText(this.parentElement.querySelector(\\'code\\').textContent, this)">Copy Example</button>';
+}}
+function renderReport() {{
+  const d = reportData();
+  const list = document.getElementById('resultsList');
+  if (!d) {{ list.innerHTML = '<div class="no-results">No data</div>'; return; }}
+  const files = d.files || [];
+  const stats = d.stats || {{}};
+  document.getElementById('targetName').textContent = (d.source_path || '').split(/[/\\\\]/).pop() || '';
+  document.getElementById('runStatus').textContent = d.status ? '(' + d.status + ')' : '';
+  document.getElementById('generatedAt').textContent = 'Generated: ' + (d.generated || '');
+  document.getElementById('statHits').textContent = stats.pattern_count != null ? stats.pattern_count : files.length;
+  document.getElementById('statBuckets').textContent = stats.bucket_rows != null ? stats.bucket_rows : files.reduce((n,f)=>n+(f.pattern_count||matchCount(f)||0),0);
+  const q = (document.getElementById('searchInput').value||'').toLowerCase().trim();
+  let html = '';
+  files.forEach((item, idx) => {{
+    const name = item.pattern_key || item.name || item.id || ('pattern-' + idx);
+    if (q && !String(name).toLowerCase().includes(q)) return;
+    const docKey = item.doc_key || item.id || String(idx);
+    const pid = 'pat-' + idx;
+    const expanded = !!window.__EE_EXPANDED__[docKey];
+    const loaded = window.__EE_LOADED__[docKey];
+    const count = item.pattern_count != null ? item.pattern_count : matchCount(item);
+    html += '<div class="pattern-card" data-doc-key="' + esc(docKey) + '" data-result-ref="' + esc(item.result_ref||'') + '" data-loaded="' + (loaded?'1':'0') + '">' +
+      '<div class="pattern-header" onclick="togglePat(\\'' + pid + '\\')"><div class="file-title">' +
+      '<span class="toggle-icon">' + (expanded?'▾':'▸') + '</span><strong>' + esc(name) + '</strong>' +
+      '<span class="file-badge badge-success">count: ' + count + '</span>' +
+      (item.cite_type ? '<span class="match-badge">type:' + esc(item.cite_type) + '</span>' : '') +
+      '</div></div><div id="' + pid + '" class="pattern-content" style="display:' + (expanded?'block':'none') + '">' +
+      (loaded ? renderExample(loaded) : '<div class="no-results">Loading example…</div>') + '</div></div>';
+  }});
+  list.innerHTML = html || '<div class="no-results">No patterns</div>';
+}}
+function togglePat(id) {{
+  const content = document.getElementById(id); if (!content) return;
+  const card = content.parentElement;
+  const icon = card.querySelector('.toggle-icon');
+  const docKey = card.getAttribute('data-doc-key') || '';
+  const expanding = content.style.display === 'none';
+  if (!expanding) {{ content.style.display='none'; if(icon) icon.textContent='▸'; delete window.__EE_EXPANDED__[docKey]; return; }}
+  const show = function(doc) {{
+    if (doc) content.innerHTML = renderExample(doc);
+    content.style.display='block'; if(icon) icon.textContent='▾'; if(docKey) window.__EE_EXPANDED__[docKey]=true;
+  }};
+  if (card.getAttribute('data-loaded') === '1') {{ show(window.__EE_LOADED__[docKey]); return; }}
+  loadDoc(docKey, card.getAttribute('data-result-ref'), function(doc) {{
+    if (doc) {{ window.__EE_LOADED__[docKey]=doc; card.setAttribute('data-loaded','1'); }}
+    show(doc);
+  }});
+}}
+function toggleAll(expand) {{
+  document.querySelectorAll('.pattern-card').forEach(card => {{
+    const content = card.querySelector('.pattern-content');
+    if (!content) return;
+    if (expand) togglePat(content.id);
+    else {{ content.style.display='none'; const icon=card.querySelector('.toggle-icon'); if(icon) icon.textContent='▸'; }}
+  }});
+}}
+renderReport();
+pollIndexWhileRunning(renderReport);
+</script>
+</body>
+</html>
+"""
+
+
+def mixed_citation_shell_html(title: str, **kwargs) -> str:
+    safe_title = html_lib.escape(title)
+    css = _common_shell_css()
+    helpers = _common_shell_js_helpers()
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{safe_title}</title>
+<style>{css}
+.badge-comment {{ background:rgba(129,140,248,0.2); color:#a5b4fc; }}
+.badge-alpha {{ background:rgba(245,158,11,0.2); color:#fbbf24; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Mixed-citation Comment + Alpha Text</h1>
+      <p>Target: <strong id="targetName"></strong> <span class="status-pill" id="runStatus"></span></p>
+    </div>
+    <div style="color:var(--muted)" id="generatedAt"></div>
+  </header>
+  <div class="stats-grid">
+    <div class="stat-card"><span class="lbl">Files searched</span><span class="val" id="statScanned">0</span></div>
+    <div class="stat-card"><span class="lbl">Files with hits</span><span class="val" id="statHits">0</span></div>
+    <div class="stat-card"><span class="lbl">Hits</span><span class="val" id="statBuckets">0</span></div>
+  </div>
+  <h2 style="font-size:1.1rem;margin:18px 0 8px">Client rollup</h2>
+  <div id="rollupBox" class="no-results">Waiting…</div>
+  <div class="controls-panel" style="margin-top:16px"><div class="filter-row">
+    <input id="searchInput" class="search-input" placeholder="Search client, file, kind, value..." oninput="applyFilters()"/>
+    <select id="filterKind" class="filter-select" onchange="applyFilters()">
+      <option value="">All kinds</option><option value="comment">comment</option><option value="alpha_text">alpha_text</option>
+    </select>
+    <button class="action-btn" onclick="toggleAll(true)">Expand all</button>
+    <button class="action-btn" onclick="toggleAll(false)">Collapse all</button>
+  </div></div>
+  <div id="resultsList" class="no-results">Loading…</div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+<script src="index.js"></script>
+<script>
+{helpers}
+function renderHits(matches) {{
+  let html = '';
+  (matches || []).forEach((m, mi) => {{
+    const kind = m.kind || m.element_kind || '';
+    const cls = kind === 'comment' ? 'badge-comment' : 'badge-alpha';
+    html += '<div class="hit-row match-item" data-kind="' + esc(kind) + '" data-text="' + esc(m.value || m.text || '') + '">' +
+      '<span class="match-badge">#' + (mi+1) + '</span> <span class="file-badge ' + cls + '">' + esc(kind) + '</span> ' +
+      '<span class="match-badge">Line ' + esc(m.line) + '</span>' +
+      '<div class="text-box" style="margin-top:8px">' + esc(m.value || m.text || '') + '</div></div>';
+  }});
+  return html || '<div class="no-results">No hits</div>';
+}}
+function renderReport() {{
+  const d = reportData();
+  if (!d) return;
+  const files = d.files || [];
+  const stats = d.stats || {{}};
+  document.getElementById('targetName').textContent = (d.source_path || '').split(/[/\\\\]/).pop() || '';
+  document.getElementById('runStatus').textContent = d.status ? '(' + d.status + ')' : '';
+  document.getElementById('generatedAt').textContent = 'Generated: ' + (d.generated || '');
+  document.getElementById('statScanned').textContent = stats.files_total || stats.files_scanned || files.length;
+  document.getElementById('statHits').textContent = stats.files_with_hits != null ? stats.files_with_hits : files.filter(f => f.ok && matchCount(f)>0).length;
+  document.getElementById('statBuckets').textContent = stats.bucket_rows != null ? stats.bucket_rows : files.reduce((n,f)=>n+matchCount(f),0);
+  const rollup = stats.rollup || [];
+  if (rollup.length) {{
+    document.getElementById('rollupBox').innerHTML = '<table class="rollup-table"><thead><tr><th>Client</th><th>Files searched</th><th>Files with hits</th><th>Comment</th><th>Alpha</th><th>Total</th></tr></thead><tbody>' +
+      rollup.map(r => '<tr><td>' + esc(r.client) + '</td><td>' + (r.files_searched||0) + '</td><td>' + (r.files_with_hits||0) +
+        '</td><td>' + (r.comment_hits||0) + '</td><td>' + (r.alpha_text_hits||0) + '</td><td><strong>' + (r.total_hits||0) + '</strong></td></tr>').join('') +
+      '</tbody></table>';
+  }} else {{
+    document.getElementById('rollupBox').innerHTML = '<div class="no-results">No rollup yet</div>';
+  }}
+  const visible = files.filter(f => !f.ok || matchCount(f) > 0);
+  let html = '';
+  visible.forEach((item, idx) => {{
+    const name = item.name || (item.path||'').split(/[/\\\\]/).pop() || '';
+    const fileId = 'file-' + idx;
+    const docKey = item.doc_key || item.id || String(idx);
+    const expanded = !!window.__EE_EXPANDED__[docKey];
+    const loaded = window.__EE_LOADED__[docKey];
+    html += '<div class="file-card" data-filename="' + esc(name) + '" data-client="' + esc(item.client||'') +
+      '" data-doc-key="' + esc(docKey) + '" data-result-ref="' + esc(item.result_ref||'') +
+      '" data-loaded="' + (loaded?'1':'0') + '" data-kinds="' + esc(((item.filter_hints||{{}}).kinds||[]).join(',')) + '">' +
+      '<div class="file-header" onclick="toggleCard(\\'' + fileId + '\\')"><div class="file-title">' +
+      '<span class="toggle-icon">' + (expanded?'▾':'▸') + '</span><span class="file-badge badge-success">' + matchCount(item) + ' hit(s)</span>' +
+      '<strong>' + esc(name) + '</strong><span class="match-badge">' + esc(item.client||'') + '</span></div>' +
+      '<div class="file-metadata">' + esc(item.path||'') + '</div></div>' +
+      '<div id="' + fileId + '" class="file-content" style="display:' + (expanded?'block':'none') + '"><div class="matches-list">' +
+      (loaded ? renderHits(loaded.matches||[]) : '') + '</div></div></div>';
+  }});
+  document.getElementById('resultsList').innerHTML = html || '<div class="no-results">No hits yet</div>';
+  applyFilters();
+}}
+function toggleCard(id) {{
+  const content = document.getElementById(id); if (!content) return;
+  const card = content.parentElement;
+  const icon = card.querySelector('.toggle-icon');
+  const docKey = card.getAttribute('data-doc-key') || '';
+  const expanding = content.style.display === 'none';
+  if (!expanding) {{ content.style.display='none'; if(icon) icon.textContent='▸'; delete window.__EE_EXPANDED__[docKey]; return; }}
+  const show = function() {{ content.style.display='block'; if(icon) icon.textContent='▾'; if(docKey) window.__EE_EXPANDED__[docKey]=true; applyFilters(); }};
+  if (card.getAttribute('data-loaded') === '1') {{ show(); return; }}
+  loadDoc(docKey, card.getAttribute('data-result-ref'), function(doc) {{
+    if (doc) {{
+      window.__EE_LOADED__[docKey]=doc; card.setAttribute('data-loaded','1');
+      const list = card.querySelector('.matches-list');
+      if (list) list.innerHTML = renderHits(doc.matches||[]);
+    }}
+    show();
+  }});
+}}
+function toggleAll(expand) {{
+  document.querySelectorAll('.file-card').forEach(card => {{
+    if (card.style.display === 'none') return;
+    const content = card.querySelector('.file-content');
+    if (!content) return;
+    if (expand) toggleCard(content.id); else {{ content.style.display='none'; const icon=card.querySelector('.toggle-icon'); if(icon) icon.textContent='▸'; }}
+  }});
+}}
+function applyFilters() {{
+  const q = (document.getElementById('searchInput').value||'').toLowerCase().trim();
+  const kind = document.getElementById('filterKind').value;
+  document.querySelectorAll('.file-card').forEach(card => {{
+    const name = (card.getAttribute('data-filename')||'').toLowerCase();
+    const client = (card.getAttribute('data-client')||'').toLowerCase();
+    const kinds = (card.getAttribute('data-kinds')||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if (kind && kinds.indexOf(kind) < 0 && card.getAttribute('data-loaded') !== '1') {{ card.style.display='none'; return; }}
+    if (card.getAttribute('data-loaded') !== '1') {{
+      card.style.display = (!q || name.includes(q) || client.includes(q)) ? 'block' : 'none';
+      return;
+    }}
+    let vis = false;
+    card.querySelectorAll('.match-item').forEach(item => {{
+      const k = item.getAttribute('data-kind') || '';
+      const t = (item.getAttribute('data-text')||'').toLowerCase();
+      const ok = (!kind || k === kind) && (!q || name.includes(q) || client.includes(q) || t.includes(q) || k.toLowerCase().includes(q));
+      item.style.display = ok ? 'block' : 'none';
+      if (ok) vis = true;
+    }});
+    card.style.display = vis ? 'block' : 'none';
+  }});
+}}
+renderReport();
+pollIndexWhileRunning(renderReport);
+</script>
+</body>
+</html>
+"""
+
