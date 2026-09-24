@@ -6,6 +6,8 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -795,6 +797,41 @@ class TestReportPathDefaults(unittest.TestCase):
             self.assertTrue(out.exists())
             self.assertTrue(missing_parent.is_dir())
             self.assertIn("_elements_v9.html", out.name)
+
+
+
+class TestRelOrAbs(unittest.TestCase):
+    def test_rel_or_abs_same_drive_relative(self):
+        with tempfile.TemporaryDirectory() as td:
+            start = Path(td) / "reports"
+            start.mkdir()
+            target = Path(td) / "docs" / "preview.html"
+            target.parent.mkdir()
+            target.write_text("x", encoding="utf-8")
+            got = ce.rel_or_abs(target, start, for_html=True)
+            self.assertFalse(got.startswith("file:"))
+            self.assertIn("preview.html", got.replace("\\", "/"))
+
+    def test_rel_or_abs_cross_drive_falls_back(self):
+        """Simulate Windows cross-mount ValueError from os.path.relpath."""
+        start = Path(r"C:\\reports")
+        target = Path(r"D:\\project\\preview.html")
+        real_relpath = os.path.relpath
+
+        def boom(p, s):
+            raise ValueError("path is on mount 'D:', start on mount 'C:'")
+
+        with unittest.mock.patch.object(os.path, "relpath", side_effect=boom):
+            uri = ce.rel_or_abs(target, start, for_html=True)
+            abs_posix = ce.rel_or_abs(target, start, for_html=False)
+        self.assertTrue(uri.startswith("file:"), uri)
+        self.assertIn("preview.html", uri)
+        self.assertFalse(abs_posix.startswith("file:"), abs_posix)
+        self.assertIn("preview", abs_posix.replace("\\", "/").lower())
+        # link_path alias
+        with unittest.mock.patch.object(os.path, "relpath", side_effect=boom):
+            self.assertEqual(ce.link_path(target, start), uri)
+
 
 
 class TestTabImport(unittest.TestCase):

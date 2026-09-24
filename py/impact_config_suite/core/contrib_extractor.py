@@ -110,14 +110,24 @@ def ensure_dir(path: Path) -> Path:
 
 
 
-def link_path(target: Path, start: Path) -> str:
-    """Href from start to target. Same drive -> relative; else file:// absolute (Windows cross-mount)."""
-    target = target.resolve()
-    start = start.resolve()
+def rel_or_abs(target: Path, start: Path, *, for_html: bool = True) -> str:
+    """Path from start to target for links/meta.
+
+    Same drive/mount -> posix relative path.
+    Cross-drive (Windows ValueError from os.path.relpath) -> absolute path;
+    when for_html=True return file:// URI so report hrefs work across C:/D:.
+    """
+    target = Path(target).resolve()
+    start = Path(start).resolve()
     try:
         return Path(os.path.relpath(target, start)).as_posix()
-    except ValueError:
-        return target.as_uri()
+    except (ValueError, OSError):
+        return target.as_uri() if for_html else target.as_posix()
+
+
+# Back-compat alias (same behavior, HTML file:// on cross-drive)
+link_path = rel_or_abs
+
 
 def default_report_root() -> Path:
     """Documents/impact-support-log (or REPORT_ROOT when tests override it)."""
@@ -126,11 +136,37 @@ def default_report_root() -> Path:
     return Path.home() / "Documents" / SUPPORT_LOG_NAME
 
 
+# Set for the duration of one extract batch (run_contrib_extract / main).
+# process_group reuses this so all shortcodes in a session share one folder.
+_SESSION_REPORT_DIR: Path | None = None
+
+
+def reset_session_report_dir() -> None:
+    """Clear the session folder so the next batch gets a new timestamp."""
+    global _SESSION_REPORT_DIR
+    _SESSION_REPORT_DIR = None
+
+
 def make_contrib_report_dir(timestamp: str | None = None) -> Path:
-    """Create one timestamped report folder per shortcode: {ts}_contrib_reports/JATS/."""
-    ts = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
+    """One timestamped report folder per extract session: {ts}_contrib_reports/JATS/.
+
+    First call in a session creates the folder; later shortcodes reuse it.
+    Pass timestamp= to force a specific folder name (tests). Call
+    reset_session_report_dir() at the start of a new batch.
+    """
+    global _SESSION_REPORT_DIR
+    if timestamp is not None:
+        report_dir = default_report_root() / f"{timestamp}_{REPORT_DIR}" / RUN_DTD
+        ensure_dir(report_dir)
+        _SESSION_REPORT_DIR = report_dir
+        return report_dir
+    if _SESSION_REPORT_DIR is not None:
+        ensure_dir(_SESSION_REPORT_DIR)
+        return _SESSION_REPORT_DIR
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_dir = default_report_root() / f"{ts}_{REPORT_DIR}" / RUN_DTD
     ensure_dir(report_dir)
+    _SESSION_REPORT_DIR = report_dir
     return report_dir
 
 
@@ -1831,13 +1867,22 @@ def process_group(
     shortcode: str,
     docids: list,
     log: LogFn = _noop_log,
+    progress: ProgressFn = _noop_progress,
     cancel_check: CancelFn = _noop_cancel,
 ) -> dict:
     """Build per-doc outputs, the contrib report, the element list and the issues csv."""
     rows = []
-    for d in docids:
+    n_docs = len(docids)
+    for di, d in enumerate(docids, 1):
         if cancel_check():
             break
+        pending_docs = n_docs - di
+        doc_msg = (
+            f"[DOC] {client}/{shortcode}  {di}/{n_docs}  "
+            f"current={d}  pending_docs={pending_docs}"
+        )
+        log(doc_msg)
+        progress(di, n_docs, doc_msg)
         rows.append(read_doc(base, d, docs[d], metas[d], log=log))
     good = [r for r in rows if r["contribs"]]
 
@@ -1876,7 +1921,7 @@ def process_group(
         r["issues"] = issues
         write_doc_outputs(r, client, shortcode, ctx, issues)
         r["cells"] = pick_cells(r["contribs"], r["raws"], ctx)
-        r["preview_rel"] = link_path(r["folder"] / OUT_HTML, report_dir)
+        r["preview_rel"] = rel_or_abs(r["folder"] / OUT_HTML, report_dir, for_html=True)
         total_issues += len(issues)
         tag = f", {len(issues)} PI issue(s)" if issues else ""
         log(f"[OK] {r['docid']} ({r['src']}) - {len(r['contribs'])} contribs{tag}")
@@ -2270,6 +2315,7 @@ def run_contrib_extract(
     Returns summary dict with keys: finished, total, cancelled, done_path, overview (pre-run).
     """
     base = Path(root)
+    reset_session_report_dir()
     log = log_callback or _noop_log
     progress = progress_callback or _noop_progress
     cancelled = cancel_check or _noop_cancel
@@ -2335,11 +2381,21 @@ def run_contrib_extract(
             msg = f"=== [{i}/{total}] {RUN_DTD} / {client} / {shortcode} ({cnt(len(ids))}) ==="
             log(f"\n{msg}")
             progress(i - 1, total, msg)
+            pending_shortcodes = total - i  # remaining after current
+            clients_left = sorted({c for c, _ in pairs[i - 1:]})  # including current
+            cl_list = ", ".join(clients_left) if clients_left else "-"
+            queue_msg = (
+                f"[QUEUE] pending_shortcodes={pending_shortcodes}  "
+                f"pending_clients={len(clients_left)} ({cl_list})  "
+                f"current={client}/{shortcode}"
+            )
+            log(queue_msg)
+            progress(i - 1, total, queue_msg)
 
             try:
                 entry = process_group(
                     base, docs, metas, client, shortcode, ids,
-                    log=log, cancel_check=cancelled,
+                    log=log, progress=progress, cancel_check=cancelled,
                 )
             except KeyboardInterrupt:
                 raise
