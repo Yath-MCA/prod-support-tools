@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Unit tests for core.contrib_extractor helpers and shortcode processing."""
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from core import contrib_extractor as ce
+
+
+MINIMAL_CONTRIB_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+  <front>
+    <article-meta>
+      <contrib-group>
+        <contrib contrib-type="author">
+          <name><surname>Doe</surname><given-names>Jane</given-names></name>
+        </contrib>
+        <contrib contrib-type="author">
+          <name><surname>Smith</surname><given-names>John</given-names></name>
+        </contrib>
+        <contrib contrib-type="author">
+          <name><surname>Lee</surname><given-names>A</given-names></name>
+        </contrib>
+      </contrib-group>
+    </article-meta>
+  </front>
+</article>
+"""
+
+BROKEN_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<article><front><article-meta><p>no contrib group</p></article-meta></front></article>
+"""
+
+
+class TestStatusOf(unittest.TestCase):
+    def test_new_when_missing(self):
+        st, n = ce.status_of({}, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "new")
+        self.assertEqual(n, 0)
+
+    def test_done_when_all_recorded(self):
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}, "b": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "done")
+        self.assertEqual(n, 0)
+        self.assertIn("filled", ce.status_note(done, "LWW", "INF", ["a", "b"]))
+
+    def test_update_when_fresh_docs(self):
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b", "c"])
+        self.assertEqual(st, "update")
+        self.assertEqual(n, 2)
+        note = ce.status_note(done, "LWW", "INF", ["a", "b", "c"])
+        self.assertIn("update", note)
+        self.assertIn("+2", note)
+
+
+class TestBuildOverview(unittest.TestCase):
+    def setUp(self):
+        self.docs = {
+            "d1": {"folder": "JATS/d1"},
+            "d2": {"folder": "JATS/d2"},
+            "d3": {"folder": "BITS/d3"},
+            "d4": {"folder": "JATS/d4"},
+            "orphan": {"folder": "JATS/orphan"},
+        }
+        self.metas = {
+            "d1": {"dtd": "JATS", "client": "LWW", "project-shortcode": "INF", "file-id": "F1"},
+            "d2": {"dtd": "JATS", "client": "LWW", "project-shortcode": "INF", "file-id": "F2"},
+            "d3": {"dtd": "BITS", "client": "LWW", "project-shortcode": "BK", "file-id": "F3"},
+            "d4": {"dtd": "JATS", "client": "PLOS", "project-shortcode": "PBIO", "file-id": "F4"},
+            # orphan doc in docs but no meta — counted in ignored
+        }
+        self.index = ce.build_index(self.docs, self.metas)
+        self.done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "failed": 0,
+                        "docids": {"d1": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+
+    def test_index_jats_only(self):
+        self.assertIn("LWW", self.index)
+        self.assertIn("PLOS", self.index)
+        self.assertEqual(sorted(self.index["LWW"]["INF"]), ["d1", "d2"])
+        self.assertNotIn("BK", self.index.get("LWW", {}))
+
+    def test_overview_counts(self):
+        ov = ce.build_overview(self.docs, self.metas, self.index, self.done)
+        self.assertEqual(ov["dtd"], "JATS")
+        self.assertEqual(ov["clients"], 2)
+        self.assertEqual(ov["shortcodes"], 2)
+        self.assertEqual(ov["docs"], 3)  # d1,d2,d4
+        self.assertEqual(ov["filled"], 0)  # INF is update (d2 missing)
+        self.assertEqual(ov["not_filled"], 1)  # PBIO
+        self.assertEqual(ov["update"], 1)  # INF
+        notes = " ".join(ov["ignored_notes"])
+        self.assertIn("BITS", notes)
+        self.assertIn("without a meta.json entry", notes)
+        text = ce.format_overview_text(ov)
+        self.assertIn("not filled", text)
+        self.assertIn("ignored / check", text)
+
+
+class TestProcessGroupAndMeta(unittest.TestCase):
+    def _make_project(self, tmp: Path, with_contrib: bool = True):
+        docs = {
+            "N001": {"folder": "JATS/N001", "files": {"xml": "JATS/N001/article.xml"}},
+            "N002": {"folder": "JATS/N002", "files": {"xml": "JATS/N002/article.xml"}},
+        }
+        metas = {
+            "N001": {
+                "dtd": "JATS",
+                "client": "LWW",
+                "project-shortcode": "INF",
+                "file-id": "INF-1",
+            },
+            "N002": {
+                "dtd": "JATS",
+                "client": "LWW",
+                "project-shortcode": "INF",
+                "file-id": "INF-2",
+            },
+        }
+        (tmp / "documents.json").write_text(json.dumps(docs), encoding="utf-8")
+        (tmp / "meta.json").write_text(json.dumps(metas), encoding="utf-8")
+        for docid in ("N001", "N002"):
+            folder = tmp / "JATS" / docid
+            folder.mkdir(parents=True)
+            body = MINIMAL_CONTRIB_XML if with_contrib else BROKEN_XML
+            (folder / "article.xml").write_text(body, encoding="utf-8")
+        return docs, metas
+
+    def test_process_group_writes_report_and_meta(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            docs, metas = self._make_project(tmp, with_contrib=True)
+            logs = []
+            entry = ce.process_group(
+                tmp, docs, metas, "LWW", "INF", ["N001", "N002"], log=logs.append
+            )
+            self.assertEqual(entry["documents"], 2)
+            self.assertEqual(entry["failed"], 0)
+            report = tmp / entry["report"]
+            self.assertTrue(report.exists())
+            self.assertTrue((tmp / "JATS" / "N001" / ce.OUT_XML).exists())
+            self.assertTrue((tmp / "JATS" / "N001" / ce.OUT_HTML).exists())
+
+            # Simulate run_contrib_extract meta write
+            done = {}
+            done.setdefault(ce.RUN_DTD, {}).setdefault("LWW", {})["INF"] = entry
+            ce.save_done(tmp, done)
+            loaded = ce.load_done(tmp)
+            self.assertIn("INF", loaded["JATS"]["LWW"])
+            st, n = ce.status_of(loaded, "LWW", "INF", ["N001", "N002"])
+            self.assertEqual(st, "done")
+            self.assertEqual(n, 0)
+
+    def test_all_fail_not_marked_filled(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            docs, metas = self._make_project(tmp, with_contrib=False)
+            result = ce.run_contrib_extract(
+                tmp,
+                shortcodes=[("LWW", "INF")],
+                delay_sc=0,
+                delay_cl=0,
+                log_callback=lambda m: None,
+            )
+            self.assertEqual(len(result["finished"]), 1)
+            _, _, entry = result["finished"][0]
+            self.assertEqual(entry["failed"], entry["documents"])
+            # meta-contrib should NOT contain INF
+            done = ce.load_done(tmp)
+            self.assertEqual(done.get("JATS", {}).get("LWW", {}).get("INF"), None)
+
+    def test_run_ordered_and_cancel_keeps_finished(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            docs = {
+                "A1": {"folder": "JATS/A1", "files": {"xml": "JATS/A1/article.xml"}},
+                "B1": {"folder": "JATS/B1", "files": {"xml": "JATS/B1/article.xml"}},
+            }
+            metas = {
+                "A1": {"dtd": "JATS", "client": "LWW", "project-shortcode": "AAA", "file-id": "A"},
+                "B1": {"dtd": "JATS", "client": "LWW", "project-shortcode": "BBB", "file-id": "B"},
+            }
+            (tmp / "documents.json").write_text(json.dumps(docs), encoding="utf-8")
+            (tmp / "meta.json").write_text(json.dumps(metas), encoding="utf-8")
+            for docid in ("A1", "B1"):
+                folder = tmp / "JATS" / docid
+                folder.mkdir(parents=True)
+                (folder / "article.xml").write_text(MINIMAL_CONTRIB_XML, encoding="utf-8")
+
+            state = {"n": 0}
+
+            def cancel():
+                # cancel after first shortcode completes (checked before next)
+                return state["n"] >= 1
+
+            def progress(cur, tot, msg):
+                if "done" in msg:
+                    state["n"] += 1
+
+            result = ce.run_contrib_extract(
+                tmp,
+                shortcodes=[("LWW", "AAA"), ("LWW", "BBB")],
+                delay_sc=0,
+                delay_cl=0,
+                log_callback=lambda m: None,
+                progress_callback=progress,
+                cancel_check=cancel,
+            )
+            self.assertTrue(result["cancelled"])
+            self.assertEqual(len(result["finished"]), 1)
+            done = ce.load_done(tmp)
+            self.assertIn("AAA", done["JATS"]["LWW"])
+            self.assertNotIn("BBB", done.get("JATS", {}).get("LWW", {}))
+
+
+class TestTabImport(unittest.TestCase):
+    def test_tab_module_imports(self):
+        # Avoid instantiating Tk widgets; skip when tkinter is unavailable (e.g. headless box).
+        try:
+            import tkinter  # noqa: F401
+        except ModuleNotFoundError:
+            self.skipTest("tkinter not installed")
+        from tabs.contrib_extractor_tab import ContribExtractorTab
+        self.assertTrue(callable(ContribExtractorTab))
+
+
+if __name__ == "__main__":
+    unittest.main()

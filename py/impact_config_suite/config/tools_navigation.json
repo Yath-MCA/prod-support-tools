@@ -42,6 +42,7 @@
       "name": "Extractor Tools",
       "tools": [
         { "id": "element_extractor", "label": "Element Extractor" },
+        { "id": "contrib_extractor", "label": "Contrib Extract" },
         { "id": "word_extractor", "label": "Word Extractor" },
         { "id": "id_pattern_extractor", "label": "ID Pattern Extractor" },
         { "id": "citation_pattern_extractor", "label": "Citation Pattern Extractor" },

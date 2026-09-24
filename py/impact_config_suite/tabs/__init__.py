@@ -11,6 +11,7 @@ from .citation_pattern_extractor_tab import CitationPatternExtractorTab
 from .new_config_tab import NewConfigTab
 from .compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from .element_extractor_tab import ElementExtractorTab
+from .contrib_extractor_tab import ContribExtractorTab
 from .xml_compare_tab import XMLCompareTab
 from .document_manager_tab import DocumentManagerTab
 
@@ -28,6 +29,7 @@ __all__ = [
     "HTMLCompareTab",
     "HTMLCompareReplaceTab",
     "ElementExtractorTab",
+    "ContribExtractorTab",
     "XMLCompareTab",
     "DocumentManagerTab",
 ]

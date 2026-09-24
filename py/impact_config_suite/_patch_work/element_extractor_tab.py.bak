@@ -1,0 +1,3317 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import json
+import os
+import re
+import shutil
+import threading
+from datetime import datetime
+from pathlib import Path
+import webbrowser
+
+from bs4 import BeautifulSoup
+
+from core.doi_pubid_by_ref import (
+    extract_buckets_from_file,
+    generate_doi_pubid_by_ref_html,
+    write_doi_pubid_by_ref_csv,
+)
+from core.element_extractor import ElementExtractor
+from core.ee_report_store import EEReportStore, _safe_id as _safe_id_local
+from core.ee_docid_cache import build_cache_payload, try_load_cache, write_cache
+from core.extraction_run_paths import format_extraction_run_folder_name
+from core.match_uniqueness import annotate_selector_results
+from core.mixed_citation_direct_hits import (
+    generate_mixed_citation_direct_hits_report_html,
+    rollup_by_client,
+    write_mixed_citation_direct_hits_csv,
+)
+from core.run_history import RunHistoryStore
+
+
+def should_skip_selector_extract(
+    mixed_hits: bool,
+    mixed_only: bool,
+    doi_pubid_by_ref: bool = False,
+) -> bool:
+    """Return True when selector extract should be skipped.
+
+    DOI/pub-id by-ref mode always skips. Mixed-citation-only skips when both
+    mixed hits and mixed-only are on.
+    """
+    if doi_pubid_by_ref:
+        return True
+    return bool(mixed_hits) and bool(mixed_only)
+
+
+class ElementExtractorTab(ttk.Frame):
+    """
+    Tkinter Tab for HTML/XML Element Extraction and reporting.
+    """
+    DEFAULT_REPORT_FOLDER_NAME = "impact-support-log"
+    HISTORY_LIMIT = 25
+    history_tool_id = "element_extractor"
+    history_tool_label = "Element Extractor"
+
+    def __init__(self, parent: ttk.Notebook):
+        super().__init__(parent)
+        self.extractor = ElementExtractor()
+        self.scan_thread = None
+        self.cancelled = False
+        self.last_report_path = None
+        self.last_summary_report_path = None
+        self.last_citation_report_path = None
+        self.last_entire_citation_report_path = None
+        self.last_mixed_citation_report_path = None
+        self.last_csv_path = None
+        self.last_unique_csv_path = None
+        self.history_entries = self._load_history_entries()
+        self.filtered_history_entries = list(self.history_entries)
+        self._build_ui()
+        self._restore_last_history_state()
+        self._refresh_history_list()
+
+    @classmethod
+    def _default_output_dir(cls) -> Path:
+        return Path.home() / "Documents" / cls.DEFAULT_REPORT_FOLDER_NAME
+
+    @classmethod
+    def _history_file_path(cls) -> Path:
+        return RunHistoryStore.history_file_path()
+
+    @classmethod
+    def _load_history_entries(cls) -> list[dict]:
+        valid_entries = []
+        for item in RunHistoryStore.recent_for_tool(cls.history_tool_id):
+            if str(item.get("source_path", "")).strip():
+                valid_entries.append(item)
+        return valid_entries[:cls.HISTORY_LIMIT]
+
+    @classmethod
+    def _save_history_entries(cls, entries: list[dict]) -> None:
+        all_entries = [entry for entry in RunHistoryStore.load_entries() if entry.get("tool_id") != cls.history_tool_id]
+        all_entries.extend(entries[:cls.HISTORY_LIMIT])
+        RunHistoryStore.save_entries(all_entries)
+
+    def _build_ui(self):
+        # Main container with dark background (blends with existing suite styling)
+        main_container = tk.Frame(self, bg="#1e293b", padx=30, pady=25)
+        main_container.pack(fill="both", expand=True)
+
+        # Header Section
+        header_frame = tk.Frame(main_container, bg="#1e293b")
+        header_frame.pack(fill="x", pady=(0, 15))
+        
+        tk.Label(
+            header_frame,
+            text="🎯 ELEMENT EXTRACTOR",
+            font=("Segoe UI", 18, "bold"),
+            fg="#818cf8",
+            bg="#1e293b",
+        ).pack(anchor="w")
+
+        tk.Label(
+            header_frame,
+            text="Analyze HTML or XML files, extract specific elements using tags, CSS selectors, or XPath, and generate an interactive report.",
+            font=("Segoe UI", 9),
+            fg="#94a3b8",
+            bg="#1e293b",
+        ).pack(anchor="w", pady=(2, 5))
+
+        # --- Settings Frame ---
+        settings_frame = tk.LabelFrame(
+            main_container,
+            text="Extraction Configuration",
+            bg="#1e293b",
+            fg="#cbd5e1",
+            font=("Segoe UI", 10, "bold"),
+            padx=20,
+            pady=15,
+            bd=1,
+            relief="flat"
+        )
+        settings_frame.pack(fill="x", pady=(0, 20))
+        settings_frame.columnconfigure(1, weight=1)
+
+        # 1. Mode Selector
+        tk.Label(
+            settings_frame,
+            text="Scan Mode:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=5)
+        
+        self.mode_var = tk.StringVar(value="Single File")
+        mode_frame = tk.Frame(settings_frame, bg="#1e293b")
+        mode_frame.grid(row=0, column=1, sticky="w", pady=5)
+        
+        tk.Radiobutton(
+            mode_frame,
+            text="Single File",
+            variable=self.mode_var,
+            value="Single File",
+            command=self._on_mode_change,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155"
+        ).pack(side="left", padx=(0, 15))
+        
+        tk.Radiobutton(
+            mode_frame,
+            text="Folder Scan",
+            variable=self.mode_var,
+            value="Folder Scan",
+            command=self._on_mode_change,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155"
+        ).pack(side="left")
+
+        # 2. Path Selection
+        self.path_label = tk.Label(
+            settings_frame,
+            text="Source XML/HTML File:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        )
+        self.path_label.grid(row=1, column=0, sticky="w", pady=5)
+
+        path_input_frame = tk.Frame(settings_frame, bg="#1e293b")
+        path_input_frame.grid(row=1, column=1, columnspan=2, sticky="ew", pady=5)
+        path_input_frame.columnconfigure(0, weight=1)
+
+        self.path_var = tk.StringVar()
+        self.path_entry = tk.Entry(
+            path_input_frame,
+            textvariable=self.path_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white"
+        )
+        self.path_entry.grid(row=0, column=0, sticky="ew", ipady=6, padx=(0, 10))
+
+        self.browse_btn = tk.Button(
+            path_input_frame,
+            text="Browse",
+            command=self._browse_path,
+            bg="#4f46e5",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=15,
+            pady=5,
+            cursor="hand2"
+        )
+        self.browse_btn.grid(row=0, column=1)
+
+        # 3. Selector Method
+        tk.Label(
+            settings_frame,
+            text="Extraction Method:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=2, column=0, sticky="w", pady=5)
+
+        selector_frame = tk.Frame(settings_frame, bg="#1e293b")
+        selector_frame.grid(row=2, column=1, columnspan=2, sticky="ew", pady=5)
+        selector_frame.columnconfigure(1, weight=1)
+
+        self.selector_type_var = tk.StringVar(value="Tag Name")
+        self.selector_combo = ttk.Combobox(
+            selector_frame,
+            textvariable=self.selector_type_var,
+            values=["Tag Name", "XPath Query", "CSS Selector"],
+            state="readonly",
+            width=15,
+            font=("Segoe UI", 9)
+        )
+        self.selector_combo.grid(row=0, column=0, padx=(0, 10), sticky="w")
+        self.selector_combo.bind("<<ComboboxSelected>>", self._on_selector_type_change)
+
+        self.query_var = tk.StringVar(value="span")
+        self.query_entry = tk.Entry(
+            selector_frame,
+            textvariable=self.query_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white"
+        )
+        self.query_entry.grid(row=0, column=1, sticky="ew", ipady=6)
+
+        # 4. Attribute Filter (Only active/visible for Tag Name)
+        self.attr_filter_lbl = tk.Label(
+            settings_frame,
+            text="Attribute Filter:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        )
+        self.attr_filter_lbl.grid(row=3, column=0, sticky="w", pady=5)
+
+        attr_frame = tk.Frame(settings_frame, bg="#1e293b")
+        attr_frame.grid(row=3, column=1, columnspan=2, sticky="ew", pady=5)
+        attr_frame.columnconfigure(1, weight=1)
+        attr_frame.columnconfigure(3, weight=1)
+
+        tk.Label(attr_frame, text="Name:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9)).grid(row=0, column=0, padx=(0, 5))
+        
+        self.attr_name_var = tk.StringVar()
+        self.attr_name_entry = tk.Entry(
+            attr_frame,
+            textvariable=self.attr_name_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white",
+            width=15
+        )
+        self.attr_name_entry.grid(row=0, column=1, sticky="ew", ipady=6, padx=(0, 15))
+
+        tk.Label(attr_frame, text="Value (Optional):", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9)).grid(row=0, column=2, padx=(0, 5))
+        
+        self.attr_val_var = tk.StringVar()
+        self.attr_val_entry = tk.Entry(
+            attr_frame,
+            textvariable=self.attr_val_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white"
+        )
+        self.attr_val_entry.grid(row=0, column=3, sticky="ew", ipady=6)
+
+        # 5. Scan Options (Recursive, Extensions)
+        self.options_lbl = tk.Label(
+            settings_frame,
+            text="Folder Scan Options:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        )
+        self.options_lbl.grid(row=4, column=0, sticky="w", pady=5)
+
+        options_frame = tk.Frame(settings_frame, bg="#1e293b")
+        options_frame.grid(row=4, column=1, columnspan=2, sticky="ew", pady=5)
+        options_frame.columnconfigure(1, weight=1)
+        options_frame.columnconfigure(2, weight=1)
+
+        self.recursive_var = tk.BooleanVar(value=False)
+        self.recursive_chk = tk.Checkbutton(
+            options_frame,
+            text="Recursive Search",
+            variable=self.recursive_var,
+            bg="#1e293b", fg="#94a3b8", activebackground="#1e293b", activeforeground="#818cf8",
+            selectcolor="#334155",
+            font=("Segoe UI", 9),
+            state="disabled" # Disabled by default since default mode is Single File
+        )
+        self.recursive_chk.grid(row=0, column=0, padx=(0, 20), sticky="w")
+
+        self.use_folder_index_var = tk.BooleanVar(value=True)
+        self.use_folder_index_chk = tk.Checkbutton(
+            options_frame,
+            text="Use folder index (faster re-scan)",
+            variable=self.use_folder_index_var,
+            bg="#1e293b", fg="#94a3b8", activebackground="#1e293b", activeforeground="#818cf8",
+            selectcolor="#334155",
+            font=("Segoe UI", 9),
+            state="disabled",
+        )
+        self.use_folder_index_chk.grid(row=0, column=3, padx=(12, 0), sticky="w")
+
+        tk.Label(options_frame, text="Extensions:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9)).grid(row=0, column=1, sticky="e", padx=(0, 5))
+        self.extensions_var = tk.StringVar(value=".xml, .html, .htm, .xhtml")
+        self.ext_entry = tk.Entry(
+            options_frame,
+            textvariable=self.extensions_var,
+            bg="#1e293b", # Disabled style initially
+            fg="#94a3b8",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white",
+            state="disabled",
+            width=25
+        )
+        self.ext_entry.grid(row=0, column=2, sticky="ew", ipady=6)
+
+        tk.Label(
+            options_frame,
+            text="Filename Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+
+        self.filename_filter_var = tk.StringVar(value="None")
+        self.filename_filter_combo = ttk.Combobox(
+            options_frame,
+            textvariable=self.filename_filter_var,
+            values=["*_original.html", "*_updated.html", "*_original.xml", "None"],
+            state="readonly",
+            width=18,
+            font=("Segoe UI", 9),
+        )
+        self.filename_filter_combo.grid(row=1, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        tk.Label(
+            options_frame,
+            text="DTD Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=2, column=0, sticky="w", pady=(10, 0))
+
+        self.dtd_filter_var = tk.StringVar(value="None")
+        self.dtd_filter_combo = ttk.Combobox(
+            options_frame,
+            textvariable=self.dtd_filter_var,
+            values=["None", "JATS", "BITS"],
+            state="readonly",
+            width=18,
+            font=("Segoe UI", 9),
+        )
+        self.dtd_filter_combo.grid(row=2, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        tk.Label(
+            options_frame,
+            text="Client Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=3, column=0, sticky="w", pady=(10, 0))
+
+        self.client_filter_var = tk.StringVar(value="None")
+        self.client_filter_combo = ttk.Combobox(
+            options_frame,
+            textvariable=self.client_filter_var,
+            values=["None", "OUP", "TNF", "PLOS", "BRILL", "ACS", "LWW", "MEDKNOW"],
+            state="readonly",
+            width=18,
+            font=("Segoe UI", 9),
+        )
+        self.client_filter_combo.grid(row=3, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        # Month Filter Section
+        tk.Label(
+            options_frame,
+            text="Modified Date Filter:",
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).grid(row=4, column=0, sticky="w", pady=(10, 0))
+
+        month_frame = tk.Frame(options_frame, bg="#1e293b")
+        month_frame.grid(row=4, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        self.month_filter_var = tk.StringVar(value="All Time")
+        self.month_filter_combo = ttk.Combobox(
+            month_frame,
+            textvariable=self.month_filter_var,
+            values=["All Time", "This Month", "Last Month", "Custom"],
+            state="readonly",
+            width=12,
+            font=("Segoe UI", 9),
+        )
+        self.month_filter_combo.pack(side="left")
+        self.month_filter_combo.bind("<<ComboboxSelected>>", self._on_month_filter_change)
+
+        # Custom month input (hidden by default)
+        self.custom_month_var = tk.StringVar()
+        self.custom_month_entry = tk.Entry(
+            month_frame,
+            textvariable=self.custom_month_var,
+            bg="#334155",
+            fg="white",
+            font=("Segoe UI", 9),
+            width=10,
+            state="disabled"
+        )
+        self.custom_month_entry.pack(side="left", padx=(5, 0))
+        tk.Label(
+            month_frame,
+            text="(MM-YYYY)",
+            bg="#1e293b",
+            fg="#64748b",
+            font=("Segoe UI", 8),
+        ).pack(side="left", padx=(2, 0))
+
+        # 5c. Parallel Processing Section (visible only in Folder Scan mode)
+        self.parallel_options_lbl = tk.Label(
+            options_frame,
+            text="Parallel Processing:",
+            bg="#1e293b", fg="#475569", font=("Segoe UI", 9, "bold"),
+        )
+        self.parallel_options_lbl.grid(row=5, column=0, sticky="w", pady=(10, 0))
+
+        parallel_frame = tk.Frame(options_frame, bg="#1e293b")
+        parallel_frame.grid(row=5, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        self.parallel_mode_var = tk.BooleanVar(value=True)
+        self.parallel_mode_chk = tk.Checkbutton(
+            parallel_frame,
+            text="Use parallel processing",
+            variable=self.parallel_mode_var,
+            bg="#1e293b", fg="#94a3b8",
+            selectcolor="#334155",
+            state="disabled",
+            command=self._on_parallel_mode_change
+        )
+        self.parallel_mode_chk.pack(side="left")
+
+        tk.Label(parallel_frame, text="Workers:", bg="#1e293b", fg="#94a3b8").pack(side="left", padx=(10, 0))
+        self.worker_count_var = tk.StringVar(value="Auto")
+        self.worker_count_combo = ttk.Combobox(
+            parallel_frame,
+            textvariable=self.worker_count_var,
+            values=["Auto", "2", "4", "6", "8", "12"],
+            state="disabled",
+            width=8,
+            font=("Segoe UI", 9)
+        )
+        self.worker_count_combo.pack(side="left", padx=(5, 0))
+
+        # 5b. Batch Processing Section (visible only in Folder Scan mode)
+        self.batch_options_lbl = tk.Label(
+            options_frame,
+            text="Batch Processing:",
+            bg="#1e293b", fg="#475569", font=("Segoe UI", 9, "bold"),
+        )
+        self.batch_options_lbl.grid(row=6, column=0, sticky="w", pady=(10, 0))
+
+        batch_frame = tk.Frame(options_frame, bg="#1e293b")
+        batch_frame.grid(row=6, column=1, columnspan=2, sticky="w", pady=(10, 0))
+
+        # Enable batch processing
+        self.batch_mode_var = tk.BooleanVar(value=False)
+        self.batch_mode_chk = tk.Checkbutton(
+            batch_frame,
+            text="Limit scan to batch",
+            variable=self.batch_mode_var,
+            bg="#1e293b", fg="#94a3b8",
+            selectcolor="#334155",
+            command=self._on_batch_mode_change,
+            state="disabled"
+        )
+        self.batch_mode_chk.pack(side="left")
+
+        # Batch size dropdown
+        self.batch_size_var = tk.StringVar(value="50")
+        self.batch_size_combo = ttk.Combobox(
+            batch_frame,
+            textvariable=self.batch_size_var,
+            values=["10", "25", "50", "100", "200", "500"],
+            state="disabled",
+            width=8,
+            font=("Segoe UI", 9)
+        )
+        self.batch_size_combo.pack(side="left", padx=(5, 0))
+        tk.Label(batch_frame, text="folders", bg="#1e293b", fg="#94a3b8").pack(side="left")
+
+        # Offset for resuming
+        tk.Label(batch_frame, text="  Skip:", bg="#1e293b", fg="#94a3b8").pack(side="left", padx=(10, 0))
+        self.batch_offset_var = tk.IntVar(value=0)
+        self.batch_offset_entry = tk.Entry(
+            batch_frame,
+            textvariable=self.batch_offset_var,
+            width=6,
+            bg="#1e293b", fg="#475569",
+            state="disabled"
+        )
+        self.batch_offset_entry.pack(side="left")
+
+        # 7. Output report path
+        tk.Label(
+            settings_frame,
+            text="Report Output Folder:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=7, column=0, sticky="w", pady=5)
+
+        output_frame = tk.Frame(settings_frame, bg="#1e293b")
+        output_frame.grid(row=7, column=1, columnspan=2, sticky="ew", pady=5)
+        output_frame.columnconfigure(0, weight=1)
+
+        self.output_dir_var = tk.StringVar(value=str(self._default_output_dir()))
+        self.output_dir_entry = tk.Entry(
+            output_frame,
+            textvariable=self.output_dir_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white"
+        )
+        self.output_dir_entry.grid(row=0, column=0, sticky="ew", ipady=6, padx=(0, 10))
+
+        self.out_browse_btn = tk.Button(
+            output_frame,
+            text="Browse",
+            command=self._browse_output_dir,
+            bg="#475569",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=15,
+            pady=5,
+            cursor="hand2"
+        )
+        self.out_browse_btn.grid(row=0, column=1)
+
+        # 7. Post action option
+        self.open_report_var = tk.BooleanVar(value=True)
+        self.open_report_chk = tk.Checkbutton(
+            settings_frame,
+            text="Open HTML report in browser when first results are ready",
+            variable=self.open_report_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.open_report_chk.grid(row=8, column=1, columnspan=2, sticky="w", pady=5)
+
+        self.ee_docid_cache_var = tk.BooleanVar(value=False)
+        self.ee_docid_cache_chk = tk.Checkbutton(
+            settings_frame,
+            text="Cache DOI/pub-id results next to docid (ee_cache) for same-query reuse",
+            variable=self.ee_docid_cache_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9),
+        )
+        self.ee_docid_cache_chk.grid(row=9, column=1, columnspan=2, sticky="w", pady=(0, 5))
+
+        # 8. Report Content Options
+        tk.Label(
+            settings_frame,
+            text="Report Content:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=10, column=0, sticky="w", pady=5)
+
+        report_options_outer = tk.Frame(settings_frame, bg="#1e293b")
+        report_options_outer.grid(row=10, column=1, columnspan=2, sticky="ew", pady=5)
+
+        report_options_frame = tk.Frame(report_options_outer, bg="#1e293b")
+        report_options_frame.pack(anchor="w")
+
+        self.show_outer_xml_var = tk.BooleanVar(value=True)
+        self.show_outer_xml_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Include Outer XML/HTML",
+            variable=self.show_outer_xml_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.show_outer_xml_chk.pack(side="left", padx=(0, 15))
+
+        self.show_inner_text_var = tk.BooleanVar(value=True)
+        self.show_inner_text_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Include Inner Text Content",
+            variable=self.show_inner_text_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.show_inner_text_chk.pack(side="left", padx=(0, 15))
+
+        self.generate_csv_var = tk.BooleanVar(value=True)
+        self.generate_csv_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Export CSV Summary",
+            variable=self.generate_csv_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.generate_csv_chk.pack(side="left", padx=(0, 15))
+
+        self.copy_matched_files_var = tk.BooleanVar(value=False)
+        self.copy_matched_files_chk = tk.Checkbutton(
+            report_options_frame,
+            text="Copy matched source files",
+            variable=self.copy_matched_files_var,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.copy_matched_files_chk.pack(side="left")
+
+        report_options_frame2 = tk.Frame(report_options_outer, bg="#1e293b")
+        report_options_frame2.pack(anchor="w", pady=(6, 0))
+
+        self.citation_type_report_var = tk.BooleanVar(value=False)
+        self.citation_type_report_chk = tk.Checkbutton(
+            report_options_frame2,
+            text="Citation type report (cite pattern)",
+            variable=self.citation_type_report_var,
+            command=self._on_citation_type_toggle,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.citation_type_report_chk.pack(side="left")
+
+        tk.Label(
+            report_options_frame2,
+            text="Cite type:",
+            bg="#1e293b", fg="#94a3b8",
+            font=("Segoe UI", 9),
+        ).pack(side="left", padx=(16, 6))
+
+        self.citation_cite_type_var = tk.StringVar(value="bibr")
+        self.citation_cite_type_combo = ttk.Combobox(
+            report_options_frame2,
+            textvariable=self.citation_cite_type_var,
+            values=list(ElementExtractor.CITE_TYPE_PRESETS),
+            width=14,
+            state="disabled",
+        )
+        self.citation_cite_type_combo.pack(side="left")
+
+        report_options_frame3 = tk.Frame(report_options_outer, bg="#1e293b")
+        report_options_frame3.pack(anchor="w", pady=(6, 0))
+
+        self.mixed_citation_direct_hits_var = tk.BooleanVar(value=False)
+        self.mixed_citation_direct_hits_chk = tk.Checkbutton(
+            report_options_frame3,
+            text="Mixed-citation comment + alpha text",
+            variable=self.mixed_citation_direct_hits_var,
+            command=self._on_mixed_citation_toggle,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.mixed_citation_direct_hits_chk.pack(side="left")
+
+        self.mixed_citation_only_var = tk.BooleanVar(value=False)
+        self.mixed_citation_only_chk = tk.Checkbutton(
+            report_options_frame3,
+            text="Mixed-citation only (skip CSS extract)",
+            variable=self.mixed_citation_only_var,
+            state="disabled",
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.mixed_citation_only_chk.pack(side="left", padx=(16, 0))
+
+        self.doi_pubid_by_ref_var = tk.BooleanVar(value=False)
+        self.doi_pubid_by_ref_chk = tk.Checkbutton(
+            report_options_frame3,
+            text="DOI / pub-id by ref (unique)",
+            variable=self.doi_pubid_by_ref_var,
+            command=self._on_doi_pubid_by_ref_toggle,
+            bg="#1e293b", fg="#e2e8f0", activebackground="#1e293b", activeforeground="white",
+            selectcolor="#334155",
+            font=("Segoe UI", 9)
+        )
+        self.doi_pubid_by_ref_chk.pack(side="left", padx=(16, 0))
+
+        # Report Organization Section
+        tk.Label(
+            settings_frame,
+            text="Report Organization:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=11, column=0, sticky="w", pady=5)
+
+        org_frame = tk.Frame(settings_frame, bg="#1e293b")
+        org_frame.grid(row=11, column=1, columnspan=2, sticky="w", pady=5)
+
+        self.org_by_month_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            org_frame,
+            text="Organize reports by month subfolders",
+            variable=self.org_by_month_var,
+            bg="#1e293b", fg="#e2e8f0",
+            selectcolor="#334155",
+            font=("Segoe UI", 9),
+        ).pack(side="left")
+
+        history_frame = tk.LabelFrame(
+            main_container,
+            text="Run History",
+            bg="#1e293b",
+            fg="#cbd5e1",
+            font=("Segoe UI", 10, "bold"),
+            padx=20,
+            pady=15,
+            bd=1,
+            relief="flat"
+        )
+        history_frame.pack(fill="x", pady=(0, 15))
+        history_frame.columnconfigure(1, weight=1)
+        history_frame.columnconfigure(3, weight=1)
+
+        tk.Label(
+            history_frame,
+            text="Search History:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=5)
+
+        self.history_search_var = tk.StringVar()
+        self.history_search_entry = tk.Entry(
+            history_frame,
+            textvariable=self.history_search_var,
+            bg="#334155",
+            fg="white",
+            border=0,
+            font=("Segoe UI", 10),
+            insertbackground="white"
+        )
+        self.history_search_entry.grid(row=0, column=1, sticky="ew", ipady=6, padx=(0, 10), pady=5)
+        self.history_search_entry.bind("<KeyRelease>", self._on_history_search_change)
+
+        tk.Label(
+            history_frame,
+            text="Saved Runs:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).grid(row=1, column=0, sticky="w", pady=5)
+
+        self.history_choice_var = tk.StringVar()
+        self.history_combo = ttk.Combobox(
+            history_frame,
+            textvariable=self.history_choice_var,
+            state="readonly",
+            font=("Segoe UI", 9),
+        )
+        self.history_combo.grid(row=1, column=1, columnspan=3, sticky="ew", ipady=4, pady=5)
+
+        self.apply_history_btn = tk.Button(
+            history_frame,
+            text="Apply Selected",
+            command=self._apply_selected_history,
+            bg="#2563eb",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.apply_history_btn.grid(row=2, column=0, pady=(10, 0), sticky="w")
+
+        self.rerun_last_btn = tk.Button(
+            history_frame,
+            text="Rerun Last",
+            command=self._rerun_last_history,
+            bg="#0f766e",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.rerun_last_btn.grid(row=2, column=1, pady=(10, 0), sticky="w")
+
+        self.open_history_report_btn = tk.Button(
+            history_frame,
+            text="Open Saved Report",
+            command=self._open_selected_history_report,
+            bg="#7c3aed",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.open_history_report_btn.grid(row=2, column=2, pady=(10, 0), sticky="w")
+
+        self.clear_history_search_btn = tk.Button(
+            history_frame,
+            text="Clear Search",
+            command=self._clear_history_search,
+            bg="#475569",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            border=0,
+            padx=14,
+            pady=6,
+            cursor="hand2"
+        )
+        self.clear_history_search_btn.grid(row=2, column=3, pady=(10, 0), sticky="e")
+
+        # --- Progress Bar & Status Line (before action buttons) ---
+        self.progress_frame = tk.Frame(main_container, bg="#1e293b")
+        self.progress_frame.pack(fill="x", pady=(10, 0))
+        
+        self.progress_bar = ttk.Progressbar(self.progress_frame, orient="horizontal", mode="determinate")
+        self.progress_bar.pack(fill="x", side="top", pady=(0, 5))
+        
+        self.status_var = tk.StringVar(value="System Ready. Configure options above and click Run.")
+        self.status_label = tk.Label(
+            self.progress_frame,
+            textvariable=self.status_var,
+            bg="#1e293b",
+            fg="#94a3b8",
+            font=("Segoe UI", 9, "italic"),
+        )
+        self.status_label.pack(side="left")
+
+        # --- Action Buttons Frame ---
+        btn_frame = tk.Frame(main_container, bg="#1e293b")
+        btn_frame.pack(fill="x", pady=(10, 15))
+
+        self.run_btn = tk.Button(
+            btn_frame,
+            text="🚀  RUN ELEMENT EXTRACTION",
+            command=self._start_extraction,
+            bg="#10b981",
+            fg="white",
+            font=("Segoe UI", 11, "bold"),
+            border=0,
+            padx=20,
+            pady=12,
+            cursor="hand2"
+        )
+        self.run_btn.pack(side="left", fill="x", expand=True)
+
+        self.cancel_btn = tk.Button(
+            btn_frame,
+            text="❌ Cancel",
+            command=self._cancel_extraction,
+            bg="#ef4444",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            border=0,
+            padx=20,
+            pady=12,
+            state="disabled",
+            cursor="hand2"
+        )
+        self.cancel_btn.pack(side="left", padx=(10, 0))
+
+        self.open_last_btn = tk.Button(
+            btn_frame,
+            text="📂 Open Last Report",
+            command=self._open_last_report,
+            bg="#4f46e5",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            border=0,
+            padx=20,
+            pady=12,
+            state="disabled",
+            cursor="hand2"
+        )
+        self.open_last_btn.pack(side="right", padx=(10, 0))
+
+        # Next Batch button (for resuming batch processing)
+        self.next_batch_btn = tk.Button(
+            btn_frame,
+            text="⏭️ Next Batch",
+            command=self._resume_next_batch,
+            bg="#7c3aed",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            border=0,
+            padx=20,
+            pady=12,
+            state="disabled",
+            cursor="hand2"
+        )
+        self.next_batch_btn.pack(side="right", padx=(10, 0))
+
+        # --- Console Log Frame ---
+        tk.Label(
+            main_container,
+            text="Activity log and extracted previews:",
+            bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9, "bold"),
+        ).pack(anchor="w", pady=(10, 5))
+
+        res_frame = tk.Frame(main_container, bg="#0f172a")
+        res_frame.pack(fill="both", expand=True)
+
+        self.res_text = tk.Text(
+            res_frame,
+            bg="#0f172a",
+            fg="#34d399",  # Beautiful green code color
+            insertbackground="white",
+            border=0,
+            font=("Consolas", 10),
+            padx=12,
+            pady=12
+        )
+        scroll = ttk.Scrollbar(res_frame, command=self.res_text.yview)
+        self.res_text.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        self.res_text.pack(fill="both", expand=True)
+
+        # Context Menu for results
+        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="Copy All Log Content", command=self._copy_all_log)
+        self.context_menu.add_command(label="Clear Console", command=lambda: self.res_text.delete("1.0", tk.END))
+        self.res_text.bind("<Button-3>", self._show_context_menu)
+
+
+
+    def _on_selector_type_change(self, event=None):
+        sel_type = self.selector_type_var.get()
+        if sel_type == "Tag Name":
+            self.attr_name_entry.config(state="normal", bg="#334155")
+            self.attr_val_entry.config(state="normal", bg="#334155")
+            self.attr_filter_lbl.config(fg="#94a3b8")
+        else:
+            self.attr_name_entry.config(state="disabled", bg="#1e293b")
+            self.attr_val_entry.config(state="disabled", bg="#1e293b")
+            self.attr_filter_lbl.config(fg="#475569")
+
+    def _on_citation_type_toggle(self):
+        """Enable cite-type combobox only when citation report is checked."""
+        enabled = bool(self.citation_type_report_var.get())
+        # ttk Combobox: use 'normal' for editable presets, 'disabled' when off
+        self.citation_cite_type_combo.config(state="normal" if enabled else "disabled")
+
+    def _on_mixed_citation_toggle(self):
+        """Enable mixed-citation-only checkbox only when mixed hits is checked."""
+        enabled = bool(self.mixed_citation_direct_hits_var.get())
+        if enabled and not bool(self.doi_pubid_by_ref_var.get()):
+            self.mixed_citation_only_chk.config(state="normal")
+        else:
+            self.mixed_citation_only_var.set(False)
+            self.mixed_citation_only_chk.config(state="disabled")
+
+    def _on_doi_pubid_by_ref_toggle(self):
+        """DOI/pub-id by-ref mode replaces extract; uncheck mixed-only when enabled."""
+        if bool(self.doi_pubid_by_ref_var.get()):
+            self.mixed_citation_only_var.set(False)
+            self.mixed_citation_only_chk.config(state="disabled")
+        else:
+            self._on_mixed_citation_toggle()
+
+    def _on_month_filter_change(self, event=None):
+        is_custom = self.month_filter_var.get() == "Custom"
+        state = "normal" if is_custom else "disabled"
+        bg = "#334155" if is_custom else "#1e293b"
+        self.custom_month_entry.config(state=state)
+        self.custom_month_entry.config(disabledbackground=bg if not is_custom else "#334155")
+        if is_custom:
+            self.custom_month_entry.config(bg="#334155")
+
+    def _on_parallel_mode_change(self, event=None):
+        """Enable/disable worker count dropdown based on parallel mode checkbox."""
+        is_parallel = self.parallel_mode_var.get()
+        self.worker_count_combo.config(state="readonly" if is_parallel else "disabled")
+
+    def _on_batch_mode_change(self, event=None):
+        """Enable/disable batch processing controls based on checkbox state."""
+        is_batch_mode = self.batch_mode_var.get()
+        state = "normal" if is_batch_mode else "disabled"
+        bg_color = "#334155" if is_batch_mode else "#1e293b"
+        fg_color = "white" if is_batch_mode else "#475569"
+
+        self.batch_size_combo.config(state="readonly" if is_batch_mode else "disabled")
+        self.batch_offset_entry.config(state=state, bg=bg_color, fg=fg_color, disabledbackground="#1e293b")
+
+    def _on_mode_change(self, event=None):
+        mode = self.mode_var.get()
+        if mode == "Single File":
+            self.recursive_chk.config(state="disabled")
+            self.use_folder_index_chk.config(state="disabled")
+            self.ext_entry.config(state="disabled", bg="#1e293b", fg="#475569")
+            self.filename_filter_combo.config(state="disabled")
+            self.dtd_filter_combo.config(state="disabled")
+            self.client_filter_combo.config(state="disabled")
+            self.month_filter_combo.config(state="disabled")
+            self.custom_month_entry.config(state="disabled")
+            self.parallel_mode_chk.config(state="disabled")
+            self.worker_count_combo.config(state="disabled")
+            self.parallel_options_lbl.config(fg="#475569")
+            self.batch_mode_chk.config(state="disabled")
+            self.batch_size_combo.config(state="disabled")
+            self.batch_offset_entry.config(state="disabled")
+            self.batch_options_lbl.config(fg="#475569")
+            self.path_label.config(text="Source XML/HTML File:")
+            self.options_lbl.config(fg="#475569")
+        else:
+            self.recursive_chk.config(state="normal")
+            self.use_folder_index_chk.config(state="normal")
+            self.ext_entry.config(state="normal", bg="#334155", fg="white")
+            self.filename_filter_combo.config(state="readonly")
+            self.dtd_filter_combo.config(state="readonly")
+            self.client_filter_combo.config(state="readonly")
+            self.month_filter_combo.config(state="readonly")
+            self.parallel_mode_chk.config(state="normal")
+            self.parallel_options_lbl.config(fg="#94a3b8")
+            # Enable worker count if parallel mode is enabled
+            if self.parallel_mode_var.get():
+                self.worker_count_combo.config(state="readonly")
+            else:
+                self.worker_count_combo.config(state="disabled")
+            self.batch_mode_chk.config(state="normal")
+            self.batch_options_lbl.config(fg="#94a3b8")
+            # Enable batch controls if batch mode is checked
+            self._on_batch_mode_change()
+            self._on_month_filter_change()  # Re-enable custom entry if "Custom" is selected
+            self.path_label.config(text="Source Folder Path:")
+            self.options_lbl.config(fg="#94a3b8")
+
+    def _browse_path(self):
+        mode = self.mode_var.get()
+        if mode == "Single File":
+            path = filedialog.askopenfilename(
+                title="Select XML/HTML File",
+                filetypes=[
+                    ("All Supported Markup", "*.xml *.html *.htm *.xhtml"),
+                    ("XML Files", "*.xml"),
+                    ("HTML Files", "*.html *.htm"),
+                    ("All Files", "*.*")
+                ]
+            )
+        else:
+            path = filedialog.askdirectory(
+                title="Select Directory to Scan"
+            )
+            
+        if path:
+            abs_path = os.path.abspath(path)
+            self.path_var.set(abs_path)
+            # Auto populate output folder if empty
+            if not self.output_dir_var.get().strip():
+                parent_dir = os.path.dirname(abs_path) if mode == "Single File" else abs_path
+                self.output_dir_var.set(parent_dir)
+
+    def _browse_output_dir(self):
+        path = filedialog.askdirectory(title="Select Output Folder")
+        if path:
+            self.output_dir_var.set(os.path.abspath(path))
+
+    def _ui(self, fn):
+        """Schedule a callable on the Tk main thread."""
+        self.after(0, fn)
+
+    def _finish_run_ui(self, *, enable_open_last: bool = False) -> None:
+        """Reset action buttons after a run. Must run on the Tk main thread."""
+        self.run_btn.config(state="normal", text="🚀  RUN ELEMENT EXTRACTION")
+        self.cancel_btn.config(state="disabled")
+        if enable_open_last and self.last_report_path and os.path.exists(self.last_report_path):
+            self.open_last_btn.config(state="normal")
+
+    def _snapshot_ui_settings(self) -> dict:
+        """Capture UI settings on the main thread for safe use in the worker."""
+        return {
+            "mode": self.mode_var.get().strip(),
+            "query_type": self.selector_type_var.get().strip(),
+            "attr_name": self.attr_name_var.get().strip(),
+            "attr_value": self.attr_val_var.get().strip(),
+            "recursive": bool(self.recursive_var.get()),
+            "extensions": self.extensions_var.get().strip(),
+            "filename_filter": self.filename_filter_var.get().strip() or "None",
+            "dtd_filter": self.dtd_filter_var.get().strip() or "None",
+            "client_filter": self.client_filter_var.get().strip() or "None",
+            "month_filter": self.month_filter_var.get().strip() or "All Time",
+            "custom_month": self.custom_month_var.get().strip(),
+            "org_by_month": bool(self.org_by_month_var.get()),
+            "parallel_mode": bool(self.parallel_mode_var.get()),
+            "worker_count": self.worker_count_var.get().strip() or "Auto",
+            "batch_mode": bool(self.batch_mode_var.get()),
+            "batch_size": self.batch_size_var.get().strip() or "50",
+            "batch_offset_ui": self.batch_offset_var.get(),
+            "open_report": bool(self.open_report_var.get()),
+            "ee_docid_cache": bool(self.ee_docid_cache_var.get()),
+            "show_outer_xml": bool(self.show_outer_xml_var.get()),
+            "show_inner_text": bool(self.show_inner_text_var.get()),
+            "generate_csv": bool(self.generate_csv_var.get()),
+            "copy_matched_files": bool(self.copy_matched_files_var.get()),
+            "citation_type_report": bool(self.citation_type_report_var.get()),
+            "citation_cite_type": self.citation_cite_type_var.get().strip() or "bibr",
+            "mixed_citation_direct_hits": bool(self.mixed_citation_direct_hits_var.get()),
+            "mixed_citation_only": bool(self.mixed_citation_only_var.get()),
+            "doi_pubid_by_ref": bool(self.doi_pubid_by_ref_var.get()),
+            "use_folder_index": bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True,
+        }
+
+    def _set_status(self, message: str):
+        """Thread-safe status line update."""
+        self._ui(lambda m=message: self.status_var.set(m))
+
+    def _log(self, message: str):
+        """Append log message to the text console in a thread-safe way."""
+        def _append(msg=message):
+            self.res_text.insert(tk.END, msg + "\n")
+            self.res_text.see(tk.END)
+        self._ui(_append)
+
+    def _show_context_menu(self, event):
+        self.context_menu.post(event.x_root, event.y_root)
+
+    def _copy_all_log(self):
+        content = self.res_text.get("1.0", tk.END).strip()
+        if content:
+            self.clipboard_clear()
+            self.clipboard_append(content)
+            self.status_var.set("Logs copied to clipboard.")
+
+    @staticmethod
+    def _parse_query_list(raw: str) -> list[str]:
+        """Parse comma-separated query string into list of individual queries."""
+        return [q.strip() for q in raw.split(",") if q.strip()]
+
+    def _normalize_query_input(self, query_type: str, query_val: str) -> str:
+        normalized = query_val.strip()
+        if not normalized:
+            raise ValueError("Please enter a tag, selector, or XPath query.")
+
+        # Fix XPath label normalization - UI sends "XPath Query" but core expects "XPath"
+        if query_type == "XPath Query":
+            query_type = "XPath"
+
+        if query_type == "CSS Selector":
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            try:
+                BeautifulSoup("", "lxml").select(normalized)
+            except Exception as exc:
+                raise ValueError(f"Invalid CSS selector: {exc}") from exc
+
+        return normalized
+
+    @staticmethod
+    def _slugify(text: str, fallback: str = "report") -> str:
+        cleaned = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in text.strip())
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        return cleaned or fallback
+
+    @staticmethod
+    def _history_summary(entry: dict) -> str:
+        ts = str(entry.get("timestamp", "")).strip() or "Unknown time"
+        mode = str(entry.get("mode", "")).strip() or "Mode?"
+        query_type = str(entry.get("query_type", "")).strip() or "Query?"
+        query_val = str(entry.get("query_value", "")).strip() or "?"
+        source_name = Path(str(entry.get("source_path", "")).strip() or ".").name
+        return f"{ts} | {mode} | {query_type}: {query_val} | {source_name}"
+
+    def _restore_last_history_state(self) -> None:
+        if not self.history_entries:
+            return
+        latest = self.history_entries[0]
+        report_path = str(latest.get("report_path", "")).strip()
+        if report_path and os.path.exists(report_path):
+            self.last_report_path = report_path
+            self.open_last_btn.config(state="normal")
+        # Restore additional report paths from params if available
+        params = latest.get("params", {})
+        summary_path = str(params.get("summary_report_path", "")).strip()
+        csv_path = str(params.get("csv_path", "")).strip()
+        if summary_path and os.path.exists(summary_path):
+            self.last_summary_report_path = summary_path
+        if csv_path and os.path.exists(csv_path):
+            self.last_csv_path = csv_path
+
+    def _refresh_history_list(self) -> None:
+        values = [self._history_summary(entry) for entry in self.filtered_history_entries]
+        self.history_combo["values"] = values
+        if values:
+            self.history_combo.current(0)
+        else:
+            self.history_choice_var.set("")
+
+    def _on_history_search_change(self, event=None) -> None:
+        needle = self.history_search_var.get().strip().lower()
+        if not needle:
+            self.filtered_history_entries = list(self.history_entries)
+        else:
+            self.filtered_history_entries = [
+                entry for entry in self.history_entries
+                if needle in json.dumps(entry, ensure_ascii=False).lower()
+            ]
+        self._refresh_history_list()
+
+    def _clear_history_search(self) -> None:
+        self.history_search_var.set("")
+        self.filtered_history_entries = list(self.history_entries)
+        self._refresh_history_list()
+
+    def _selected_history_entry(self) -> dict | None:
+        index = self.history_combo.current()
+        if index < 0 or index >= len(self.filtered_history_entries):
+            return None
+        return self.filtered_history_entries[index]
+
+    def _apply_history_entry(self, entry: dict) -> None:
+        mode = str(entry.get("mode", "Single File")).strip() or "Single File"
+        self.mode_var.set(mode)
+        self._on_mode_change()
+        self.path_var.set(str(entry.get("source_path", "")).strip())
+        self.selector_type_var.set(str(entry.get("query_type", "Tag Name")).strip() or "Tag Name")
+        self._on_selector_type_change()
+        self.query_var.set(str(entry.get("query_value", "")).strip())
+        self.attr_name_var.set(str(entry.get("attr_name", "")).strip())
+        self.attr_val_var.set(str(entry.get("attr_value", "")).strip())
+        self.recursive_var.set(bool(entry.get("recursive", False)))
+        self.extensions_var.set(str(entry.get("extensions", ".xml, .html, .htm, .xhtml")).strip() or ".xml, .html, .htm, .xhtml")
+        self.filename_filter_var.set(str(entry.get("filename_filter", "None")).strip() or "None")
+        self.dtd_filter_var.set(str(entry.get("dtd_filter", "None")).strip() or "None")
+        self.client_filter_var.set(str(entry.get("client_filter", "None")).strip() or "None")
+        self.month_filter_var.set(str(entry.get("month_filter", "All Time")).strip() or "All Time")
+        self.custom_month_var.set(str(entry.get("custom_month", "")).strip())
+        self.org_by_month_var.set(bool(entry.get("org_by_month", False)))
+        # Restore parallel processing settings
+        self.parallel_mode_var.set(bool(entry.get("parallel_mode", True)))
+        self.worker_count_var.set(str(entry.get("worker_count", "Auto")).strip() or "Auto")
+        # Restore batch processing settings
+        self.batch_mode_var.set(bool(entry.get("batch_mode", False)))
+        self.batch_size_var.set(str(entry.get("batch_size", "50")).strip() or "50")
+        self.batch_offset_var.set(int(entry.get("batch_offset", 0)))
+        self._on_mode_change()  # Re-apply mode change to update parallel/batch control states
+        self._on_parallel_mode_change()  # Update parallel control states
+        self._on_batch_mode_change()  # Update batch control states
+        self._on_month_filter_change()  # Update custom entry state
+        self.output_dir_var.set(str(entry.get("output_dir", str(self._default_output_dir()))).strip() or str(self._default_output_dir()))
+        self.open_report_var.set(bool(entry.get("open_report", True)))
+        self.ee_docid_cache_var.set(bool(entry.get("ee_docid_cache", False)))
+        # Restore new report content options
+        self.show_outer_xml_var.set(bool(entry.get("show_outer_xml", True)))
+        self.show_inner_text_var.set(bool(entry.get("show_inner_text", True)))
+        self.generate_csv_var.set(bool(entry.get("generate_csv", True)))
+        self.copy_matched_files_var.set(bool(entry.get("copy_matched_files", False)))
+        self.citation_type_report_var.set(bool(entry.get("citation_type_report", False)))
+        self.citation_cite_type_var.set(str(entry.get("citation_cite_type", "bibr") or "bibr").strip() or "bibr")
+        self.mixed_citation_direct_hits_var.set(bool(entry.get("mixed_citation_direct_hits", False)))
+        self.mixed_citation_only_var.set(bool(entry.get("mixed_citation_only", False)))
+        self.doi_pubid_by_ref_var.set(bool(entry.get("doi_pubid_by_ref", False)))
+        self._on_citation_type_toggle()
+        self._on_mixed_citation_toggle()
+        self._on_doi_pubid_by_ref_toggle()
+        # Restore batch state for Next Batch button
+        params = entry.get("params", {})
+        if params.get("has_more_batches") and params.get("next_batch_offset"):
+            self._last_batch_next_offset = params.get("next_batch_offset")
+            self.next_batch_btn.config(state="normal")
+        else:
+            self.next_batch_btn.config(state="disabled")
+            if hasattr(self, '_last_batch_next_offset'):
+                delattr(self, '_last_batch_next_offset')
+        report_path = str(entry.get("report_path", "")).strip()
+        if report_path:
+            self.last_report_path = report_path
+            self.open_last_btn.config(state="normal")
+        self.status_var.set("History entry applied.")
+
+    def apply_history_entry(self, entry: dict) -> bool:
+        self._apply_history_entry(entry)
+        return True
+
+    def _apply_selected_history(self) -> None:
+        entry = self._selected_history_entry()
+        if not entry:
+            messagebox.showinfo("Run History", "No saved history entry is selected.")
+            return
+        self._apply_history_entry(entry)
+
+    def _open_selected_history_report(self) -> None:
+        entry = self._selected_history_entry()
+        if not entry:
+            messagebox.showinfo("Run History", "No saved history entry is selected.")
+            return
+        report_path = str(entry.get("report_path", "")).strip()
+        if not report_path or not os.path.exists(report_path):
+            messagebox.showerror("Run History", "Saved report is missing for the selected history entry.")
+            return
+        self.last_report_path = report_path
+        self.open_last_btn.config(state="normal")
+        webbrowser.open(f"file:///{os.path.abspath(report_path)}")
+
+    def _rerun_last_history(self) -> None:
+        if not self.history_entries:
+            messagebox.showinfo("Run History", "No previous run is available yet.")
+            return
+        self._apply_history_entry(self.history_entries[0])
+        self._start_extraction()
+
+    def rerun_history_entry(self, entry: dict) -> bool:
+        self._apply_history_entry(entry)
+        self._start_extraction()
+        return True
+
+    def _current_run_settings(self, source_path: str, query_val: str, output_dir: str, report_path: str,
+                               summary_report_path: str = "", csv_path: str = "",
+                               copied_files_count: int = 0, copied_folder_path: str = "",
+                               batch_offset: int = 0, has_more_batches: bool = False,
+                               next_batch_offset: int = 0, settings: dict | None = None,
+                               unique_csv_path: str = "") -> dict:
+        s = settings or self._snapshot_ui_settings()
+        return {
+            "tool_id": self.history_tool_id,
+            "tool_label": self.history_tool_label,
+            "action": "extract",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": s.get("mode", ""),
+            "source_path": source_path,
+            "query_type": s.get("query_type", ""),
+            "query_value": query_val,
+            "attr_name": s.get("attr_name", ""),
+            "attr_value": s.get("attr_value", ""),
+            "recursive": bool(s.get("recursive", False)),
+            "extensions": s.get("extensions", ""),
+            "filename_filter": s.get("filename_filter", "None"),
+            "dtd_filter": s.get("dtd_filter", "None"),
+            "client_filter": s.get("client_filter", "None"),
+            "month_filter": s.get("month_filter", "All Time"),
+            "custom_month": s.get("custom_month", ""),
+            "org_by_month": bool(s.get("org_by_month", False)),
+            "parallel_mode": bool(s.get("parallel_mode", False)),
+            "worker_count": s.get("worker_count", "Auto"),
+            "batch_mode": bool(s.get("batch_mode", False)),
+            "batch_size": s.get("batch_size", "50"),
+            "batch_offset": batch_offset,
+            "output_dir": output_dir,
+            "open_report": bool(s.get("open_report", True)),
+            "ee_docid_cache": bool(s.get("ee_docid_cache", False)),
+            "report_path": report_path,
+            "summary": f"{s.get('mode', '')} | {s.get('query_type', '')}: {query_val}",
+            "show_outer_xml": bool(s.get("show_outer_xml", True)),
+            "show_inner_text": bool(s.get("show_inner_text", True)),
+            "generate_csv": bool(s.get("generate_csv", True)),
+            "copy_matched_files": bool(s.get("copy_matched_files", False)),
+            "citation_type_report": bool(s.get("citation_type_report", False)),
+            "citation_cite_type": s.get("citation_cite_type", "bibr"),
+            "mixed_citation_direct_hits": bool(s.get("mixed_citation_direct_hits", False)),
+            "mixed_citation_only": bool(s.get("mixed_citation_only", False)),
+            "doi_pubid_by_ref": bool(s.get("doi_pubid_by_ref", False)),
+            "params": {
+                "mode": s.get("mode", ""),
+                "query_type": s.get("query_type", ""),
+                "query_value": query_val,
+                "attr_name": s.get("attr_name", ""),
+                "attr_value": s.get("attr_value", ""),
+                "recursive": bool(s.get("recursive", False)),
+                "extensions": s.get("extensions", ""),
+                "filename_filter": s.get("filename_filter", "None"),
+                "dtd_filter": s.get("dtd_filter", "None"),
+                "client_filter": s.get("client_filter", "None"),
+                "month_filter": s.get("month_filter", "All Time"),
+                "custom_month": s.get("custom_month", ""),
+                "org_by_month": bool(s.get("org_by_month", False)),
+                "parallel_mode": bool(s.get("parallel_mode", False)),
+                "worker_count": s.get("worker_count", "Auto"),
+                "batch_mode": bool(s.get("batch_mode", False)),
+                "batch_size": s.get("batch_size", "50"),
+                "batch_offset": batch_offset,
+                "has_more_batches": has_more_batches,
+                "next_batch_offset": next_batch_offset,
+                "show_outer_xml": bool(s.get("show_outer_xml", True)),
+                "show_inner_text": bool(s.get("show_inner_text", True)),
+                "generate_csv": bool(s.get("generate_csv", True)),
+                "copy_matched_files": bool(s.get("copy_matched_files", False)),
+                "citation_type_report": bool(s.get("citation_type_report", False)),
+                "citation_cite_type": s.get("citation_cite_type", "bibr"),
+                "mixed_citation_direct_hits": bool(s.get("mixed_citation_direct_hits", False)),
+                "mixed_citation_only": bool(s.get("mixed_citation_only", False)),
+                "doi_pubid_by_ref": bool(s.get("doi_pubid_by_ref", False)),
+                "summary_report_path": summary_report_path,
+                "csv_path": csv_path,
+                "unique_csv_path": unique_csv_path,
+                "copied_files_count": copied_files_count,
+                "copied_folder_path": copied_folder_path,
+            },
+        }
+
+    def _record_history_entry(self, entry: dict) -> None:
+        try:
+            RunHistoryStore.add_entry(entry)
+            # Schedule UI update on main thread (tkinter is not thread-safe)
+            self.after(0, self._update_history_ui)
+        except Exception as e:
+            # Log error but don't fail the extraction due to history issues
+            self.after(0, lambda msg=str(e): self._log(f"⚠️ Failed to save history: {msg}"))
+
+    def _update_history_ui(self) -> None:
+        """Update history UI - must be called from main thread."""
+        try:
+            self.history_entries = self._load_history_entries()
+            self.filtered_history_entries = list(self.history_entries)
+            self._refresh_history_list()
+        except Exception as e:
+            self._log(f"⚠️ Failed to refresh history UI: {e}")
+
+    def _start_extraction(self):
+        # Validate inputs
+        source_path = self.path_var.get().strip()
+        query_type = self.selector_type_var.get()
+        raw_query_val = self.query_var.get().strip()
+        output_dir = self.output_dir_var.get().strip()
+
+        # Fix XPath label normalization before validation
+        if query_type == "XPath Query":
+            query_type = "XPath"
+
+        # Parse comma-separated queries for all query types (Tag Name, CSS Selector, XPath)
+        doi_pubid_by_ref = bool(self.doi_pubid_by_ref_var.get())
+        mixed_citation_only = should_skip_selector_extract(
+            bool(self.mixed_citation_direct_hits_var.get()),
+            bool(self.mixed_citation_only_var.get()),
+            doi_pubid_by_ref=doi_pubid_by_ref,
+        )
+        queries = self._parse_query_list(raw_query_val)
+        if not queries:
+            if mixed_citation_only or doi_pubid_by_ref:
+                normalized_queries = []
+            else:
+                messagebox.showerror("Error", "Please enter a tag, selector, or XPath query.")
+                return
+        else:
+            # Validate each query
+            normalized_queries = []
+            for query in queries:
+                try:
+                    normalized = self._normalize_query_input(query_type, query)
+                    normalized_queries.append(normalized)
+                except ValueError as exc:
+                    messagebox.showerror("Error", f"Invalid query '{query}': {str(exc)}")
+                    return
+
+        if not source_path:
+            messagebox.showerror("Error", "Please provide a valid source path (file or folder).")
+            return
+        if not os.path.exists(source_path):
+            messagebox.showerror("Error", f"Source path does not exist:\n{source_path}")
+            return
+        if not output_dir:
+            messagebox.showerror("Error", "Please specify an output folder to save the HTML report.")
+            return
+        if not os.path.isdir(output_dir):
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not create output directory:\n{str(e)}")
+                return
+
+        # Prepare UI
+        self.res_text.delete("1.0", tk.END)
+        self.run_btn.config(state="disabled", text="⏳ EXTRACTING ELEMENTS...")
+        self.cancel_btn.config(state="normal")
+        self.progress_bar.config(value=0)
+        if doi_pubid_by_ref:
+            start_msg = "Starting DOI / pub-id by-ref scan…"
+        elif should_skip_selector_extract(
+            bool(self.mixed_citation_direct_hits_var.get()),
+            bool(self.mixed_citation_only_var.get()),
+        ):
+            start_msg = "Starting mixed-citation scan…"
+        else:
+            start_msg = "Starting extraction…"
+        self.status_var.set(start_msg)
+
+        self.cancelled = False
+        ui_settings = self._snapshot_ui_settings()
+
+        # Start Thread with multiple queries
+        self.scan_thread = threading.Thread(
+            target=self._run_extraction_thread,
+            args=(source_path, normalized_queries, query_type, output_dir, ui_settings),
+            daemon=True
+        )
+        self.scan_thread.start()
+
+    def _cancel_extraction(self):
+        self.cancelled = True
+        self._log("\n⚠️ Cancellation requested. Stopping scan...")
+        self.status_var.set("Cancellation requested...")
+        self.cancel_btn.config(state="disabled")
+
+    def _open_last_report(self):
+        if self.last_report_path and os.path.exists(self.last_report_path):
+            webbrowser.open(f"file:///{os.path.abspath(self.last_report_path)}")
+        else:
+            messagebox.showerror("Error", "Last report path is invalid or missing.")
+
+    def _resume_next_batch(self):
+        """Resume processing from the next batch using stored offset."""
+        if not hasattr(self, '_last_batch_next_offset'):
+            messagebox.showinfo("Next Batch", "No previous batch run found. Please run a batch scan first.")
+            return
+
+        # Set the offset to the next batch position
+        self.batch_offset_var.set(self._last_batch_next_offset)
+        # Ensure batch mode is enabled
+        self.batch_mode_var.set(True)
+        self._on_batch_mode_change()
+
+        # Start the extraction
+        self._start_extraction()
+
+        self.status_var.set(f"Resuming from batch offset {self._last_batch_next_offset}...")
+
+
+    def _collect_paths_for_mixed_scan(
+        self,
+        source_path: Path,
+        is_single: bool,
+        all_files: list,
+        all_selector_results: list,
+    ) -> list:
+        """Reuse files already discovered during selector extract (avoid a second tree walk).
+
+        Prefer the explicit ``all_files`` enumeration when present. Otherwise union
+        keys from all selector ``scan_results`` (parallel mode records every scanned
+        file, including zero-match). Returns [] only when nothing was discovered;
+        callers should treat [] as "do not pass file_paths" only if they intend a
+        fresh walk — prefer passing the list whenever non-empty.
+        """
+        if is_single:
+            return [Path(source_path)]
+        paths = []
+        seen = set()
+
+        def _add(raw):
+            fp = Path(raw)
+            try:
+                key = str(fp.resolve())
+            except Exception:
+                key = str(fp.absolute())
+            if key in seen:
+                return
+            seen.add(key)
+            paths.append(fp)
+
+        if all_files:
+            for p in all_files:
+                _add(p)
+            return paths
+        for sel in all_selector_results or []:
+            for fp in (sel.get("scan_results") or {}):
+                _add(fp)
+        return paths
+
+    def _extract_match_payload(self, m: dict, query_val: str, query_type: str) -> dict:
+        tag = str(m.get("tag") or "")
+        return {
+            "line": m.get("line", ""),
+            "tag": tag,
+            "element_kind": tag,
+            "attributes": m.get("attributes") or {},
+            "text": m.get("text", ""),
+            "html": m.get("html", ""),
+            "query_val": query_val,
+            "query_type": query_type,
+            "is_unique": m.get("is_unique"),
+            "unique_group_size": m.get("unique_group_size"),
+        }
+
+    def _extract_live_upsert_file(
+        self,
+        store: EEReportStore,
+        file_path_str: str,
+        data: dict,
+        query_val: str,
+        query_type: str,
+        *,
+        open_report: bool = False,
+        report_path: str | Path | None = None,
+        files_total: int = 0,
+    ) -> None:
+        """Merge one extract file result into the live store and write by_docid (main thread)."""
+        if store is None:
+            return
+        fp = Path(file_path_str)
+        abs_path = str(fp.absolute())
+        docid = fp.parent.name
+        fid = f"{docid}_{fp.name}"
+        matches_out = [
+            self._extract_match_payload(m, query_val, query_type)
+            for m in (data.get("matches") or [])
+        ]
+        ok = bool(data.get("ok", True))
+        err = str(data.get("error", "") or "")
+        # Skip empty successful files (matches detailed-report focus)
+        if ok and not matches_out:
+            return
+
+        existing = None
+        for rec in store._files:
+            if _safe_id_local(str(rec.get("id") or "")) == _safe_id_local(fid) or rec.get("id") == fid:
+                existing = rec
+                break
+        if existing is None:
+            # also match by path
+            for rec in store._files:
+                if str(rec.get("path") or "") == abs_path:
+                    existing = rec
+                    break
+
+        if existing is not None:
+            if not ok:
+                existing["ok"] = False
+                existing["error"] = err or existing.get("error", "")
+            existing.setdefault("matches", []).extend(matches_out)
+            # rebuild query_breakdown
+            breakdown = {}
+            for m in existing["matches"]:
+                qv = str(m.get("query_val") or "")
+                breakdown[qv] = breakdown.get(qv, 0) + 1
+            existing["query_breakdown"] = breakdown
+            lines = [m.get("line") for m in existing["matches"] if m.get("line") not in (None, "")]
+            existing["lines_preview"] = lines[:10]
+            store.write_result(existing)
+        else:
+            try:
+                meta = self.extractor.get_file_metadata(fp)
+            except Exception:
+                meta = {}
+            breakdown = {}
+            for m in matches_out:
+                qv = str(m.get("query_val") or "")
+                breakdown[qv] = breakdown.get(qv, 0) + 1
+            record = {
+                "id": fid,
+                "path": abs_path,
+                "name": fp.name,
+                "doc_type": meta.get("doc_type", ""),
+                "client": meta.get("client", ""),
+                "link_info": meta.get("link_info", ""),
+                "identifier": meta.get("identifier", ""),
+                "project_shortcode": "",
+                "ok": ok,
+                "error": err,
+                "matches": matches_out,
+                "query_breakdown": breakdown,
+                "lines_preview": [m.get("line") for m in matches_out if m.get("line") not in (None, "")][:10],
+            }
+            store.write_result(record)
+
+        files_with, bucket_rows = store.match_stats()
+        done = len(store._files)
+        running_stats = {
+            "files_done": done,
+            "files_total": files_total or done,
+            "files_with_hits": files_with,
+            "bucket_rows": bucket_rows,
+        }
+        if open_report and report_path and not getattr(self, "_extract_report_opened_early", False):
+            store.flush_index(status="running", stats=running_stats)
+            webbrowser.open(f"file:///{report_path}")
+            self._extract_report_opened_early = True
+        else:
+            store.maybe_flush_index(status="running", stats=running_stats)
+
+    def _write_extract_progressive_report(
+        self,
+        *,
+        source_path: Path,
+        is_single: bool,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        query_slug: str,
+        queries: list,
+        query_type: str,
+        attr_name: str,
+        attr_val: str,
+        all_selector_results: list,
+        grand_total_matches: int,
+        total_files_scanned: int,
+        show_outer_xml: bool,
+        show_inner_text: bool,
+        open_report: bool,
+        settings: dict | None = None,
+        all_files: list | None = None,
+    ) -> str:
+        """Write thin extract shell + by_docid + index via EEReportStore (no giant HTML)."""
+        settings = settings or {}
+        self._extract_report_opened_early = False
+        self._set_status("Preparing progressive HTML report...")
+
+        dtd_filter = str(settings.get("dtd_filter", "None") or "None").strip()
+        client_filter = str(settings.get("client_filter", "None") or "None").strip()
+        dtd_norm = dtd_filter if dtd_filter != "None" else ""
+        client_norm = client_filter if client_filter != "None" else ""
+
+        detailed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+        query_label = f"{query_type}: {', '.join(queries)}"
+        if query_type == "Tag Name" and str(attr_name or "").strip():
+            query_label += f" (Filter: {attr_name}"
+            if str(attr_val or "").strip():
+                query_label += f" = {attr_val}"
+            query_label += ")"
+
+        live = getattr(self, "_extract_live_store", None)
+        if live is not None and Path(live.run_folder) == Path(run_folder) and live.kind == "extract":
+            store = live
+        else:
+            store = EEReportStore(run_folder, kind="extract", source_path=str(source_path))
+            self._extract_live_store = store
+        meta_root = source_path if source_path.is_dir() else source_path.parent
+        if store.snapshot_run_meta(meta_root):
+            self._log("Copied meta.json -> run_meta.json")
+
+        manifest_paths: list[dict] = []
+        seen_paths: set[str] = set()
+        if all_files:
+            for fp in all_files:
+                key = str(Path(fp).absolute())
+                if key in seen_paths:
+                    continue
+                seen_paths.add(key)
+                p = Path(fp)
+                manifest_paths.append({"docid": p.parent.name, "path": key})
+        for sel in all_selector_results or []:
+            for fp_str in (sel.get("scan_results") or {}):
+                key = str(Path(fp_str).absolute())
+                if key in seen_paths:
+                    continue
+                seen_paths.add(key)
+                p = Path(fp_str)
+                manifest_paths.append({"docid": p.parent.name, "path": key})
+
+        store.write_manifest(dtd_norm, client_norm, manifest_paths)
+        report_path = store.write_extract_shell_html(
+            detailed_report_name,
+            f"Element Extraction - {safe_target_name}",
+            show_outer_xml=show_outer_xml,
+            show_inner_text=show_inner_text,
+            query_label=query_label,
+        )
+        files_total = total_files_scanned if not is_single else 1
+        store.flush_index(
+            status="running",
+            stats={
+                "files_done": 0,
+                "files_total": files_total,
+                "files_with_hits": 0,
+                "bucket_rows": 0,
+            },
+        )
+        self.last_report_path = str(Path(report_path).absolute())
+        self._log(
+            f"\nProgressive report shell ready: {run_folder_name}/{detailed_report_name}"
+        )
+
+        # Merge per-file records across selectors
+        records: dict[str, dict] = {}
+        for sel in all_selector_results or []:
+            qv = sel.get("query_val", "")
+            qt = sel.get("query_type", query_type)
+            for fp_str, data in (sel.get("scan_results") or {}).items():
+                fp = Path(fp_str)
+                abs_path = str(fp.absolute())
+                docid = fp.parent.name
+                fid = f"{docid}_{fp.name}"
+                matches_out = []
+                for m in (data.get("matches") or []):
+                    tag = str(m.get("tag") or "")
+                    matches_out.append({
+                        "line": m.get("line", ""),
+                        "tag": tag,
+                        "element_kind": tag,
+                        "attributes": m.get("attributes") or {},
+                        "text": m.get("text", ""),
+                        "html": m.get("html", ""),
+                        "query_val": qv,
+                        "query_type": qt,
+                        "is_unique": m.get("is_unique"),
+                        "unique_group_size": m.get("unique_group_size"),
+                    })
+                ok = bool(data.get("ok", True))
+                err = str(data.get("error", "") or "")
+                if fid in records:
+                    rec = records[fid]
+                    if not ok:
+                        rec["ok"] = False
+                        rec["error"] = err or rec.get("error", "")
+                    rec["matches"].extend(matches_out)
+                    breakdown = rec.get("query_breakdown") or {}
+                    for m in matches_out:
+                        qvx = str(m.get("query_val") or "")
+                        breakdown[qvx] = breakdown.get(qvx, 0) + 1
+                    rec["query_breakdown"] = breakdown
+                    rec["lines_preview"] = [
+                        m.get("line") for m in rec["matches"] if m.get("line") not in (None, "")
+                    ][:10]
+                else:
+                    try:
+                        meta = self.extractor.get_file_metadata(fp)
+                    except Exception:
+                        meta = {}
+                    breakdown = {}
+                    for m in matches_out:
+                        qvx = str(m.get("query_val") or "")
+                        breakdown[qvx] = breakdown.get(qvx, 0) + 1
+                    records[fid] = {
+                        "id": fid,
+                        "path": abs_path,
+                        "name": fp.name,
+                        "doc_type": meta.get("doc_type", ""),
+                        "client": meta.get("client", ""),
+                        "link_info": meta.get("link_info", ""),
+                        "identifier": meta.get("identifier", ""),
+                        "project_shortcode": "",
+                        "ok": ok,
+                        "error": err,
+                        "matches": matches_out,
+                        "query_breakdown": breakdown,
+                        "lines_preview": [m.get("line") for m in matches_out if m.get("line") not in (None, "")][:10],
+                    }
+
+        # Prefer files with hits or errors (matches old detailed report focus)
+        to_write = [
+            rec for rec in records.values()
+            if (not rec.get("ok")) or (rec.get("matches"))
+        ]
+        total_write = len(to_write)
+        for i, record in enumerate(to_write, 1):
+            if self.cancelled:
+                break
+            self._set_status(
+                f"Writing report artifacts ({i}/{total_write}): {record.get('name', '')}"
+            )
+            percent = int((i / total_write) * 100) if total_write else 100
+            self._ui(lambda p=percent: self.progress_bar.config(value=p))
+            store.write_result(record)
+            files_with, bucket_rows = store.match_stats()
+            running_stats = {
+                "files_done": i,
+                "files_total": files_total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            }
+            if open_report and not self._extract_report_opened_early:
+                store.flush_index(status="running", stats=running_stats)
+                webbrowser.open(f"file:///{report_path}")
+                self._extract_report_opened_early = True
+            else:
+                store.maybe_flush_index(status="running", stats=running_stats)
+
+        status = "cancelled" if self.cancelled else "complete"
+        files_with, bucket_rows = store.match_stats()
+        store.finalize(
+            status=status,
+            stats={
+                "files_scanned": files_total,
+                "files_total": files_total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows if bucket_rows else grand_total_matches,
+                "selector_count": len(all_selector_results or []),
+            },
+        )
+        self._log(
+            f"Detailed progressive report saved: {run_folder_name}/{detailed_report_name} "
+            f"({bucket_rows or grand_total_matches} match(es) in {files_with} file(s))"
+        )
+        return str(Path(report_path).absolute())
+
+
+    def _write_doi_pubid_by_ref_outputs(
+        self,
+        source_path: Path,
+        is_single: bool,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        ts: str,
+        settings: dict | None = None,
+    ) -> str:
+        """Scan DOI/pub-id by-ref buckets; progressive index.js + by_docid + shell HTML + CSV."""
+        settings = settings or {}
+        self._set_status("Scanning DOI / pub-id by ref…")
+        self._log("\nScanning pub-id / ext-link doi|uri (in vs out of .ref)…")
+        self._doi_report_opened_early = False
+
+        recursive = bool(settings.get("recursive", False)) if not is_single else False
+        ext_str = settings.get("extensions", ".xml, .html, .htm, .xhtml")
+        filename_filter = str(settings.get("filename_filter", "None") or "None").strip()
+        dtd_filter = str(settings.get("dtd_filter", "None") or "None").strip()
+        client_filter = str(settings.get("client_filter", "None") or "None").strip()
+        month_filter = str(settings.get("month_filter", "All Time") or "All Time").strip()
+        custom_month = str(settings.get("custom_month", "") or "").strip()
+        extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+        if not extensions:
+            extensions = [".xml", ".html", ".htm", ".xhtml"]
+        open_report = bool(settings.get("open_report", True))
+        use_docid_cache = bool(settings.get("ee_docid_cache", False))
+        cache_hits = 0
+        dtd_norm = dtd_filter if dtd_filter != "None" else ""
+        client_norm = client_filter if client_filter != "None" else ""
+
+        if is_single:
+            file_list = [Path(source_path)]
+        else:
+            use_index = bool(settings.get("use_folder_index", True))
+            file_list = self.extractor.collect_matching_files(
+                source_path,
+                recursive=recursive,
+                extensions=extensions,
+                filename_filter=filename_filter if filename_filter != "None" else None,
+                dtd_filter=dtd_norm or None,
+                client_filter=client_norm or None,
+                month_filter=month_filter,
+                custom_month=custom_month if month_filter == "Custom" else "",
+                use_index=use_index,
+                discover_new=True,
+                log_callback=self._log,
+                cancel_check=lambda: self.cancelled,
+            )
+            self._log(f"Files to scan after filters: {len(file_list)}")
+
+        report_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.html"
+        csv_name = f"DOI_PubID_By_Ref_{safe_target_name}_{ts}.csv"
+        store = EEReportStore(
+            run_folder, kind="doi_pubid_by_ref", source_path=str(source_path)
+        )
+        meta_root = source_path if source_path.is_dir() else source_path.parent
+        if store.snapshot_run_meta(meta_root):
+            self._log("Copied meta.json → run_meta.json")
+        run_meta_map = {}
+        run_meta_path = run_folder / "run_meta.json"
+        if run_meta_path.is_file():
+            try:
+                import json as _json
+                loaded = _json.loads(run_meta_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    run_meta_map = loaded
+            except Exception:
+                run_meta_map = {}
+        store.write_manifest(
+            dtd_norm,
+            client_norm,
+            [{"docid": fp.parent.name, "path": str(fp)} for fp in file_list],
+        )
+        report_path = store.write_doi_shell_html(
+            report_name, f"DOI / pub-id by ref — {safe_target_name}"
+        )
+        store.flush_index(
+            status="running",
+            stats={"files_done": 0, "files_total": len(file_list)},
+        )
+
+        file_results = []
+        total = len(file_list)
+        for i, fp in enumerate(file_list, 1):
+            if self.cancelled:
+                break
+            percent = int((i / total) * 100) if total else 0
+            self._ui(lambda p=percent: self.progress_bar.config(value=p))
+            self._set_status(f"DOI/pub-id by ref ({i}/{total}): {fp.name}")
+            buckets = None
+            parsed = None
+            if use_docid_cache:
+                cached = try_load_cache(fp)
+                if cached is not None:
+                    buckets = cached["buckets"]
+                    parsed = {"ok": True, "error": "", "buckets": buckets}
+                    cache_hits += 1
+            if buckets is None:
+                parsed = extract_buckets_from_file(fp)
+                buckets = parsed.get("buckets") or []
+                if use_docid_cache and parsed.get("ok"):
+                    write_cache(fp, build_cache_payload(fp, buckets=buckets))
+            meta = self.extractor.get_file_metadata(fp)
+            docid = fp.parent.name
+            meta_entry = run_meta_map.get(docid) if isinstance(run_meta_map.get(docid), dict) else {}
+            project_shortcode = str(
+                meta_entry.get("project-shortcode")
+                or meta_entry.get("project_shortcode")
+                or ""
+            ).strip()
+            matches = []
+            for b in buckets:
+                matches.append({
+                    "bucket": b.get("bucket"),
+                    "element_kind": b.get("element_kind", ""),
+                    "in_ref": bool(b.get("in_ref")),
+                    "under_comment": bool(b.get("under_comment")),
+                    "doi_org_in_href": bool(b.get("doi_org_in_href")),
+                    "doi_org_in_text": bool(b.get("doi_org_in_text")),
+                    "line": b.get("line", ""),
+                    "href": b.get("href", ""),
+                    "text": b.get("text", ""),
+                    "html": b.get("html", ""),
+                })
+            record = {
+                "id": f"{docid}_{fp.name}",
+                "path": str(fp.absolute()),
+                "name": fp.name,
+                "doc_type": meta.get("doc_type", "") or str(meta_entry.get("type") or ""),
+                "client": meta.get("client", "") or str(meta_entry.get("client") or ""),
+                "link_info": meta.get("link_info", ""),
+                "identifier": meta.get("identifier", "") or str(meta_entry.get("file-id") or ""),
+                "project_shortcode": project_shortcode,
+                "ok": parsed.get("ok", False),
+                "error": parsed.get("error", ""),
+                "matches": matches,
+            }
+            store.write_result(record)
+            files_with, bucket_rows = store.match_stats()
+            running_stats = {
+                "files_done": i,
+                "files_total": total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            }
+            file_results.append({
+                "path": str(fp.absolute()),
+                "doc_type": record["doc_type"],
+                "client": record["client"],
+                "link_info": record["link_info"],
+                "identifier": record["identifier"],
+                "ok": parsed.get("ok", False),
+                "error": parsed.get("error", ""),
+                "buckets": buckets,
+            })
+            if open_report and not self._doi_report_opened_early:
+                # Force flush so file:// shell is not opened against empty index.js
+                store.flush_index(status="running", stats=running_stats)
+                webbrowser.open(f"file:///{report_path}")
+                self._doi_report_opened_early = True
+            else:
+                store.maybe_flush_index(status="running", stats=running_stats)
+
+        status = "cancelled" if self.cancelled else "complete"
+        if self.cancelled and not file_results:
+            store.finalize(status="cancelled", stats={"files_total": total})
+            self._log("\nProcess Cancelled by User.")
+            self._set_status("Extraction cancelled.")
+            return ""
+
+        bucket_rows = sum(len(r.get("buckets") or []) for r in file_results if r.get("ok"))
+        files_with = sum(1 for r in file_results if r.get("ok") and r.get("buckets"))
+        store.finalize(
+            status=status,
+            stats={
+                "files_scanned": len(file_results),
+                "files_total": total,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows,
+            },
+        )
+        if self.cancelled:
+            self._log("\nProcess Cancelled by User.")
+            self._set_status("Extraction cancelled.")
+
+        csv_path = run_folder / csv_name
+        write_doi_pubid_by_ref_csv(file_results, csv_path)
+        self.last_csv_path = str(csv_path.absolute())
+        self._log(
+            f"DOI/pub-id by-ref report saved: {run_folder_name}/{report_name} "
+            f"({bucket_rows} bucket row(s) in {files_with}/{len(file_results)} file(s))"
+        )
+        self._log(f"DOI/pub-id by-ref CSV saved: {run_folder_name}/{csv_name}")
+        if use_docid_cache:
+            self._log(f"ee_cache hits: {cache_hits}/{len(file_results)}")
+        return str(Path(report_path).absolute())
+
+    def _write_citation_progressive_reports(
+        self,
+        *,
+        source_path: Path,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        ts: str,
+        cite_type: str,
+        type_slug: str,
+        type_scan: dict,
+        type_matches: int,
+        type_files: int,
+    ) -> tuple[str, str]:
+        """Write citation-type + entire-citation progressive shells (no giant HTML)."""
+        cite_label = ""
+        try:
+            cite_label = self.extractor.cite_type_selector_label(cite_type)
+        except Exception:
+            cite_label = f"cite type: {cite_type}"
+
+        # --- Citation type (per-file matches) ---
+        cite_dir = run_folder / f"citation_type_{type_slug}"
+        cite_store = EEReportStore(
+            cite_dir, kind="citation_type", source_path=str(source_path)
+        )
+        cite_name = f"Citation_Type_Report_{type_slug}_{safe_target_name}_{ts}.html"
+        cite_path = cite_store.write_citation_type_shell_html(
+            cite_name,
+            f"Citation Type Report - {safe_target_name}",
+            cite_label=cite_label,
+        )
+        cite_store.write_manifest("", "", [
+            {"docid": Path(fp).parent.name, "path": fp} for fp in (type_scan or {})
+        ])
+        cite_store.flush_index(
+            status="running",
+            stats={"files_done": 0, "files_total": len(type_scan or {})},
+        )
+
+        # Prefer deduped rows for display consistency with legacy report
+        try:
+            deduped = self.extractor.dedupe_scan_results_per_file_pattern(type_scan)
+        except Exception:
+            deduped = type_scan
+
+        for i, (file_path_str, data) in enumerate((deduped or {}).items(), 1):
+            if self.cancelled:
+                break
+            fp = Path(file_path_str)
+            matches_out = []
+            for m in (data.get("matches") or []):
+                sub = m.get("subcategory") or m.get("classification") or m.get("pattern_key") or ""
+                matches_out.append({
+                    "line": m.get("line", ""),
+                    "tag": m.get("tag", ""),
+                    "element_kind": str(sub),
+                    "classification": m.get("classification") or "",
+                    "subcategory": sub,
+                    "pattern_key": m.get("pattern_key") or "",
+                    "pattern_count": m.get("pattern_count", 1),
+                    "cite_type": (m.get("cite_type") or cite_type or "").strip().lower(),
+                    "text": m.get("text", ""),
+                    "html": m.get("html", "") or "",
+                    "snippet": m.get("snippet", "") or m.get("html", "") or "",
+                    "entire_citation": m.get("entire_citation", "") or "",
+                })
+            ok = bool(data.get("ok", True))
+            if ok and not matches_out:
+                continue
+            record = {
+                "id": f"{fp.parent.name}_{fp.name}",
+                "path": file_path_str,
+                "name": fp.name,
+                "doc_type": "",
+                "client": "",
+                "link_info": "",
+                "identifier": "",
+                "project_shortcode": "",
+                "ok": ok,
+                "error": str(data.get("error", "") or ""),
+                "matches": matches_out,
+            }
+            cite_store.write_result(record)
+            files_with, bucket_rows = cite_store.match_stats()
+            cite_store.maybe_flush_index(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": len(deduped or {}),
+                    "files_with_hits": files_with,
+                    "bucket_rows": bucket_rows,
+                },
+            )
+
+        files_with, bucket_rows = cite_store.match_stats()
+        cite_store.finalize(
+            status="cancelled" if self.cancelled else "complete",
+            stats={
+                "files_scanned": type_files,
+                "files_total": type_files,
+                "files_with_hits": files_with,
+                "bucket_rows": bucket_rows or type_matches,
+            },
+        )
+        citation_report_path = str(Path(cite_path).absolute())
+        self._log(
+            f"Citation type report saved: {run_folder_name}/citation_type_{type_slug}/{cite_name} "
+            f"({type_matches} citation(s) in {type_files} file(s), type={cite_type})"
+        )
+
+        # --- Entire citation (one record per pattern_key) ---
+        self._set_status(f"Writing entire citation report ({cite_type})...")
+        entire_dir = run_folder / f"entire_citation_{type_slug}"
+        entire_store = EEReportStore(
+            entire_dir, kind="entire_citation", source_path=str(source_path)
+        )
+        entire_name = f"Entire_Citation_Report_{type_slug}_{safe_target_name}_{ts}.html"
+        entire_path = entire_store.write_entire_citation_shell_html(
+            entire_name,
+            f"Entire Citation Report - {safe_target_name}",
+            cite_label=cite_label,
+        )
+        entire_store.flush_index(status="running", stats={"files_done": 0, "files_total": 0})
+
+        pattern_map: dict[str, dict] = {}
+        for file_path_str, data in (type_scan or {}).items():
+            if not data.get("ok", True):
+                continue
+            for m in (data.get("matches") or []):
+                pk = m.get("pattern_key") or "Bare Link Text"
+                ct = (m.get("cite_type") or cite_type or "").strip().lower() or "unknown"
+                key = f"{ct}::{pk}"
+                bucket = pattern_map.get(key)
+                example = m.get("entire_citation") or m.get("html") or m.get("snippet") or ""
+                if bucket is None:
+                    pattern_map[key] = {
+                        "id": _safe_id_local(key),
+                        "name": pk,
+                        "pattern_key": pk,
+                        "cite_type": ct,
+                        "path": "",
+                        "doc_type": "",
+                        "client": "",
+                        "link_info": "",
+                        "identifier": "",
+                        "project_shortcode": "",
+                        "ok": True,
+                        "error": "",
+                        "pattern_count": 1,
+                        "match_count": 1,
+                        "matches": [{
+                            "entire_citation": example,
+                            "html": m.get("html", "") or "",
+                            "snippet": m.get("snippet", "") or "",
+                            "pattern_key": pk,
+                            "cite_type": ct,
+                            "element_kind": pk,
+                        }],
+                    }
+                else:
+                    bucket["pattern_count"] = int(bucket.get("pattern_count") or 0) + 1
+                    bucket["match_count"] = bucket["pattern_count"]
+                    if example and not (bucket["matches"][0].get("entire_citation") or ""):
+                        bucket["matches"][0]["entire_citation"] = example
+
+        entire_store.write_manifest("", "", [
+            {"docid": rec["id"], "path": rec.get("pattern_key") or rec["id"]}
+            for rec in pattern_map.values()
+        ])
+        for i, rec in enumerate(pattern_map.values(), 1):
+            if self.cancelled:
+                break
+            entire_store.write_result(rec)
+            entire_store.maybe_flush_index(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": len(pattern_map),
+                    "pattern_count": len(pattern_map),
+                    "bucket_rows": sum(int(r.get("pattern_count") or 0) for r in pattern_map.values()),
+                },
+            )
+
+        occ = sum(int(r.get("pattern_count") or 0) for r in pattern_map.values())
+        entire_store.finalize(
+            status="cancelled" if self.cancelled else "complete",
+            stats={
+                "files_scanned": len(pattern_map),
+                "files_total": len(pattern_map),
+                "files_with_hits": len(pattern_map),
+                "pattern_count": len(pattern_map),
+                "bucket_rows": occ,
+            },
+        )
+        entire_citation_report_path = str(Path(entire_path).absolute())
+        self._log(
+            f"Entire citation report saved: {run_folder_name}/entire_citation_{type_slug}/{entire_name}"
+        )
+        return citation_report_path, entire_citation_report_path
+
+    def _write_mixed_citation_direct_hits_outputs(
+        self,
+        source_path: Path,
+        is_single: bool,
+        run_folder: Path,
+        run_folder_name: str,
+        safe_target_name: str,
+        ts: str,
+        file_paths: list | None = None,
+    ) -> str:
+        """Scan mixed-citation direct hits and write HTML + CSV under run_folder.
+
+        Returns absolute path of the HTML report, or empty string on cancel/no write.
+        """
+        self._set_status("Scanning mixed-citation comment / alpha text…")
+        self._log("\nScanning mixed-citation direct comment + alpha text hits...")
+
+        recursive = bool(self.recursive_var.get()) if not is_single else False
+        ext_str = self.extensions_var.get()
+        filename_filter = self.filename_filter_var.get().strip()
+        dtd_filter = self.dtd_filter_var.get().strip()
+        client_filter = self.client_filter_var.get().strip()
+        month_filter = self.month_filter_var.get().strip() or "All Time"
+        custom_month = self.custom_month_var.get().strip()
+        extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+        if not extensions:
+            extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+        self.progress_bar.config(value=0)
+
+        def progress_update(current, total, file_name):
+            percent = int((current / total) * 100) if total > 0 else 0
+            self.progress_bar.config(value=percent)
+            self._set_status(
+                f"Mixed-citation scan ({current}/{total}): {file_name}"
+            )
+
+        if file_paths is not None:
+            self._log(
+                f"Reusing {len(file_paths)} discovered file path(s) for mixed-citation "
+                f"(skipping tree walk)"
+            )
+        mixed_scan_results = self.extractor.scan_mixed_citation_direct_hits(
+            source_path,
+            recursive=recursive,
+            extensions=extensions,
+            filename_filter=filename_filter if not is_single else None,
+            dtd_filter=dtd_filter if not is_single else None,
+            client_filter=client_filter if not is_single else None,
+            month_filter=month_filter if not is_single else "All Time",
+            custom_month=custom_month if not is_single else "",
+            progress_callback=progress_update,
+            cancel_check=lambda: self.cancelled,
+            file_paths=file_paths,
+            use_index=(bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True) and not is_single and file_paths is None,
+            log_callback=self._log,
+        )
+
+        if self.cancelled:
+            self._log("\nProcess Cancelled by User during mixed-citation scan.")
+            self._set_status("Extraction cancelled.")
+            return ""
+
+        artifact_dir = run_folder / "mixed_citation"
+        store = EEReportStore(
+            artifact_dir, kind="mixed_citation", source_path=str(source_path)
+        )
+        mixed_report_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.html"
+        report_path = store.write_mixed_citation_shell_html(
+            mixed_report_name,
+            f"Mixed-citation Direct Hits - {safe_target_name}",
+        )
+        store.write_manifest("", "", [
+            {"docid": Path(fp).parent.name, "path": fp}
+            for fp in (mixed_scan_results or {})
+        ])
+        store.flush_index(
+            status="running",
+            stats={"files_done": 0, "files_total": len(mixed_scan_results or {})},
+        )
+
+        file_results = []
+        total = len(mixed_scan_results or {})
+        for i, (file_path_str, data) in enumerate((mixed_scan_results or {}).items(), 1):
+            hits = list(data.get("hits") or [])
+            ok = bool(data.get("ok", True))
+            client = data.get("client", "") or ""
+            file_results.append({
+                "path": file_path_str,
+                "client": client,
+                "ok": ok,
+                "hits": hits,
+            })
+            if ok and not hits:
+                continue
+            fp = Path(file_path_str)
+            matches = []
+            for h in hits:
+                kind = str(h.get("kind") or "")
+                matches.append({
+                    "kind": kind,
+                    "element_kind": kind,
+                    "value": h.get("value", ""),
+                    "text": h.get("value", ""),
+                    "line": h.get("line", ""),
+                    "html": h.get("html", "") or "",
+                })
+            record = {
+                "id": f"{fp.parent.name}_{fp.name}",
+                "path": str(fp.absolute()) if fp.exists() else file_path_str,
+                "name": fp.name,
+                "client": client,
+                "doc_type": "",
+                "link_info": "",
+                "identifier": "",
+                "project_shortcode": "",
+                "ok": ok,
+                "error": str(data.get("error", "") or ""),
+                "matches": matches,
+            }
+            store.write_result(record)
+            files_with, bucket_rows = store.match_stats()
+            store.maybe_flush_index(
+                status="running",
+                stats={
+                    "files_done": i,
+                    "files_total": total,
+                    "files_with_hits": files_with,
+                    "bucket_rows": bucket_rows,
+                },
+            )
+
+        rollup_rows = rollup_by_client(file_results)
+        total_mixed_hits = sum(len(r.get("hits") or []) for r in file_results)
+        files_with_mixed = sum(1 for r in file_results if r.get("hits"))
+        store.finalize(
+            status="cancelled" if self.cancelled else "complete",
+            stats={
+                "files_scanned": len(file_results),
+                "files_total": len(file_results),
+                "files_with_hits": files_with_mixed,
+                "bucket_rows": total_mixed_hits,
+                "rollup": rollup_rows,
+            },
+        )
+
+        mixed_citation_report_path = str(Path(report_path).absolute())
+        self.last_mixed_citation_report_path = mixed_citation_report_path
+
+        mixed_csv_name = f"Mixed_Citation_Direct_Hits_{safe_target_name}_{ts}.csv"
+        mixed_csv_file = run_folder / mixed_csv_name
+        write_mixed_citation_direct_hits_csv(
+            mixed_csv_file, file_results, rollup_rows
+        )
+
+        self._log(
+            f"Mixed-citation report saved: {run_folder_name}/mixed_citation/{mixed_report_name} "
+            f"({total_mixed_hits} hit(s) in {files_with_mixed}/{len(file_results)} file(s))"
+        )
+        self._log(f"Mixed-citation CSV saved: {run_folder_name}/{mixed_csv_name}")
+        self._set_status(
+            f"Mixed-citation report complete: {total_mixed_hits} hit(s) "
+            f"in {files_with_mixed}/{len(file_results)} file(s)."
+        )
+        return mixed_citation_report_path
+
+    def _run_extraction_thread(
+        self,
+        source_path_str: str,
+        queries: list[str],
+        query_type: str,
+        output_dir_str: str,
+        ui_settings: dict | None = None,
+    ):
+        settings = ui_settings or {}
+        try:
+            mode = settings.get("mode") or self.mode_var.get()
+            # Fix XPath label normalization
+            if query_type == "XPath Query":
+                query_type = "XPath"
+            attr_name = (settings.get("attr_name") if settings else None)
+            if attr_name is None:
+                attr_name = self.attr_name_var.get().strip()
+            else:
+                attr_name = str(attr_name).strip()
+            attr_val = (settings.get("attr_value") if settings else None)
+            if attr_val is None:
+                attr_val = self.attr_val_var.get().strip()
+            else:
+                attr_val = str(attr_val).strip()
+
+            # Report content options
+            show_outer_xml = bool(settings.get("show_outer_xml", True))
+            show_inner_text = bool(settings.get("show_inner_text", True))
+            generate_csv = bool(settings.get("generate_csv", True))
+            citation_type_report = bool(settings.get("citation_type_report", False))
+            citation_cite_type = str(settings.get("citation_cite_type") or "bibr").strip() or "bibr"
+            mixed_citation_direct_hits = bool(settings.get("mixed_citation_direct_hits", False))
+            doi_pubid_by_ref = bool(settings.get("doi_pubid_by_ref", False))
+            mixed_citation_only = should_skip_selector_extract(
+                mixed_citation_direct_hits,
+                bool(settings.get("mixed_citation_only", False)),
+                doi_pubid_by_ref=doi_pubid_by_ref,
+            )
+
+            # Batch processing options
+            is_batch_mode = bool(settings.get("batch_mode", False)) if mode == "Folder Scan" else False
+            batch_size = int(settings.get("batch_size") or 0) if is_batch_mode else 0
+            batch_offset = settings.get("batch_offset_ui", 0) if is_batch_mode else 0
+
+            # Parallel processing options
+            use_parallel = bool(settings.get("parallel_mode", False)) if mode == "Folder Scan" else False
+            worker_count_raw = settings.get("worker_count", "Auto")
+            worker_count = None if worker_count_raw == "Auto" else int(worker_count_raw)
+
+            source_path = Path(source_path_str)
+            output_dir = Path(output_dir_str)
+
+            is_single = (mode == "Single File")
+
+            # Print scan meta
+            self._log(f"🚀 Starting Element Extraction - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            self._log(f"  Mode:          {mode}")
+            self._log(f"  Source Path:   {source_path}")
+            self._log(f"  Query Type:    {query_type}")
+            if mixed_citation_only and not doi_pubid_by_ref:
+                self._log("  Queries:       (skipped — mixed-citation only mode)")
+            elif doi_pubid_by_ref:
+                self._log("  Queries:       (skipped — DOI / pub-id by ref mode)")
+            else:
+                self._log(f"  Queries:       {len(queries)} selector(s) to process")
+                for i, q in enumerate(queries, 1):
+                    self._log(f"    [{i}] {q}")
+            if query_type == "Tag Name" and attr_name:
+                self._log(f"  Attr Filter:   {attr_name} = '{attr_val}'")
+            copy_matched_files = bool(settings.get("copy_matched_files", False))
+            open_report = bool(settings.get("open_report", True))
+            org_by_month = bool(settings.get("org_by_month", False))
+            self._log(
+                f"  Report Options: Outer XML={'Yes' if show_outer_xml else 'No'}, "
+                f"Inner Text={'Yes' if show_inner_text else 'No'}, CSV={'Yes' if generate_csv else 'No'}, "
+                f"Copy Files={'Yes' if copy_matched_files else 'No'}, "
+                f"Citation Type={'Yes' if citation_type_report else 'No'} (cite={citation_cite_type}), "
+                f"Mixed-citation hits={'Yes' if mixed_citation_direct_hits else 'No'}, "
+                f"Mixed-only={'Yes' if mixed_citation_only and not doi_pubid_by_ref else 'No'}, "
+                f"DOI/pub-id by ref={'Yes' if doi_pubid_by_ref else 'No'}"
+            )
+
+            # Parallel and batch mode logging
+            batch_has_more = False
+            batch_next_offset = 0
+            total_folders = 0
+            processed_folders = 0
+
+            if not is_single and use_parallel:
+                workers_str = str(worker_count) if worker_count else "Auto"
+                self._log(f"  Parallel Mode: Enabled (Workers: {workers_str})")
+
+            if is_batch_mode:
+                # Count total folders for reporting
+                total_folders = len([d for d in source_path.iterdir() if d.is_dir()])
+                processed_folders = min(batch_size, total_folders - batch_offset)
+                self._log(f"  Batch Mode:    Processing {processed_folders} folders (offset: {batch_offset}, size: {batch_size})")
+                self._log(f"  Total Folders: {total_folders}")
+
+            self._log("---------------------------------------------------------------------\n")
+
+            if doi_pubid_by_ref:
+                self._log("DOI / pub-id by ref mode — skipping selector extract")
+                self._set_status("Starting DOI / pub-id by-ref scan…")
+
+                safe_target_name = self._slugify(source_path.stem, "selected_file")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                query_slug = "doi_pubid_by_ref"
+                run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
+                if org_by_month:
+                    month_folder = datetime.now().strftime("%Y-%m")
+                    run_folder = output_dir / month_folder / run_folder_name
+                else:
+                    run_folder = output_dir / run_folder_name
+                run_folder.mkdir(parents=True, exist_ok=True)
+
+                report_path = self._write_doi_pubid_by_ref_outputs(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    ts=ts,
+                    settings=settings,
+                )
+
+                self.last_report_path = report_path or ""
+                self.last_summary_report_path = ""
+                self._record_history_entry(
+                    self._current_run_settings(
+                        str(source_path),
+                        "(doi_pubid_by_ref)",
+                        str(output_dir),
+                        self.last_report_path,
+                        "",
+                        getattr(self, "last_csv_path", "") or "",
+                        0,
+                        "",
+                        batch_offset=0,
+                        has_more_batches=False,
+                        next_batch_offset=0,
+                        settings=settings,
+                    )
+                )
+
+                self._log(f"\nAll outputs saved to: {run_folder}")
+                self._set_status("DOI / pub-id by-ref scan complete.")
+                self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
+                if open_report and report_path and not getattr(self, "_doi_report_opened_early", False):
+                    webbrowser.open(f"file:///{report_path}")
+                return
+
+            if mixed_citation_only:
+                self._log("Mixed-citation only mode — skipping selector extract")
+                self._set_status("Starting mixed-citation scan…")
+
+                safe_target_name = self._slugify(source_path.stem, "selected_file")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                query_slug = "mixed_citation_only"
+                run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
+                if org_by_month:
+                    month_folder = datetime.now().strftime("%Y-%m")
+                    run_folder = output_dir / month_folder / run_folder_name
+                else:
+                    run_folder = output_dir / run_folder_name
+                run_folder.mkdir(parents=True, exist_ok=True)
+
+                mixed_citation_report_path = self._write_mixed_citation_direct_hits_outputs(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    ts=ts,
+                )
+
+                query_label = "(mixed-citation only)"
+                self.last_report_path = mixed_citation_report_path or ""
+                self.last_summary_report_path = ""
+                self._record_history_entry(
+                    self._current_run_settings(
+                        str(source_path),
+                        query_label,
+                        str(output_dir),
+                        self.last_report_path,
+                        "",
+                        "",
+                        0,
+                        "",
+                        batch_offset=0,
+                        has_more_batches=False,
+                        next_batch_offset=0,
+                        settings=settings,
+                    )
+                )
+
+                self._log(f"\nAll outputs saved to: {run_folder}")
+                self._set_status("Mixed-citation only scan complete.")
+                self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
+                if open_report and mixed_citation_report_path:
+                    webbrowser.open(f"file:///{mixed_citation_report_path}")
+                return
+
+            # Collect results for all selectors
+            all_selector_results = []
+            grand_total_matches = 0
+            total_files_scanned = 0
+
+            # Create run folder early so progressive artifacts appear before scan finishes
+            safe_target_name = self._slugify(source_path.stem, "selected_file")
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if len(queries) == 1:
+                query_slug = self._slugify(queries[0][:60], "selector")
+            else:
+                query_slug = f"{self._slugify(queries[0][:30], 'selector')}_and_{len(queries)-1}_more"
+            run_folder_name = format_extraction_run_folder_name(ts, safe_target_name, query_slug)
+            if org_by_month:
+                month_folder = datetime.now().strftime("%Y-%m")
+                run_folder = output_dir / month_folder / run_folder_name
+            else:
+                run_folder = output_dir / run_folder_name
+            run_folder.mkdir(parents=True, exist_ok=True)
+            self._log(f"Run folder ready: {run_folder}")  # run_folder created before classic scan
+            # Seed thin shell + empty index so folder is never empty during long scans
+            self._extract_report_opened_early = False
+            _seed_store = EEReportStore(run_folder, kind="extract", source_path=str(source_path))
+            self._extract_live_store = _seed_store
+            _query_label = f"{query_type}: {', '.join(queries)}"
+            if query_type == "Tag Name" and str(attr_name or "").strip():
+                _query_label += f" (Filter: {attr_name}"
+                if str(attr_val or "").strip():
+                    _query_label += f" = {attr_val}"
+                _query_label += ")"
+            _seed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+            _seed_path = _seed_store.write_extract_shell_html(
+                _seed_report_name,
+                f"Element Extraction - {safe_target_name}",
+                show_outer_xml=show_outer_xml,
+                show_inner_text=show_inner_text,
+                query_label=_query_label,
+            )
+            _seed_store.flush_index(
+                status="running",
+                stats={"files_done": 0, "files_total": 0, "files_with_hits": 0, "bucket_rows": 0},
+            )
+            self.last_report_path = str(Path(_seed_path).absolute())
+            self._extract_seed_report_path = self.last_report_path
+            # Browser opens on first by_docid write (same pattern as DOI), not at empty seed
+            self._log(f"Progressive shell seeded: {run_folder_name}/{_seed_report_name}")
+
+            # Pre-scan file list for sequential folder mode only.
+            # Parallel mode rediscovers files inside scan_directory_parallel, so
+            # a full silent glob here is redundant and freezes the UI status.
+            all_files = []
+            if not is_single and not is_batch_mode and not use_parallel:
+                recursive = self.recursive_var.get()
+                ext_str = self.extensions_var.get()
+                filename_filter = self.filename_filter_var.get().strip()
+                dtd_filter = self.dtd_filter_var.get().strip()
+                client_filter = self.client_filter_var.get().strip()
+                month_filter = self.month_filter_var.get()
+                custom_month = self.custom_month_var.get() if month_filter == "Custom" else ""
+                extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+                if not extensions:
+                    extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                # Build file list once (durable folder index when enabled)
+                self._set_status("Enumerating files...")
+                use_index = bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True
+                all_files = self.extractor.collect_matching_files(
+                    source_path,
+                    recursive=recursive,
+                    extensions=extensions,
+                    filename_filter=filename_filter,
+                    dtd_filter=dtd_filter,
+                    client_filter=client_filter,
+                    month_filter=month_filter,
+                    custom_month=custom_month,
+                    use_index=use_index,
+                    discover_new=True,
+                    log_callback=self._log,
+                    cancel_check=lambda: self.cancelled,
+                )
+
+                if self.cancelled:
+                    self._log("\nProcess Cancelled by User.")
+                    self._set_status("Extraction cancelled.")
+                    return
+                total_files_scanned = len(all_files)
+
+                filter_label = filename_filter if filename_filter != "None" else "No filename filter"
+                dtd_label = dtd_filter if dtd_filter != "None" else "No DTD filter"
+                client_label = client_filter if client_filter != "None" else "No client filter"
+                month_label = month_filter if month_filter != "All Time" else "No month filter"
+                self._log(
+                    f"Scanning directory with filters: {', '.join(extensions)} "
+                    f"(Recursive: {'Yes' if recursive else 'No'}, Filename: {filter_label}, "
+                    f"DTD: {dtd_label}, Client: {client_label}, Month: {month_label})"
+                )
+                if month_filter != "All Time":
+                    if custom_month:
+                        self._log(f"Only scanning files modified in {custom_month}")
+                self._log(f"Found {total_files_scanned} file(s) to scan\n")
+
+            # Process each query
+            for query_idx, query_val in enumerate(queries):
+                if self.cancelled:
+                    self._log("\n❌ Process Cancelled by User.")
+                    self._set_status("Extraction cancelled.")
+                    return
+
+                self._log(f"Processing query [{query_idx + 1}/{len(queries)}]: '{query_val}'")
+                self._set_status(f"Processing query {query_idx + 1}/{len(queries)}: {query_val}")
+
+                scan_results = {}
+                total_matches = 0
+                total_files = 0
+
+                if is_single:
+                    if source_path.is_dir():
+                        raise ValueError("Single File mode selected, but a directory was provided.")
+
+                    total_files = 1
+                    matches = self.extractor.parse_and_extract(
+                        source_path, query_type, query_val, attr_name, attr_val
+                    )
+                    scan_results[str(source_path.absolute())] = {
+                        "ok": True,
+                        "matches": matches
+                    }
+                    total_matches = len(matches)
+                    if getattr(self, "_extract_live_store", None) is not None:
+                        self._extract_live_upsert_file(
+                            self._extract_live_store,
+                            str(source_path.absolute()),
+                            scan_results[str(source_path.absolute())],
+                            query_val,
+                            query_type,
+                            open_report=open_report,
+                            report_path=getattr(self, "_extract_seed_report_path", None),
+                            files_total=1,
+                        )
+                    self._log(f"  ✔ Found {total_matches} matching element(s)")
+
+                elif is_batch_mode:
+                    # Batch mode - use scan_directory_batch
+                    if not source_path.is_dir():
+                        raise ValueError("Folder Scan mode selected, but a file path was provided.")
+
+                    ext_str = self.extensions_var.get()
+                    filename_filter = self.filename_filter_var.get().strip()
+                    dtd_filter = self.dtd_filter_var.get().strip()
+                    client_filter = self.client_filter_var.get().strip()
+                    month_filter = self.month_filter_var.get()
+                    custom_month = self.custom_month_var.get() if month_filter == "Custom" else ""
+                    recursive = self.recursive_var.get()
+                    extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+                    if not extensions:
+                        extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                    def progress_update(current, total, file_name):
+                        percent = int((current / total) * 100) if total > 0 else 0
+                        mode_str = "Parallel" if use_parallel else "Batch"
+                        def _update(p=percent, ms=mode_str, c=current, t=total, n=file_name, qi=query_idx, ql=len(queries)):
+                            self.progress_bar.config(value=p)
+                            self.status_var.set(f"{ms} Query {qi + 1}/{ql} - Scanning ({c}/{t}): {n}")
+                        self._ui(_update)
+
+                    # Use parallel or batch scanning
+                    if use_parallel:
+                        def _on_extract_file_done_batch(file_path_str, result_dict, qv=query_val, qt=query_type):
+                            if getattr(self, "_extract_live_store", None) is None:
+                                return
+                            self._extract_live_upsert_file(
+                                self._extract_live_store,
+                                file_path_str,
+                                result_dict,
+                                qv,
+                                qt,
+                                open_report=open_report,
+                                report_path=getattr(self, "_extract_seed_report_path", None),
+                                files_total=0,
+                            )
+
+                        scan_results, total_matches, total_files, has_more, next_offset = \
+                            self.extractor.scan_directory_parallel(
+                                source_path, query_type, query_val,
+                                attr_name=attr_name, attr_val=attr_val,
+                                extensions=extensions, filename_filter=filename_filter,
+                                dtd_filter=dtd_filter, client_filter=client_filter,
+                                month_filter=month_filter, custom_month=custom_month,
+                                batch_size=batch_size, batch_offset=batch_offset,
+                                max_workers=worker_count,
+                                progress_callback=progress_update,
+                                recursive=recursive,
+                                use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
+                                log_callback=self._log,
+                                file_result_callback=_on_extract_file_done_batch,
+                            )
+                        if scan_results:
+                            seen_af = {str(Path(p).absolute()) for p in all_files}
+                            for fp_str in scan_results:
+                                key = str(Path(fp_str).absolute())
+                                if key not in seen_af:
+                                    all_files.append(Path(fp_str))
+                                    seen_af.add(key)
+                    else:
+                        scan_results, total_matches, total_files, has_more, next_offset = \
+                            self.extractor.scan_directory_batch(
+                                source_path, query_type, query_val,
+                                attr_name=attr_name, attr_val=attr_val,
+                                extensions=extensions, filename_filter=filename_filter,
+                                dtd_filter=dtd_filter, client_filter=client_filter,
+                                month_filter=month_filter, custom_month=custom_month,
+                                batch_size=batch_size, batch_offset=batch_offset,
+                                progress_callback=progress_update,
+                                use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
+                                log_callback=self._log,
+                            )
+
+                    # Track batch info for enabling Next Batch button
+                    batch_has_more = has_more
+                    batch_next_offset = next_offset
+                    total_files_scanned = max(total_files_scanned, total_files)
+
+                    # Log summary for this query
+                    files_with_matches = sum(1 for data in scan_results.values() if data.get("matches"))
+                    self._log(f"  ✔ Found {total_matches} match(es) in {files_with_matches} file(s) (batch: {total_files} files)")
+
+                else:
+                    # Folder scan mode - use parallel processing or sequential processing
+                    if not source_path.is_dir():
+                        raise ValueError("Folder Scan mode selected, but a file path was provided.")
+
+                    def progress_update(current, total, file_name):
+                        percent = int((current / total) * 100) if total > 0 else 0
+                        mode_str = "Parallel" if use_parallel else "Query"
+                        def _update(p=percent, ms=mode_str, c=current, t=total, n=file_name, qi=query_idx, ql=len(queries)):
+                            self.progress_bar.config(value=p)
+                            self.status_var.set(f"{ms} {qi + 1}/{ql} - Scanning ({c}/{t}): {n}")
+                        self._ui(_update)
+
+                    if use_parallel:
+                        # Use parallel processing with scan_directory_parallel
+                        ext_str = self.extensions_var.get()
+                        filename_filter = self.filename_filter_var.get().strip()
+                        dtd_filter = self.dtd_filter_var.get().strip()
+                        client_filter = self.client_filter_var.get().strip()
+                        month_filter = self.month_filter_var.get()
+                        custom_month = self.custom_month_var.get() if month_filter == "Custom" else ""
+                        recursive = self.recursive_var.get()
+                        extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+                        if not extensions:
+                            extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                        def _on_extract_file_done(file_path_str, result_dict, qv=query_val, qt=query_type):
+                            if getattr(self, "_extract_live_store", None) is None:
+                                return
+                            self._extract_live_upsert_file(
+                                self._extract_live_store,
+                                file_path_str,
+                                result_dict,
+                                qv,
+                                qt,
+                                open_report=open_report,
+                                report_path=getattr(self, "_extract_seed_report_path", None),
+                                files_total=0,
+                            )
+
+                        scan_results, total_matches, total_files, _, _ = \
+                            self.extractor.scan_directory_parallel(
+                                source_path, query_type, query_val,
+                                attr_name=attr_name, attr_val=attr_val,
+                                extensions=extensions, filename_filter=filename_filter,
+                                dtd_filter=dtd_filter, client_filter=client_filter,
+                                month_filter=month_filter, custom_month=custom_month,
+                                batch_size=0, batch_offset=0,
+                                max_workers=worker_count,
+                                progress_callback=progress_update,
+                                recursive=recursive,
+                                use_index=bool(self.use_folder_index_var.get()) if hasattr(self, 'use_folder_index_var') else True,
+                                log_callback=self._log,
+                                file_result_callback=_on_extract_file_done,
+                            )
+                        total_files_scanned = max(total_files_scanned, total_files)
+                        # Capture discovered paths so mixed/citation can skip a second tree walk
+                        if scan_results:
+                            seen_af = {str(Path(p).absolute()) for p in all_files}
+                            for fp_str in scan_results:
+                                key = str(Path(fp_str).absolute())
+                                if key not in seen_af:
+                                    all_files.append(Path(fp_str))
+                                    seen_af.add(key)
+                    else:
+                        # Process each file with caching (sequential mode)
+                        total_files = total_files_scanned
+
+                        for i, file_path in enumerate(all_files):
+                            if self.cancelled:
+                                break
+                            progress_update(i + 1, total_files, file_path.name)
+
+                            try:
+                                cached = self.extractor._get_cached(file_path, query_type, query_val, attr_name, attr_val)
+                                if cached is not None:
+                                    matches = cached
+                                else:
+                                    matches = self.extractor.parse_and_extract(file_path, query_type, query_val, attr_name, attr_val)
+                                    self.extractor._set_cache(file_path, query_type, query_val, attr_name, attr_val, matches)
+
+                                if matches:
+                                    scan_results[str(file_path.absolute())] = {
+                                        "ok": True,
+                                        "matches": matches
+                                    }
+                                    total_matches += len(matches)
+                                    if getattr(self, "_extract_live_store", None) is not None:
+                                        self._extract_live_upsert_file(
+                                            self._extract_live_store,
+                                            str(file_path.absolute()),
+                                            scan_results[str(file_path.absolute())],
+                                            query_val,
+                                            query_type,
+                                            open_report=open_report,
+                                            report_path=getattr(self, "_extract_seed_report_path", None),
+                                            files_total=total_files_scanned or total_files,
+                                        )
+                            except Exception as e:
+                                scan_results[str(file_path.absolute())] = {
+                                    "ok": False,
+                                    "error": str(e),
+                                    "matches": []
+                                }
+                                if getattr(self, "_extract_live_store", None) is not None:
+                                    self._extract_live_upsert_file(
+                                        self._extract_live_store,
+                                        str(file_path.absolute()),
+                                        scan_results[str(file_path.absolute())],
+                                        query_val,
+                                        query_type,
+                                        open_report=open_report,
+                                        report_path=getattr(self, "_extract_seed_report_path", None),
+                                        files_total=total_files_scanned or total_files,
+                                    )
+
+                    # Log summary for this query
+                    files_with_matches = sum(1 for data in scan_results.values() if data.get("matches"))
+                    self._log(f"  ✔ Found {total_matches} match(es) in {files_with_matches} file(s)")
+
+                # Store results for this selector
+                all_selector_results.append({
+                    "query_val": query_val,
+                    "query_type": query_type,
+                    "scan_results": scan_results,
+                    "total_matches": total_matches,
+                    "total_files": total_files
+                })
+                grand_total_matches += total_matches
+
+            # Check for cancellation
+            if self.cancelled:
+                self._log("\n❌ Process Cancelled by User.")
+                self._set_status("Extraction cancelled.")
+                return
+
+            self._log("\n---------------------------------------------------------------------")
+            self._log(f"All queries complete! Total Files Checked: {total_files_scanned if not is_single else 1}")
+            self._log(f"Total Matching Elements Found: {grand_total_matches} across {len(queries)} selector(s)")
+            # run_folder / names already created before scan
+
+            # Progressive detailed report (EEReportStore) — skip giant in-memory HTML by default
+            use_legacy_giant = bool(settings.get("legacy_giant_html_report", False))
+            if use_legacy_giant:
+                self._set_status("Generating detailed HTML report...")
+                report_html = self.extractor.generate_html_report(
+                    str(source_path), query_type, ", ".join(queries), attr_name, attr_val,
+                    all_selector_results, grand_total_matches, total_files_scanned if not is_single else 1, is_single,
+                    show_outer_xml=show_outer_xml, show_inner_text=show_inner_text
+                )
+                detailed_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.html"
+                detailed_report_path = run_folder / detailed_report_name
+                with open(detailed_report_path, "w", encoding="utf-8") as f:
+                    f.write(report_html)
+                self.last_report_path = str(detailed_report_path.absolute())
+                self._log(f"\nDetailed report saved: {run_folder_name}/{detailed_report_name}")
+            else:
+                self.last_report_path = self._write_extract_progressive_report(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    query_slug=query_slug,
+                    queries=queries,
+                    query_type=query_type,
+                    attr_name=attr_name,
+                    attr_val=attr_val,
+                    all_selector_results=all_selector_results,
+                    grand_total_matches=grand_total_matches,
+                    total_files_scanned=total_files_scanned,
+                    show_outer_xml=show_outer_xml,
+                    show_inner_text=show_inner_text,
+                    open_report=open_report,
+                    settings=settings,
+                    all_files=all_files if not is_single else [source_path],
+                )
+
+            # Progressive summary shell (same extract index.js + by_docid; no giant HTML)
+            self._set_status("Writing consolidated summary shell...")
+            summary_report_name = f"Element_Extraction_Summary_{safe_target_name}_{query_slug}.html"
+            summary_store = getattr(self, "_extract_live_store", None)
+            if summary_store is None:
+                summary_store = EEReportStore(run_folder, kind="extract", source_path=str(source_path))
+            summary_path = summary_store.write_summary_shell_html(
+                summary_report_name,
+                f"Element Extraction Summary - {safe_target_name}",
+                query_label=f"{query_type}: {', '.join(queries)}",
+                index_src="index.js",
+            )
+            self.last_summary_report_path = str(Path(summary_path).absolute())
+            self._log(f"Summary report saved: {run_folder_name}/{summary_report_name}")
+
+            # Generate citation type (direct/indirect) report if enabled (progressive store)
+            citation_report_path = ""
+            entire_citation_report_path = ""
+            if citation_type_report:
+                self._set_status("Generating citation type report...")
+                self._log(
+                    f"\nScanning citations for cite type '{citation_cite_type}' "
+                    f"(ref-type | object-type | data-role)..."
+                )
+
+                recursive = bool(self.recursive_var.get()) if not is_single else False
+                ext_str = self.extensions_var.get()
+                filename_filter = self.filename_filter_var.get().strip()
+                dtd_filter = self.dtd_filter_var.get().strip()
+                client_filter = self.client_filter_var.get().strip()
+                month_filter = self.month_filter_var.get().strip() or "All Time"
+                custom_month = self.custom_month_var.get().strip()
+                extensions = [e.strip().lower() for e in ext_str.replace(" ", "").split(",") if e.strip()]
+                if not extensions:
+                    extensions = ['.xml', '.html', '.htm', '.xhtml']
+
+                self.progress_bar.config(value=0)
+
+                def citation_progress_update(current, total, file_name):
+                    percent = int((current / total) * 100) if total > 0 else 0
+                    self.progress_bar.config(value=percent)
+                    self._set_status(
+                        f"Citation-type scan ({current}/{total}): {file_name}"
+                    )
+
+                reused_cite_paths = self._collect_paths_for_mixed_scan(
+                    source_path, is_single, all_files, all_selector_results
+                )
+                bibr_scan_results, bibr_total_matches, bibr_total_files = self.extractor.scan_bibr_citations(
+                    source_path,
+                    recursive=recursive,
+                    extensions=extensions,
+                    filename_filter=filename_filter if not is_single else None,
+                    dtd_filter=dtd_filter if not is_single else None,
+                    client_filter=client_filter if not is_single else None,
+                    month_filter=month_filter if not is_single else "All Time",
+                    custom_month=custom_month if not is_single else "",
+                    progress_callback=citation_progress_update,
+                    cite_type=citation_cite_type,
+                    file_paths=reused_cite_paths if reused_cite_paths else None,
+                    use_index=(bool(self.use_folder_index_var.get()) if hasattr(self, "use_folder_index_var") else True) and not is_single and not reused_cite_paths,
+                    log_callback=self._log,
+                    cancel_check=lambda: self.cancelled,
+                )
+
+                cite_types_to_write = self.extractor.discover_cite_types(bibr_scan_results)
+                if not cite_types_to_write:
+                    cite_types_to_write = (
+                        [citation_cite_type]
+                        if (citation_cite_type or "").strip().lower() != "all"
+                        else []
+                    )
+
+                citation_report_path = ""
+                entire_citation_report_path = ""
+                for ct in cite_types_to_write:
+                    type_scan, type_matches, type_files = self.extractor.filter_scan_results_by_cite_type(
+                        bibr_scan_results, ct
+                    )
+                    if type_matches == 0:
+                        continue
+                    type_slug = re.sub(r"[^\w\-]+", "_", ct.lower()) or "cite"
+                    citation_report_path, entire_citation_report_path = self._write_citation_progressive_reports(
+                        source_path=source_path,
+                        run_folder=run_folder,
+                        run_folder_name=run_folder_name,
+                        safe_target_name=safe_target_name,
+                        ts=ts,
+                        cite_type=ct,
+                        type_slug=type_slug,
+                        type_scan=type_scan,
+                        type_matches=type_matches,
+                        type_files=type_files,
+                    )
+
+                if citation_report_path:
+                    self.last_citation_report_path = citation_report_path
+                if entire_citation_report_path:
+                    self.last_entire_citation_report_path = entire_citation_report_path
+                if not cite_types_to_write:
+                    self._log(
+                        f"No citations found for cite type '{citation_cite_type}' "
+                        f"({bibr_total_matches} match(es) in {bibr_total_files} file(s))"
+                    )
+
+            # Generate mixed-citation comment + alpha text report if enabled
+            mixed_citation_report_path = ""
+            if mixed_citation_direct_hits:
+                reused_paths = self._collect_paths_for_mixed_scan(
+                    source_path, is_single, all_files, all_selector_results
+                )
+                mixed_citation_report_path = self._write_mixed_citation_direct_hits_outputs(
+                    source_path=source_path,
+                    is_single=is_single,
+                    run_folder=run_folder,
+                    run_folder_name=run_folder_name,
+                    safe_target_name=safe_target_name,
+                    ts=ts,
+                    file_paths=reused_paths if reused_paths else None,
+                )
+
+            # Generate and save CSV if enabled
+            csv_path = ""
+            unique_csv_path = ""
+            if generate_csv:
+                self._set_status("Generating CSV export...")
+                annotate_selector_results(all_selector_results)
+
+                csv_report_name = f"Element_Extraction_Report_{safe_target_name}_{query_slug}.csv"
+                csv_unique_name = f"Element_Extraction_Unique_{safe_target_name}_{query_slug}.csv"
+                csv_report_path = run_folder / csv_report_name
+                csv_unique_file = run_folder / csv_unique_name
+
+                self.extractor.export_csv(all_selector_results, csv_report_path, unique_only=False)
+                self.extractor.export_csv(all_selector_results, csv_unique_file, unique_only=True)
+
+                self.last_csv_path = str(csv_report_path.absolute())
+                self.last_unique_csv_path = str(csv_unique_file.absolute())
+                csv_path = self.last_csv_path
+                unique_csv_path = self.last_unique_csv_path
+                self._log(f"📋 CSV export saved: {run_folder_name}/{csv_report_name}")
+                self._log(f"📋 Unique CSV saved: {run_folder_name}/{csv_unique_name}")
+
+            # Copy matched files if enabled
+            copied_files_count = 0
+            copied_folder_path = ""
+            if copy_matched_files and grand_total_matches > 0:
+                self._set_status("Copying matched files...")
+                self._log("\n📁 Copying matched source files...")
+
+                # Create subfolder inside run folder for matched files
+                copy_folder = run_folder / "matched_files"
+                copy_folder.mkdir(exist_ok=True)
+
+                # Collect unique files with matches across all selectors
+                files_to_copy = set()
+                for selector_result in all_selector_results:
+                    for file_path_str, data in selector_result["scan_results"].items():
+                        if data.get("ok", True) and data.get("matches"):
+                            files_to_copy.add(Path(file_path_str))
+
+                # Copy each file with collision handling
+                for src_path in files_to_copy:
+                    try:
+                        if not src_path.exists():
+                            self._log(f"  ⚠️ Source file no longer exists: {src_path.name}")
+                            continue
+
+                        dst_path = copy_folder / src_path.name
+
+                        # Handle name collisions
+                        counter = 1
+                        original_dst = dst_path
+                        while dst_path.exists():
+                            stem = original_dst.stem
+                            suffix = original_dst.suffix
+                            dst_path = original_dst.with_name(f"{stem}_{counter}{suffix}")
+                            counter += 1
+
+                        shutil.copy2(src_path, dst_path)  # copy2 preserves timestamps
+                        copied_files_count += 1
+                    except Exception as e:
+                        self._log(f"  ⚠️ Could not copy {src_path.name}: {e}")
+
+                copied_folder_path = str(copy_folder.absolute())
+                self._log(f"  ✔ Copied {copied_files_count} file(s) to: {run_folder_name}/matched_files/")
+
+            # Record history with batch info if applicable
+            is_batch_mode_local = is_batch_mode  # Use local variable from earlier in the method
+            current_batch_offset = batch_offset if is_batch_mode_local else 0
+            current_has_more = batch_has_more if is_batch_mode_local else False
+            current_next_offset = batch_next_offset if is_batch_mode_local else 0
+
+            self._record_history_entry(
+                self._current_run_settings(
+                    str(source_path),
+                    ", ".join(queries),
+                    str(output_dir),
+                    self.last_report_path,
+                    self.last_summary_report_path,
+                    csv_path,
+                    copied_files_count if copy_matched_files else 0,
+                    copied_folder_path if copy_matched_files else "",
+                    batch_offset=current_batch_offset,
+                    has_more_batches=current_has_more,
+                    next_batch_offset=current_next_offset,
+                    settings=settings,
+                    unique_csv_path=unique_csv_path,
+                )
+            )
+
+            self._log(f"\nAll outputs saved to: {run_folder}")
+
+            # Update status with batch info if in batch mode
+            if is_batch_mode:
+                batch_info = f" (Batch: {processed_folders} folders from offset {batch_offset})"
+                if batch_has_more:
+                    batch_info += f" - More batches available (next offset: {batch_next_offset})"
+                    # Store batch state for Next Batch button
+                    self._last_batch_next_offset = batch_next_offset
+                    # Enable Next Batch button on main thread
+                    self.after(0, lambda: self.next_batch_btn.config(state="normal"))
+                else:
+                    batch_info += " - All batches complete"
+                    # Disable Next Batch button
+                    self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
+                    if hasattr(self, '_last_batch_next_offset'):
+                        delattr(self, '_last_batch_next_offset')
+                self._set_status(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).{batch_info}")
+                self._log(batch_info)
+            else:
+                self._set_status(f"Complete! Found {grand_total_matches} match(es) across {len(queries)} selector(s).")
+                # Disable Next Batch button in non-batch mode
+                self.after(0, lambda: self.next_batch_btn.config(state="disabled"))
+
+            # Auto-open detailed report if checked (skip if progressive path already opened)
+            if open_report:
+                if self.last_report_path and not getattr(self, "_extract_report_opened_early", False):
+                    webbrowser.open(f"file:///{self.last_report_path}")
+                if citation_type_report and citation_report_path:
+                    webbrowser.open(f"file:///{citation_report_path}")
+                if citation_type_report and entire_citation_report_path:
+                    webbrowser.open(f"file:///{entire_citation_report_path}")
+                if mixed_citation_direct_hits and mixed_citation_report_path:
+                    webbrowser.open(f"file:///{mixed_citation_report_path}")
+
+        except Exception as e:
+            self._log(f"\n❌ Error during extraction:\n{str(e)}")
+            self._set_status("Extraction failed with errors.")
+            self._ui(lambda err=str(e): messagebox.showerror("Extraction Error", f"An error occurred:\n{err}"))
+
+        finally:
+            enable_open = bool(self.last_report_path and os.path.exists(self.last_report_path))
+            self._ui(lambda eo=enable_open: self._finish_run_ui(enable_open_last=eo))

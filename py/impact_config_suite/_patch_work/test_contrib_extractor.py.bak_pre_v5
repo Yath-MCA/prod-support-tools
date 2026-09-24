@@ -1,0 +1,443 @@
+#!/usr/bin/env python3
+"""Unit tests for core.contrib_extractor helpers and shortcode processing."""
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from core import contrib_extractor as ce
+
+
+MINIMAL_CONTRIB_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+  <front>
+    <article-meta>
+      <contrib-group>
+        <contrib contrib-type="author">
+          <name><surname>Doe</surname><given-names>Jane</given-names></name>
+        </contrib>
+        <contrib contrib-type="author">
+          <name><surname>Smith</surname><given-names>John</given-names></name>
+        </contrib>
+        <contrib contrib-type="author">
+          <name><surname>Lee</surname><given-names>A</given-names></name>
+        </contrib>
+      </contrib-group>
+    </article-meta>
+  </front>
+</article>
+"""
+
+BROKEN_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<article><front><article-meta><p>no contrib group</p></article-meta></front></article>
+"""
+
+
+class TestStatusOf(unittest.TestCase):
+    def test_new_when_missing(self):
+        st, n = ce.status_of({}, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "new")
+        self.assertEqual(n, 0)
+
+    def test_done_when_all_recorded(self):
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "logic": ce.LOGIC_VERSION,
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}, "b": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "done")
+        self.assertEqual(n, 0)
+        self.assertIn("filled", ce.status_note(done, "LWW", "INF", ["a", "b"]))
+
+    def test_update_when_fresh_docs(self):
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b", "c"])
+        self.assertEqual(st, "update")
+        self.assertEqual(n, 2)
+        note = ce.status_note(done, "LWW", "INF", ["a", "b", "c"])
+        self.assertIn("update", note)
+        self.assertIn("+2", note)
+
+    def test_update_when_older_logic(self):
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "logic": 1,
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}, "b": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "update")
+        self.assertEqual(n, 0)
+        note = ce.status_note(done, "LWW", "INF", ["a", "b"])
+        self.assertEqual(note, "update (older logic, regenerate)")
+
+    def test_update_when_logic_missing(self):
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}, "b": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "update")
+        self.assertEqual(n, 0)
+        self.assertIn("older logic", ce.status_note(done, "LWW", "INF", ["a", "b"]))
+
+    def test_update_when_logic_2_under_v3(self):
+        """LOGIC_VERSION=3 treats prior logic=2 reports as older-logic updates."""
+        self.assertEqual(ce.LOGIC_VERSION, 3)
+        done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "logic": 2,
+                        "failed": 0,
+                        "docids": {"a": {"status": "ok"}, "b": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+        st, n = ce.status_of(done, "LWW", "INF", ["a", "b"])
+        self.assertEqual(st, "update")
+        self.assertEqual(n, 0)
+        self.assertEqual(
+            ce.status_note(done, "LWW", "INF", ["a", "b"]),
+            "update (older logic, regenerate)",
+        )
+
+
+class TestXrefHelpers(unittest.TestCase):
+    def _contrib(self, xml: str):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(xml)
+
+    def test_xref_key_count_mode(self):
+        self.assertEqual(ce.XREF_SUBGROUP_BY, "count")
+        c0 = self._contrib("<contrib><name><surname>A</surname></name></contrib>")
+        c2 = self._contrib(
+            '<contrib><name><surname>A</surname></name>'
+            '<xref ref-type="aff" rid="a1">1</xref>'
+            '<xref ref-type="fn" rid="f1">*</xref></contrib>'
+        )
+        self.assertEqual(ce.xref_key(c0), (0, ""))
+        self.assertEqual(ce.xref_key(c2), (2, ""))
+        self.assertEqual(ce.xref_label((0, "")), "xref 0")
+        self.assertEqual(ce.xref_label((2, "")), "xref 2")
+
+    def test_xref_label_types_sig(self):
+        self.assertEqual(ce.xref_label((3, "aff+aff+fn")), "xref 3 (aff+aff+fn)")
+
+    def test_contrib_class(self):
+        self.assertEqual(ce.contrib_class(0, 1), "last")
+        self.assertEqual(ce.contrib_class(0, 2), "before")
+        self.assertEqual(ce.contrib_class(1, 2), "last")
+        self.assertEqual(ce.contrib_class(0, 3), "other")
+        self.assertEqual(ce.contrib_class(1, 3), "before")
+        self.assertEqual(ce.contrib_class(2, 3), "last")
+
+
+class TestBuildStatsSubgroups(unittest.TestCase):
+    def test_subgroups_structure(self):
+        """build_stats cards expose xref subgroups without needing full HTML."""
+        import xml.etree.ElementTree as ET
+
+        def row_for(xml: str, docid: str):
+            c = ET.fromstring(xml)
+            gaps = ce.analyze(c)
+            xk = ce.xref_key(c)
+            return {
+                "docid": docid,
+                "file_id": docid,
+                "contribs": [c],
+                "gaps": [gaps],
+                "xkeys": [xk],
+                "cmp_cls": [("last", xk)],
+                "seqs": [ce.pi_sequences(gaps)],
+                "pat": {},
+                "xk": {},
+            }
+
+        bare = "<contrib><name><surname>A</surname></name></contrib>"
+        with_xref = (
+            '<contrib><name><surname>B</surname></name>'
+            '<xref ref-type="aff" rid="a1">1</xref></contrib>'
+        )
+        rows = [
+            row_for(bare, "d0a"),
+            row_for(bare, "d0b"),
+            row_for(with_xref, "d1a"),
+        ]
+        stats = ce.build_stats(rows)
+        self.assertEqual(stats["total"], 3)
+        card = stats["cards"][("last", "attr")]
+        self.assertIn("subgroups", card)
+        self.assertIn("na", card)
+        # first column n/a for 1-contrib docs; last column has two xref groups
+        xks = [sg["xk"] for sg in card["subgroups"]]
+        self.assertEqual(xks, [(0, ""), (1, "")])
+        by_xk = {sg["xk"]: sg for sg in card["subgroups"]}
+        self.assertEqual(by_xk[(0, "")]["files"], 2)
+        self.assertEqual(by_xk[(1, "")]["files"], 1)
+        # pattern numbers assigned within each group
+        for sg in card["subgroups"]:
+            self.assertTrue(sg["patterns"])
+            self.assertEqual(sg["patterns"][0]["n"], 1)
+            self.assertEqual(sum(len(p["rows"]) for p in sg["patterns"]), sg["files"])
+
+    def test_seq_diff_slot_by_slot(self):
+        base = (",", " and ")
+        seq = (",", ", ")
+        bad, lines = ce.seq_diff(base, seq, "attr")
+        self.assertEqual(bad, {1})
+        self.assertEqual(len(lines), 1)
+        self.assertIn("differs</b> #2", lines[0])
+        self.assertIn("expected", lines[0])
+        self.assertIn("found", lines[0])
+
+
+class TestRoleIndex(unittest.TestCase):
+    def test_one_contrib_last_only(self):
+        self.assertIsNone(ce.role_index(1, "first"))
+        self.assertIsNone(ce.role_index(1, "before"))
+        self.assertEqual(ce.role_index(1, "last"), 0)
+
+    def test_two_contribs_before_and_last(self):
+        self.assertIsNone(ce.role_index(2, "first"))
+        self.assertEqual(ce.role_index(2, "before"), 0)
+        self.assertEqual(ce.role_index(2, "last"), 1)
+
+    def test_three_plus_first_before_last(self):
+        self.assertEqual(ce.role_index(3, "first"), 0)
+        self.assertEqual(ce.role_index(3, "before"), 1)
+        self.assertEqual(ce.role_index(3, "last"), 2)
+        self.assertEqual(ce.role_index(5, "first"), 0)
+        self.assertEqual(ce.role_index(5, "before"), 3)
+        self.assertEqual(ce.role_index(5, "last"), 4)
+
+    def test_zero_contribs(self):
+        self.assertIsNone(ce.role_index(0, "first"))
+        self.assertIsNone(ce.role_index(0, "before"))
+        self.assertIsNone(ce.role_index(0, "last"))
+
+
+class TestBuildOverview(unittest.TestCase):
+    def setUp(self):
+        self.docs = {
+            "d1": {"folder": "JATS/d1"},
+            "d2": {"folder": "JATS/d2"},
+            "d3": {"folder": "BITS/d3"},
+            "d4": {"folder": "JATS/d4"},
+            "orphan": {"folder": "JATS/orphan"},
+        }
+        self.metas = {
+            "d1": {"dtd": "JATS", "client": "LWW", "project-shortcode": "INF", "file-id": "F1"},
+            "d2": {"dtd": "JATS", "client": "LWW", "project-shortcode": "INF", "file-id": "F2"},
+            "d3": {"dtd": "BITS", "client": "LWW", "project-shortcode": "BK", "file-id": "F3"},
+            "d4": {"dtd": "JATS", "client": "PLOS", "project-shortcode": "PBIO", "file-id": "F4"},
+            # orphan doc in docs but no meta — counted in ignored
+        }
+        self.index = ce.build_index(self.docs, self.metas)
+        self.done = {
+            "JATS": {
+                "LWW": {
+                    "INF": {
+                        "generated_at": "2026-09-23 19:10",
+                        "failed": 0,
+                        "docids": {"d1": {"status": "ok"}},
+                    }
+                }
+            }
+        }
+
+    def test_index_jats_only(self):
+        self.assertIn("LWW", self.index)
+        self.assertIn("PLOS", self.index)
+        self.assertEqual(sorted(self.index["LWW"]["INF"]), ["d1", "d2"])
+        self.assertNotIn("BK", self.index.get("LWW", {}))
+
+    def test_overview_counts(self):
+        ov = ce.build_overview(self.docs, self.metas, self.index, self.done)
+        self.assertEqual(ov["dtd"], "JATS")
+        self.assertEqual(ov["clients"], 2)
+        self.assertEqual(ov["shortcodes"], 2)
+        self.assertEqual(ov["docs"], 3)  # d1,d2,d4
+        self.assertEqual(ov["filled"], 0)  # INF is update (d2 missing)
+        self.assertEqual(ov["not_filled"], 1)  # PBIO
+        self.assertEqual(ov["update"], 1)  # INF
+        notes = " ".join(ov["ignored_notes"])
+        self.assertIn("BITS", notes)
+        self.assertIn("without a meta.json entry", notes)
+        text = ce.format_overview_text(ov)
+        self.assertIn("not filled", text)
+        self.assertIn("ignored / check", text)
+
+
+class TestProcessGroupAndMeta(unittest.TestCase):
+    def _make_project(self, tmp: Path, with_contrib: bool = True):
+        docs = {
+            "N001": {"folder": "JATS/N001", "files": {"xml": "JATS/N001/article.xml"}},
+            "N002": {"folder": "JATS/N002", "files": {"xml": "JATS/N002/article.xml"}},
+        }
+        metas = {
+            "N001": {
+                "dtd": "JATS",
+                "client": "LWW",
+                "project-shortcode": "INF",
+                "file-id": "INF-1",
+            },
+            "N002": {
+                "dtd": "JATS",
+                "client": "LWW",
+                "project-shortcode": "INF",
+                "file-id": "INF-2",
+            },
+        }
+        (tmp / "documents.json").write_text(json.dumps(docs), encoding="utf-8")
+        (tmp / "meta.json").write_text(json.dumps(metas), encoding="utf-8")
+        for docid in ("N001", "N002"):
+            folder = tmp / "JATS" / docid
+            folder.mkdir(parents=True)
+            body = MINIMAL_CONTRIB_XML if with_contrib else BROKEN_XML
+            (folder / "article.xml").write_text(body, encoding="utf-8")
+        return docs, metas
+
+    def test_process_group_writes_report_and_meta(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            docs, metas = self._make_project(tmp, with_contrib=True)
+            logs = []
+            entry = ce.process_group(
+                tmp, docs, metas, "LWW", "INF", ["N001", "N002"], log=logs.append
+            )
+            self.assertEqual(entry["documents"], 2)
+            self.assertEqual(entry["failed"], 0)
+            self.assertEqual(ce.LOGIC_VERSION, 3)
+            self.assertEqual(entry.get("logic"), 3)
+            report = tmp / entry["report"]
+            self.assertTrue(report.exists())
+            self.assertTrue((tmp / "JATS" / "N001" / ce.OUT_XML).exists())
+            self.assertTrue((tmp / "JATS" / "N001" / ce.OUT_HTML).exists())
+
+            # Simulate run_contrib_extract meta write
+            done = {}
+            done.setdefault(ce.RUN_DTD, {}).setdefault("LWW", {})["INF"] = entry
+            ce.save_done(tmp, done)
+            loaded = ce.load_done(tmp)
+            self.assertIn("INF", loaded["JATS"]["LWW"])
+            self.assertEqual(loaded["JATS"]["LWW"]["INF"].get("logic"), 3)
+            st, n = ce.status_of(loaded, "LWW", "INF", ["N001", "N002"])
+            self.assertEqual(st, "done")
+            self.assertEqual(n, 0)
+
+    def test_all_fail_not_marked_filled(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            docs, metas = self._make_project(tmp, with_contrib=False)
+            result = ce.run_contrib_extract(
+                tmp,
+                shortcodes=[("LWW", "INF")],
+                delay_sc=0,
+                delay_cl=0,
+                log_callback=lambda m: None,
+            )
+            self.assertEqual(len(result["finished"]), 1)
+            _, _, entry = result["finished"][0]
+            self.assertEqual(entry["failed"], entry["documents"])
+            # meta-contrib should NOT contain INF
+            done = ce.load_done(tmp)
+            self.assertEqual(done.get("JATS", {}).get("LWW", {}).get("INF"), None)
+
+    def test_run_ordered_and_cancel_keeps_finished(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            docs = {
+                "A1": {"folder": "JATS/A1", "files": {"xml": "JATS/A1/article.xml"}},
+                "B1": {"folder": "JATS/B1", "files": {"xml": "JATS/B1/article.xml"}},
+            }
+            metas = {
+                "A1": {"dtd": "JATS", "client": "LWW", "project-shortcode": "AAA", "file-id": "A"},
+                "B1": {"dtd": "JATS", "client": "LWW", "project-shortcode": "BBB", "file-id": "B"},
+            }
+            (tmp / "documents.json").write_text(json.dumps(docs), encoding="utf-8")
+            (tmp / "meta.json").write_text(json.dumps(metas), encoding="utf-8")
+            for docid in ("A1", "B1"):
+                folder = tmp / "JATS" / docid
+                folder.mkdir(parents=True)
+                (folder / "article.xml").write_text(MINIMAL_CONTRIB_XML, encoding="utf-8")
+
+            state = {"n": 0}
+
+            def cancel():
+                # cancel after first shortcode completes (checked before next)
+                return state["n"] >= 1
+
+            def progress(cur, tot, msg):
+                if "done" in msg:
+                    state["n"] += 1
+
+            result = ce.run_contrib_extract(
+                tmp,
+                shortcodes=[("LWW", "AAA"), ("LWW", "BBB")],
+                delay_sc=0,
+                delay_cl=0,
+                log_callback=lambda m: None,
+                progress_callback=progress,
+                cancel_check=cancel,
+            )
+            self.assertTrue(result["cancelled"])
+            self.assertEqual(len(result["finished"]), 1)
+            done = ce.load_done(tmp)
+            self.assertIn("AAA", done["JATS"]["LWW"])
+            self.assertNotIn("BBB", done.get("JATS", {}).get("LWW", {}))
+
+
+class TestTabImport(unittest.TestCase):
+    def test_tab_module_imports(self):
+        # Avoid instantiating Tk widgets; skip when tkinter is unavailable (e.g. headless box).
+        try:
+            import tkinter  # noqa: F401
+        except ModuleNotFoundError:
+            self.skipTest("tkinter not installed")
+        from tabs.contrib_extractor_tab import ContribExtractorTab
+        self.assertTrue(callable(ContribExtractorTab))
+
+
+if __name__ == "__main__":
+    unittest.main()
