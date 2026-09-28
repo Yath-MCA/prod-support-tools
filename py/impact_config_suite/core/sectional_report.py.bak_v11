@@ -19,7 +19,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 12
+REPORT_VERSION = 11
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -294,7 +294,6 @@ def extract_file(xml_path: str | Path) -> dict[str, Any]:
                             "query_key": qk,
                             "section": section,
                             "raw_xml": _element_xml(el),
-                            "attrs": _format_element_attrs(el),
                             **flags,
                         }
                     )
@@ -486,31 +485,6 @@ _DOI_TOKEN_RE = re.compile(
 )
 
 
-
-def _format_element_attrs(el: etree._Element) -> str:
-    """Compact attr string for pattern details (local names; preserves values)."""
-    parts: list[str] = []
-    for key, value in el.attrib.items():
-        name = key.split("}", 1)[-1] if "}" in str(key) else str(key)
-        parts.append(f'{name}="{value}"')
-    return " ".join(parts)
-
-
-def _hit_attrs_display(hit: dict[str, Any], query_key: str) -> str:
-    """Prefer stored attrs; fall back to type meta + href for synthetic hits."""
-    stored = str(hit.get("attrs") or "").strip()
-    if stored:
-        return stored
-    type_attr, type_value = QUERY_TYPE_META.get(query_key, ("", ""))
-    parts: list[str] = []
-    if type_attr and type_value:
-        parts.append(f'{type_attr}="{type_value}"')
-    href = str(hit.get("href") or "").strip()
-    if href:
-        parts.append(f'href="{href}"')
-    return " ".join(parts)
-
-
 def _doi_tokens_from_hit(hit: dict[str, Any]) -> set[str]:
     """Extract normalized DOI values from hit text and href."""
     values: set[str] = set()
@@ -524,21 +498,9 @@ def _doi_tokens_from_hit(hit: dict[str, Any]) -> set[str]:
 
 CLIENT_SUMMARY_HEADERS = [
     "Client",
-    "File_id",
-    "Docid",
-    "Pattern#",
-    "Kind",
-    "DOI",
-    "Tag_L",
-    "Attr_L",
-    "Tag_R",
-    "Attr_R",
-    "Sections",
+    "Scanned document count",
+    "Issue document count",
 ]
-
-KIND_V1 = "extlink_doi↔uri"
-KIND_V1_LEFT = "extlink_doi"
-KIND_V1_RIGHT = "uri"
 
 
 def _doc_identity(row_or_issue: dict[str, Any]) -> tuple[str, str, str]:
@@ -548,102 +510,6 @@ def _doc_identity(row_or_issue: dict[str, Any]) -> tuple[str, str, str]:
         str(row_or_issue.get("docid") or ""),
         str(row_or_issue.get("xml_path") or ""),
     )
-
-
-def _pick_side_hit(hits: list[dict[str, Any]]) -> dict[str, Any]:
-    """Prefer a hit that mentions doi.org; else first sample."""
-    if not hits:
-        return {}
-    for hit in hits:
-        text = str(hit.get("text") or "")
-        href = str(hit.get("href") or "")
-        if "doi.org" in text.lower() or "doi.org" in href.lower():
-            return hit
-        if hit.get("doi_org_in_href") or hit.get("doi_org_in_text"):
-            return hit
-    return hits[0]
-
-
-def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Kind v1: same normalized DOI in both extlink_doi and uri buckets per file.
-
-    Returns pattern dicts sorted by client, file_id/docid, DOI. Pattern# is
-    assigned per (client, file_id, docid) starting at 1.
-    """
-    raw: list[dict[str, Any]] = []
-    for row in rows:
-        by_doi: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(
-            lambda: defaultdict(list)
-        )
-        per = row.get("per_section") or {}
-        for section in SECTIONS:
-            for query_key in (KIND_V1_LEFT, KIND_V1_RIGHT):
-                bucket = (per.get(section) or {}).get(query_key) or {}
-                for hit in bucket.get("hits") or []:
-                    for doi in _doi_tokens_from_hit(hit):
-                        sample = {
-                            "section": section,
-                            "query": query_key,
-                            "tag": str(hit.get("tag") or ""),
-                            "text": str(hit.get("text") or ""),
-                            "href": str(hit.get("href") or ""),
-                            "attrs": _hit_attrs_display(hit, query_key),
-                            "doi_org_in_href": bool(hit.get("doi_org_in_href")),
-                            "doi_org_in_text": bool(hit.get("doi_org_in_text")),
-                        }
-                        by_doi[doi][query_key].append(sample)
-        for doi, sides in by_doi.items():
-            if KIND_V1_LEFT not in sides or KIND_V1_RIGHT not in sides:
-                continue
-            left = _pick_side_hit(sides[KIND_V1_LEFT])
-            right = _pick_side_hit(sides[KIND_V1_RIGHT])
-            sections = sorted(
-                {
-                    str(h.get("section") or "")
-                    for h in (sides[KIND_V1_LEFT] + sides[KIND_V1_RIGHT])
-                    if h.get("section")
-                }
-            )
-            raw.append(
-                {
-                    "client": row.get("client") or "unknown",
-                    "file_id": row.get("file_id") or "",
-                    "docid": row.get("docid") or "",
-                    "xml_path": row.get("xml_path") or "",
-                    "kind": KIND_V1,
-                    "doi": doi,
-                    "tag_l": left.get("tag") or "ext-link",
-                    "attr_l": left.get("attrs") or "",
-                    "sample_l": left.get("text") or left.get("href") or "",
-                    "tag_r": right.get("tag") or "uri",
-                    "attr_r": right.get("attrs") or "",
-                    "sample_r": right.get("text") or right.get("href") or "",
-                    "sections": sections,
-                }
-            )
-
-    raw.sort(
-        key=lambda p: (
-            str(p["client"]).lower(),
-            str(p["file_id"] or p["docid"]).lower(),
-            str(p["docid"]).lower(),
-            p["doi"],
-        )
-    )
-    # Number patterns per file identity
-    counters: dict[tuple[str, str, str], int] = defaultdict(int)
-    patterns: list[dict[str, Any]] = []
-    for item in raw:
-        key = (
-            str(item["client"]),
-            str(item["file_id"]),
-            str(item["docid"]),
-        )
-        counters[key] += 1
-        numbered = dict(item)
-        numbered["pattern_num"] = counters[key]
-        patterns.append(numbered)
-    return patterns
 
 
 def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -674,93 +540,12 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return summary
 
 
-def _pattern_block_html(pat: dict[str, Any]) -> str:
-    """One numbered Kind-v1 pattern card (no View HTML/XML columns)."""
-    sections = ", ".join(pat.get("sections") or [])
-    return (
-        f'<div class="pattern-block">'
-        f'<div class="pattern-h"><b>pattern-{int(pat["pattern_num"])}</b>'
-        f' <span class="kind">{_esc(pat.get("kind") or KIND_V1)}</span></div>'
-        f'<div class="pattern-doi">DOI: <code>{_esc(pat.get("doi") or "")}</code></div>'
-        f'<div class="pattern-sides">'
-        f'<div class="side left"><div class="side-label">Left ({_esc(KIND_V1_LEFT)})</div>'
-        f'<div><code>{_esc(pat.get("tag_l") or "")}</code>'
-        f' <span class="attrs">{_esc(pat.get("attr_l") or "")}</span></div>'
-        f'<div class="sample">{_esc(pat.get("sample_l") or "")}</div></div>'
-        f'<div class="side right"><div class="side-label">Right ({_esc(KIND_V1_RIGHT)})</div>'
-        f'<div><code>{_esc(pat.get("tag_r") or "")}</code>'
-        f' <span class="attrs">{_esc(pat.get("attr_r") or "")}</span></div>'
-        f'<div class="sample">{_esc(pat.get("sample_r") or "")}</div></div>'
-        f"</div>"
-        f'<div class="pattern-sections">Sections: {_esc(sections or "—")}</div>'
-        f"</div>"
-    )
-
-
-def _client_details_html(patterns: list[dict[str, Any]]) -> str:
-    """Per-client → per file-id/docid → pattern-1..N details blocks."""
-    if not patterns:
-        return (
-            '<section class="client-summary-details" aria-label="Pattern details">'
-            "<h2>Details</h2>"
-            f"<p class=\"inconsistency-note\">No {KIND_V1} patterns "
-            "(same normalized DOI in both buckets).</p></section>"
-        )
-
-    by_client: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for pat in patterns:
-        by_client[str(pat.get("client") or "unknown")].append(pat)
-
-    client_blocks: list[str] = []
-    for client in sorted(by_client, key=lambda c: c.lower()):
-        pats = by_client[client]
-        by_file: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
-        for pat in pats:
-            by_file[(str(pat.get("file_id") or ""), str(pat.get("docid") or ""))].append(pat)
-
-        file_blocks: list[str] = []
-        for (file_id, docid), file_pats in sorted(
-            by_file.items(),
-            key=lambda kv: ((kv[0][0] or kv[0][1]).lower(), kv[0][1].lower()),
-        ):
-            file_pats = sorted(file_pats, key=lambda p: int(p["pattern_num"]))
-            id_label = _combined_id_text(file_id, docid).replace("\n", " / ")
-            body = "".join(_pattern_block_html(p) for p in file_pats)
-            file_blocks.append(
-                f'<details class="file-details" open>'
-                f"<summary>{_esc(id_label)} "
-                f'<span class="cnt">{len(file_pats)} pattern'
-                f'{"s" if len(file_pats) != 1 else ""}</span></summary>'
-                f"{body}</details>"
-            )
-
-        n_files = len(by_file)
-        n_pats = len(pats)
-        client_blocks.append(
-            f'<details class="client-details" open data-client="{_esc(client)}">'
-            f"<summary><b>{_esc(client)}</b> "
-            f'<span class="cnt">{n_pats} pattern{"s" if n_pats != 1 else ""} '
-            f'/ {n_files} file{"s" if n_files != 1 else ""}</span></summary>'
-            f'{"".join(file_blocks)}</details>'
-        )
-
-    return (
-        '<section class="client-summary-details" aria-label="Pattern details">'
-        "<h2>Details</h2>"
-        f'<p class="inconsistency-note">Kind v1 ({_esc(KIND_V1)}): same normalized '
-        "DOI present in both <code>extlink_doi</code> and <code>uri</code> buckets. "
-        "Patterns numbered per file-id / docid.</p>"
-        f'{"".join(client_blocks)}</section>'
-    )
-
-
 def _client_summary_panel_html(
     summary: list[dict[str, Any]],
     *,
     title: str = "Client-wise summary",
-    patterns: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Shareable table + bar chart + Kind-v1 pattern details per client/file."""
+    """Shareable table + bar chart: scanned docs vs issue docs per client."""
     total_scanned = sum(int(item["scanned_document_count"]) for item in summary)
     total_issues = sum(int(item["issue_document_count"]) for item in summary)
     n_clients = len(summary)
@@ -817,14 +602,12 @@ def _client_summary_panel_html(
         f"</tr></thead><tbody>{table_rows}</tbody></table>"
     )
 
-    details = _client_details_html(patterns or [])
-
     return (
         f'<section class="client-summary-panel" aria-label="{_esc(title)}">'
         f"<h2>{_esc(title)}</h2>"
         '<p class="inconsistency-note">Shareable overview for production / XML teams: '
         "scanned documents vs documents with DOI cross-query inconsistencies.</p>"
-        f"{kpi}{chart}{table}{details}</section>"
+        f"{kpi}{chart}{table}</section>"
     )
 
 
@@ -834,35 +617,26 @@ def write_client_summary(
     *,
     basename: str = "client_summary",
 ) -> tuple[Path, Path]:
-    """Write shareable client-wise summary HTML (KPI + Kind-v1 details) + detail CSV."""
+    """Write shareable client-wise scanned/issue summary HTML + CSV."""
     ensure_dir(report_dir)
     summary = compute_client_summary(rows)
-    patterns = find_kind_v1_patterns(rows)
     html_path = report_dir / f"{basename}.html"
     csv_path = report_dir / f"{basename}.csv"
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(CLIENT_SUMMARY_HEADERS)
-        for pat in patterns:
+        for item in summary:
             writer.writerow(
                 [
-                    pat["client"],
-                    pat["file_id"],
-                    pat["docid"],
-                    pat["pattern_num"],
-                    pat["kind"],
-                    pat["doi"],
-                    pat["tag_l"],
-                    pat["attr_l"],
-                    pat["tag_r"],
-                    pat["attr_r"],
-                    ";".join(pat.get("sections") or []),
+                    item["client"],
+                    item["scanned_document_count"],
+                    item["issue_document_count"],
                 ]
             )
     css = (
         "body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
         "h1,h2,h3{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}"
-        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;max-width:1100px}"
+        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;max-width:960px}"
         ".client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}"
         ".kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;"
         "border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}"
@@ -879,19 +653,6 @@ def write_client_summary(
         "table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a}"
         "th,td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left}"
         "th{color:#94a3b8;font-weight:600}"
-        ".client-summary-details{margin-top:22px}"
-        "details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;"
-        "border-radius:8px;margin:10px 0;padding:8px 12px}"
-        "details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}"
-        "details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}"
-        ".pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}"
-        ".pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}"
-        ".pattern-doi{margin:6px 0;font-size:13px}"
-        ".pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}"
-        ".side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}"
-        ".side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}"
-        ".pattern-sections{font-size:12px;color:#94a3b8}"
-        "code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
     )
     page = "\n".join(
         [
@@ -899,9 +660,9 @@ def write_client_summary(
             '<html lang="en"><head><meta charset="utf-8"/>',
             f"<title>Sectional Report Client Summary v{REPORT_VERSION}</title>",
             f"<style>{css}</style></head><body>",
-            "<h1>Sectional Report - Client-wise summary</h1>",
+            "<h1>Sectional Report — Client-wise summary</h1>",
             f'<div class="meta">REPORT_VERSION={REPORT_VERSION}</div>',
-            _client_summary_panel_html(summary, patterns=patterns),
+            _client_summary_panel_html(summary),
             "</body></html>",
         ]
     )
@@ -993,11 +754,8 @@ def _inconsistency_section_html(
         else:
             summary = []
 
-    patterns = find_kind_v1_patterns(rows) if rows is not None else []
     summary_panel = (
-        _client_summary_panel_html(summary, patterns=patterns)
-        if (summary or rows is not None)
-        else ""
+        _client_summary_panel_html(summary) if (summary or rows is not None) else ""
     )
 
     counts: dict[str, int] = defaultdict(int)
@@ -1055,7 +813,7 @@ def write_inconsistency_report(
         "<!DOCTYPE html>", '<html lang="en"><head><meta charset="utf-8"/>',
         f"<title>Sectional Report Inconsistency Report v{REPORT_VERSION}</title>",
         "<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
-        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.cause-chart{margin:0 0 20px}.cause-bar{display:grid;grid-template-columns:minmax(120px,180px) 1fr auto;align-items:center;gap:10px;margin:8px 0}.cause-bar-label{font-size:13px;font-weight:600}.cause-bar-track{height:18px;background:#334155;position:relative;overflow:hidden;border-radius:6px}.cause-bar-fill{display:block;height:100%;position:absolute;left:0;top:0;border-radius:6px}.cause-bar-fill.scanned{width:var(--pct-scanned);background:#0ea5e9;opacity:.35}.cause-bar-fill.issue{width:var(--pct-issue);background:#f59e0b}.cause-bar-value{font-size:12px;color:#94a3b8;white-space:nowrap}.client-bar{display:flex;gap:10px;align-items:center;margin:6px 0}.client-bar-label{width:160px}.client-bar-track{background:#334155;display:inline-block;flex:1;height:12px;border-radius:8px}.client-bar-fill{background:#f59e0b;display:block;height:100%;border-radius:8px}table{width:100%;border-collapse:collapse;font-size:13px;background:#1e293b}th,td{border-bottom:1px solid #334155;padding:6px 8px;text-align:left;vertical-align:top}small{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}</style></head><body>",
+        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.cause-chart{margin:0 0 20px}.cause-bar{display:grid;grid-template-columns:minmax(120px,180px) 1fr auto;align-items:center;gap:10px;margin:8px 0}.cause-bar-label{font-size:13px;font-weight:600}.cause-bar-track{height:18px;background:#334155;position:relative;overflow:hidden;border-radius:6px}.cause-bar-fill{display:block;height:100%;position:absolute;left:0;top:0;border-radius:6px}.cause-bar-fill.scanned{width:var(--pct-scanned);background:#0ea5e9;opacity:.35}.cause-bar-fill.issue{width:var(--pct-issue);background:#f59e0b}.cause-bar-value{font-size:12px;color:#94a3b8;white-space:nowrap}.client-bar{display:flex;gap:10px;align-items:center;margin:6px 0}.client-bar-label{width:160px}.client-bar-track{background:#334155;display:inline-block;flex:1;height:12px;border-radius:8px}.client-bar-fill{background:#f59e0b;display:block;height:100%;border-radius:8px}table{width:100%;border-collapse:collapse;font-size:13px;background:#1e293b}th,td{border-bottom:1px solid #334155;padding:6px 8px;text-align:left;vertical-align:top}small{color:#94a3b8}</style></head><body>",
         f"<h1>Sectional Report Inconsistency Report</h1><div class=\"meta\">REPORT_VERSION={REPORT_VERSION}</div>",
         _inconsistency_section_html(issues, rows=rows),
         "</body></html>",
@@ -1290,18 +1048,6 @@ small {{ color:#94a3b8; }}
 .cause-bar-fill.scanned {{ width:var(--pct-scanned); background:#0ea5e9; opacity:.35; }}
 .cause-bar-fill.issue {{ width:var(--pct-issue); background:#f59e0b; }}
 .cause-bar-value {{ font-size:12px; color:#94a3b8; white-space:nowrap; }}
-.client-summary-details {{ margin-top:22px; }}
-details.client-details, details.file-details {{ background:#0f172a; border:1px solid #334155; border-radius:8px; margin:10px 0; padding:8px 12px; }}
-details.client-details>summary, details.file-details>summary {{ cursor:pointer; font-weight:600; }}
-details .cnt {{ font-weight:400; color:#94a3b8; font-size:12px; margin-left:8px; }}
-.pattern-block {{ border-left:3px solid #6366f1; padding:8px 12px; margin:10px 0; background:#1e293b; border-radius:6px; }}
-.pattern-h .kind {{ color:#fbbf24; font-size:12px; margin-left:8px; }}
-.pattern-doi {{ margin:6px 0; font-size:13px; }}
-.pattern-sides {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:8px 0; }}
-.side-label {{ font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }}
-.side .attrs {{ color:#94a3b8; font-size:12px; }}
-.side .sample {{ margin-top:4px; font-size:12px; color:#cbd5e1; word-break:break-word; }}
-.pattern-sections {{ font-size:12px; color:#94a3b8; }}
 .inconsistency-report {{ margin-top:28px; background:#1e293b; border-radius:10px; padding:16px; }}
 .inconsistency-report h2 {{ color:#fbbf24; }}
 .client-bar {{ display:flex; gap:10px; align-items:center; margin:6px 0; }}

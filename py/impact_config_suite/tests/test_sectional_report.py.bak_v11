@@ -334,7 +334,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(result["per_section"]["OTHER"]["doi_id"]["count"], 0)
 
     def test_report_version_and_html_filters(self):
-        self.assertEqual(sr.REPORT_VERSION, 12)
+        self.assertEqual(sr.REPORT_VERSION, 11)
         xml = self._write("folder/b.xml", SAMPLE_XML)
         # synthetic meta-bearing row via project
         proj = self.tmp / "proj_filters"
@@ -558,29 +558,8 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(by_client["ClientB"]["issue_document_count"], 0)
         self.assertEqual(
             sr.CLIENT_SUMMARY_HEADERS,
-            [
-                "Client",
-                "File_id",
-                "Docid",
-                "Pattern#",
-                "Kind",
-                "DOI",
-                "Tag_L",
-                "Attr_L",
-                "Tag_R",
-                "Attr_R",
-                "Sections",
-            ],
+            ["Client", "Scanned document count", "Issue document count"],
         )
-
-        patterns = sr.find_kind_v1_patterns([row, clean])
-        self.assertEqual(len(patterns), 1)
-        self.assertEqual(patterns[0]["kind"], sr.KIND_V1)
-        self.assertEqual(patterns[0]["pattern_num"], 1)
-        self.assertEqual(patterns[0]["doi"], doi)
-        self.assertEqual(patterns[0]["tag_l"], "ext-link")
-        self.assertEqual(patterns[0]["tag_r"], "uri")
-        self.assertIn("BODY", patterns[0]["sections"])
 
         cs_html, cs_csv = sr.write_client_summary([row, clean], self.tmp / "reports")
         self.assertTrue(cs_html.is_file())
@@ -590,32 +569,14 @@ class TestSectionalReport(unittest.TestCase):
         self.assertIn("cause-bar", cs_text)
         self.assertIn("ClientA", cs_text)
         self.assertIn("ClientB", cs_text)
-        self.assertIn("pattern-1", cs_text)
-        self.assertIn(sr.KIND_V1, cs_text)
-        self.assertIn("client-summary-details", cs_text)
-        self.assertIn("file-details", cs_text)
-        self.assertNotIn("View HTML", cs_text)
-        self.assertNotIn("View XML", cs_text)
         csv_text = cs_csv.read_text(encoding="utf-8")
-        self.assertIn(
-            "Client,File_id,Docid,Pattern#,Kind,DOI,Tag_L,Attr_L,Tag_R,Attr_R,Sections",
-            csv_text,
-        )
-        self.assertIn("ClientA,F1,D1,1,", csv_text)
-        self.assertIn(doi, csv_text)
-        self.assertIn("ext-link", csv_text)
-        self.assertIn(",uri,", csv_text)
-        self.assertNotIn("ClientA,1,1", csv_text)
+        self.assertIn("Client,Scanned document count,Issue document count", csv_text)
+        self.assertIn("ClientA,1,1", csv_text)
+        self.assertIn("ClientB,1,0", csv_text)
 
         # Main sectional HTML also embeds the shareable summary panel
         self.assertIn("Client-wise summary", page)
         self.assertIn("Scanned document count", page)
-        self.assertIn("pattern-1", page)
-        self.assertIn(sr.KIND_V1, page)
-        # Text Sample toggle left alone on main report
-        self.assertIn("HTML Preview", page)
-        self.assertIn("Raw XML", page)
-        self.assertIn("previewToggle", page)
 
 
 if __name__ == "__main__":
