@@ -1,0 +1,226 @@
+    log(f"[ISSUES] {len(entries)} pattern finding(s) in {n_files} file(s); {n_all} PI issue(s) on all contribs")
+    for e in entries[:limit]:
+        r = e["row"]
+        detail = e["plain"][0] if e["plain"] else ""
+        log(f"    {fid_of(r)} ({GROUP_LABEL[e['group']]}): {e['role']} / {e['xref']} / {e['kind']} - {detail}")
+    if len(entries) > limit:
+        log(f"    ... +{len(entries) - limit} more (see the report / csv)")
+
+
+# ------------------------------------------------------------- one document
+
+def read_doc(base: Path, docid: str, item: dict, meta: dict, log: LogFn = _noop_log) -> dict:
+    """Read + parse one document. Never raises; problems go into row['error']."""
+    row = {
+        "docid": docid,
+        "file_id": meta.get("file-id", ""),
+        "folder": doc_folder(base, docid, item, meta),
+        "preview_rel": "",
+        "cells": None,
+        "error": None,
+        "contribs": None,
+        "raws": [],
+        "gaps": [],
+        "raw_group": "",
+        "group_root": None,
+        "issues": [],
+        "xkeys": [],
+        "cmp_cls": [],
+        "xk": {},
+        "hits": [],
+        "seqs": [],
+        "pat": {},
+    }
+    folder = row["folder"]
+    if not folder.is_dir():
+        row["error"] = f"folder not found: {folder}"
+        log(f"[MISSING] {docid} - {row['error']}")
+        return row
+
+    src, raw = extract_contrib_groups(folder, base, item)
+    if not raw:
+        row["error"] = "no <contrib-group> found in any xml in folder"
+        # Skip this doc only; shortcode run continues with remaining docs
+        log(f"[NO CONTRIB] {docid} - {row['error']} (skip doc; continue)")
+        return row
+
+    try:
+        group_root = parse_group(raw)
+        contribs = list(group_root.iter("contrib"))
+    except ET.ParseError as e:
+        row["error"] = f"contrib-group parse error: {e}"
+        log(f"[FAILED] {docid} - {row['error']}")
+        return row
+
+    if not contribs:
+        row["error"] = "<contrib-group> has no <contrib>"
+        log(f"[EMPTY] {docid} - {row['error']}")
+        return row
+
+    raws = raw_contribs(raw)
+    if len(raws) != len(contribs):
+        log(f"[WARN] {docid} - raw/parsed contrib count differs ({len(raws)} vs {len(contribs)})")
+
+    row["contribs"] = contribs
+    row["raws"] = raws
+    row["raw_group"] = raw
+    row["group_root"] = group_root
+    row["src"] = src.name
+    row["gaps"] = [analyze(c) for c in contribs]
+    n = len(contribs)
+    row["xkeys"] = [xref_key(c) for c in contribs]
+    row["cmp_cls"] = [(contrib_class(i, n), row["xkeys"][i]) for i in range(n)]
+    row["hits"] = [pattern_hits(g) for g in row["gaps"]]
+    row["seqs"] = [pi_sequences(h) for h in row["hits"]]
+    return row
+
+
+# ------------------------------------------------------ one client + shortcode
+
+def process_group(
+    base: Path,
+    docs: dict,
+    metas: dict,
+    client: str,
+    shortcode: str,
+    docids: list,
+    log: LogFn = _noop_log,
+    progress: ProgressFn = _noop_progress,
+    cancel_check: CancelFn = _noop_cancel,
+) -> dict:
+    """Build per-doc outputs, the contrib report, the element list and the issues csv."""
+    rows = []
+    n_docs = len(docids)
+    for di, d in enumerate(docids, 1):
+        if cancel_check():
+            break
+        pending_docs = n_docs - di
+        doc_msg = (
+            f"[DOC] {client}/{shortcode}  {di}/{n_docs}  "
+            f"current={d}  pending_docs={pending_docs}"
+        )
+        log(doc_msg)
+        progress(di, n_docs, doc_msg)
+        rows.append(read_doc(base, d, docs[d], metas[d], log=log))
+    good = [r for r in rows if r["contribs"]]
+
+    expected = expected_values(
+        (cls, gl) for r in good for cls, gl in zip(r["cmp_cls"], r["gaps"])
+    )
+    # one statistics set per contrib-count group (= one tab of the report)
+    stats_by: dict = {}
+    entries: list = []
+    for gid, _, roles in GROUPS:
+        rs = [r for r in good if group_of(len(r["contribs"])) == gid]
+        if rs:
+            stats_by[gid] = build_stats(rs, roles)
+            entries += fix_entries(stats_by[gid], gid)
+    cross = cross_group(stats_by)
+
+    # One timestamped folder per shortcode (under Documents/impact-support-log).
+    # ensure_dir(out.parent) also runs immediately before each report write.
+    report_dir = make_contrib_report_dir()
+    log(f"[PATHS] report_dir={report_dir}")
+
+    inv = build_inventory(good) if good else None
+    elements_out = None
+    if inv:
+        elements_out = build_elements_report(client, shortcode, inv, report_dir)
+        log(
+            f"[ELEMENTS] {elements_out} "
+            f"({len(inv['elems'])} elements, {flagged_count(inv)} flagged)"
+        )
+
+    total_issues = 0
+    for r in good:
+        if cancel_check():
+            break
+        ctx, issues = build_ctx(r["gaps"], r["cmp_cls"], expected)
+        r["issues"] = issues
+        write_doc_outputs(r, client, shortcode, ctx, issues, project_base=base)
+        r["cells"] = pick_cells(r["contribs"], r["raws"], ctx)
+        r["preview_rel"] = rel_or_abs(r["folder"] / OUT_HTML, report_dir, for_html=True)
+        total_issues += len(issues)
+        tag = f", {len(issues)} PI issue(s)" if issues else ""
+        log(f"[OK] {r['docid']} ({r['src']}) - {len(r['contribs'])} contribs{tag}")
+
+    cancelled_mid = cancel_check()
+    if cancelled_mid and len(rows) < len(docids):
+        log(
+            f"[CANCELLED] {client}/{shortcode} stopped mid-shortcode "
+            f"({len(rows)}/{len(docids)} docs read) - not marked filled"
+        )
+        return {
+            "generated_at": now(),
+            "version": SCRIPT_VERSION,
+            "report": "",
+            "elements_report": None,
+            "issues_csv": None,
+            "unique_elements": 0,
+            "flagged_elements": 0,
+            "documents": len(rows),
+            "failed": len(rows) - len(good),
+            "off_pattern_files": 0,
+            "pattern_findings": 0,
+            "cross_group_differences": 0,
+            "groups": {},
+            "consistency_issues": total_issues,
+            "cancelled": True,
+            "docids": {
+                r["docid"]: {
+                    "file-id": r["file_id"],
+                    "contribs": len(r["contribs"]) if r["contribs"] else 0,
+                    "status": "ok" if r["contribs"] else f"error: {r['error']}",
+                }
+                for r in rows
+            },
+        }
+
+    out, n_off = build_report(
+        client, shortcode, rows, report_dir, stats_by, entries, cross,
+        elements_out.name if elements_out else None,
+    )
+    log(f"[REPORT] {out} ({len(rows)} docs, {n_off} off-pattern)")
+    csv_out = write_issues_csv(client, shortcode, entries, good, report_dir)
+    log(f"[ISSUES CSV] {csv_out}")
+    # PATHS-style summary for GUI log (tab also emits [PATHS] from entry keys)
+    path_bits = [f"contrib={path_for_meta(out)}"]
+    if elements_out:
+        path_bits.append(f"elements={path_for_meta(elements_out)}")
+    path_bits.append(f"issues={path_for_meta(csv_out)}")
+    log(f"[PATHS] {client}/{shortcode}: " + " | ".join(path_bits))
+    print_top_issues(entries, good, cross, log=log)
+
+    gs = group_summary(good)
+    return {
+        "generated_at": now(),
+        "version": SCRIPT_VERSION,
+        "report": path_for_meta(out),
+        "elements_report": path_for_meta(elements_out) if elements_out else None,
+        "issues_csv": path_for_meta(csv_out),
+        "unique_elements": len(inv["elems"]) if inv else 0,
+        "flagged_elements": flagged_count(inv) if inv else 0,
+        "documents": len(rows),
+        "failed": len(rows) - len(good),
+        "off_pattern_files": n_off,
+        "pattern_findings": len(entries),
+        "cross_group_differences": sum(1 for c in cross if not c["same"]),
+        "groups": gs,
+        "consistency_issues": total_issues,
+        "cancelled": False,
+        "docids": {
+            r["docid"]: {
+                "file-id": r["file_id"],
+                "contribs": len(r["contribs"]) if r["contribs"] else 0,
+                "status": "ok" if r["contribs"] else f"error: {r['error']}",
+            }
+            for r in rows
+        },
+    }
+
+
+# ------------------------------------------------ what is in meta / what is done
+
+def dtd_of(item: dict, meta: dict) -> str:
+    return meta.get("dtd") or item.get("folder", "").split("/", 1)[0]
+

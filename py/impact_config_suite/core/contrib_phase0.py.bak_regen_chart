@@ -1,0 +1,437 @@
+"""
+contrib_phase0.py - Phase 0 output chain for contrib-group extracts.
+
+Writes master original (with comments), consumer copy, comment-stripped clean,
+PI-stripped, config-driven regen (or stub copy), and compare HTML stub alongside
+existing outputs.
+
+When a pi-config is found for client/shortcode, contrib_group_regen.xml is built
+from strip_pi by re-inserting separator PIs (given-names, between-xrefs,
+between-contribs). Element/ques validation is deferred; Phase 0 focuses on
+separators.
+"""
+from __future__ import annotations
+
+import html
+import re
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional
+
+# Phase 0 output filenames (per doc folder). OUT_XML / OUT_HTML remain in
+# contrib_extractor and keep their existing names/behavior for consumers.
+OUT_XML_ORIGINAL = "contrib_group_original.xml"  # master WITH comments
+OUT_XML_ORIGINAL_CLEAN = "contrib_group_original_clean.xml"
+OUT_XML_STRIP_PI = "contrib_group_strip_pi.xml"
+OUT_XML_REGEN = "contrib_group_regen.xml"
+OUT_COMPARE_HTML = "contrib_group_compare.html"
+
+# Same basename as contrib_extractor.OUT_XML - written here so the chain is atomic.
+_OUT_XML_CONSUMER = "contrib_group.xml"
+
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# Processing instructions <?...?> but NOT an XML declaration at the start of the fragment.
+_XML_DECL_RE = re.compile(r"\A(\s*<\?xml\b[^?]*\?>)", re.IGNORECASE | re.DOTALL)
+_PI_RE = re.compile(r"<\?[^?]*\?>", re.DOTALL)
+
+_CONTRIB_RE = re.compile(r"<contrib\b[^>]*>.*?</contrib>", re.IGNORECASE | re.DOTALL)
+_XREF_RE = re.compile(
+    r"<xref\b[^>]*/>|<xref\b[^>]*>.*?</xref>",
+    re.IGNORECASE | re.DOTALL,
+)
+_GIVEN_CLOSE_RE = re.compile(r"</given-names>", re.IGNORECASE)
+_GIVEN_EMPTY_RE = re.compile(r"<given-names(\s[^>]*)?\s*/>", re.IGNORECASE)
+
+_COMPARE_PREVIEW_CHARS = 2000
+
+# Default suite root: parent of core/
+_DEFAULT_SUITE_ROOT = Path(__file__).resolve().parent.parent
+
+
+@dataclass
+class SeparatorRule:
+    kind: str
+    value: str  # unescaped text carried by the PI
+    pos: str = "after"  # inner | after
+    contribs: Optional[str] = None  # "1" | "2" | "3+" | None (any)
+    when: Optional[str] = None  # last-before | last | None
+
+
+@dataclass
+class PiConfig:
+    client: str
+    shortcode: str
+    dtd: str = ""
+    version: str = ""
+    status: str = ""
+    elements: Dict[str, bool] = field(default_factory=dict)
+    ques: Dict[str, bool] = field(default_factory=dict)
+    separators: List[SeparatorRule] = field(default_factory=list)
+
+    def separators_of(self, kind: str) -> List[SeparatorRule]:
+        return [s for s in self.separators if s.kind == kind]
+
+
+def ensure_dir(path: Path) -> Path:
+    """Create path (and parents) if missing; return path."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def strip_xml_comments(text: str) -> str:
+    """Remove XML comments <!-- ... --> (non-greedy, DOTALL). Keep PIs."""
+    return _COMMENT_RE.sub("", text)
+
+
+def strip_processing_instructions(text: str) -> str:
+    """Remove <?...?> PIs. Preserve a leading XML declaration if present."""
+    decl = ""
+    rest = text
+    m = _XML_DECL_RE.match(text)
+    if m:
+        decl = m.group(1)
+        rest = text[m.end() :]
+    return decl + _PI_RE.sub("", rest)
+
+
+def _allowed_flag(raw: Optional[str]) -> bool:
+    return (raw or "").strip().lower() in {"yes", "true", "1"}
+
+
+def _parse_pi_config_xml(text: str) -> PiConfig:
+    root = ET.fromstring(text)
+    if root.tag != "pi-config":
+        found = root.find(".//pi-config")
+        if found is None:
+            raise ValueError(f"expected <pi-config>, got <{root.tag}>")
+        root = found
+
+    cfg = PiConfig(
+        client=root.get("client") or "",
+        shortcode=root.get("shortcode") or "",
+        dtd=root.get("dtd") or "",
+        version=root.get("version") or "",
+        status=root.get("status") or "",
+    )
+    contrib = root.find("contrib")
+    if contrib is None:
+        return cfg
+
+    elems = contrib.find("elements")
+    if elems is not None:
+        for child in list(elems):
+            cfg.elements[child.tag] = _allowed_flag(child.get("allowed"))
+
+    ques = contrib.find("ques")
+    if ques is not None:
+        for child in list(ques):
+            cfg.ques[child.tag] = _allowed_flag(child.get("allowed"))
+
+    seps = contrib.find("separators")
+    if seps is not None:
+        for child in list(seps):
+            raw_val = child.get("value")
+            if raw_val is None:
+                raw_val = ""
+            when_raw = child.get("when")
+            cfg.separators.append(
+                SeparatorRule(
+                    kind=child.tag,
+                    value=html.unescape(raw_val),
+                    pos=(child.get("pos") or "after").strip().lower(),
+                    contribs=child.get("contribs"),
+                    when=when_raw if when_raw else None,
+                )
+            )
+    return cfg
+
+
+def resolve_pi_config_path(
+    client: str,
+    shortcode: str,
+    project_base: Path | None = None,
+    suite_root: Path | None = None,
+) -> Path | None:
+    """Prefer project override, else suite bundled template."""
+    name = f"{client}_{shortcode}.xml"
+    candidates: List[Path] = []
+    if project_base is not None:
+        candidates.append(Path(project_base) / "contrib_config" / name)
+    root = Path(suite_root) if suite_root is not None else _DEFAULT_SUITE_ROOT
+    candidates.append(root / "contrib_config" / name)
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
+
+
+def load_pi_config(
+    client: str,
+    shortcode: str,
+    project_base: Path | None = None,
+    suite_root: Path | None = None,
+) -> PiConfig | None:
+    """Load and parse pi-config for client/shortcode, or None if not found."""
+    path = resolve_pi_config_path(client, shortcode, project_base, suite_root)
+    if path is None:
+        return None
+    return _parse_pi_config_xml(path.read_text(encoding="utf-8"))
+
+
+def format_pi_attr_value(value: str) -> str:
+    """Serialize PI text for xml:space=\"...\". NBSP as &#x00A0; to match samples."""
+    if value == "\u00a0":
+        return "&#x00A0;"
+    return (
+        value.replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+    )
+
+
+def make_pistart(value: str) -> str:
+    """Build a pistart PI matching strip_pi / extractor conventions."""
+    return f'<?pistart xml:space="{format_pi_attr_value(value)}"?>'
+
+
+def _contribs_match(rule_contribs: Optional[str], n: int) -> bool:
+    if rule_contribs is None or rule_contribs == "":
+        return True
+    rc = rule_contribs.strip()
+    if rc.endswith("+"):
+        try:
+            return n >= int(rc[:-1])
+        except ValueError:
+            return False
+    try:
+        return n == int(rc)
+    except ValueError:
+        return False
+
+
+def pick_between_contribs_rule(
+    rules: List[SeparatorRule], index: int, n: int
+) -> SeparatorRule | None:
+    """Choose between-contribs rule for contrib at 0-based index among n."""
+    if n <= 0:
+        return None
+    is_last = index == n - 1
+    is_last_before = n >= 2 and index == n - 2
+
+    if is_last:
+        for r in rules:
+            if r.when == "last" and _contribs_match(r.contribs, n):
+                return r
+    if is_last_before:
+        for r in rules:
+            if r.when == "last-before" and _contribs_match(r.contribs, n):
+                return r
+    if not is_last:
+        for r in rules:
+            if not r.when and _contribs_match(r.contribs, n):
+                return r
+    return None
+
+
+def _insert_given_names_pis(text: str, rule: SeparatorRule) -> str:
+    if rule.pos != "inner":
+        return text
+    pi = make_pistart(rule.value)
+
+    def expand_empty(m: re.Match) -> str:
+        attrs = m.group(1) or ""
+        return f"<given-names{attrs}>{pi}</given-names>"
+
+    text = _GIVEN_EMPTY_RE.sub(expand_empty, text)
+    text = _GIVEN_CLOSE_RE.sub(pi + "</given-names>", text)
+    return text
+
+
+def _insert_xref_pis(contrib_xml: str, rule: SeparatorRule) -> str:
+    if rule.pos != "after":
+        return contrib_xml
+    matches = list(_XREF_RE.finditer(contrib_xml))
+    if len(matches) < 2:
+        return contrib_xml
+    pi = make_pistart(rule.value)
+    parts: List[str] = []
+    last = 0
+    for i, m in enumerate(matches):
+        parts.append(contrib_xml[last : m.end()])
+        if i < len(matches) - 1:
+            parts.append(pi)
+        last = m.end()
+    parts.append(contrib_xml[last:])
+    return "".join(parts)
+
+
+def _insert_between_contribs(text: str, rules: List[SeparatorRule]) -> str:
+    matches = list(_CONTRIB_RE.finditer(text))
+    n = len(matches)
+    if n == 0 or not rules:
+        return text
+    # Insert from the end so earlier offsets stay valid.
+    out = text
+    for i in range(n - 1, -1, -1):
+        rule = pick_between_contribs_rule(rules, i, n)
+        if rule is None:
+            continue
+        pi = make_pistart(rule.value)
+        end = matches[i].end()
+        out = out[:end] + pi + out[end:]
+    return out
+
+
+def regen_contrib_group(strip_xml: str, config: PiConfig) -> str:
+    """Rebuild contrib-group XML from strip_pi by inserting separator PIs.
+
+    Focus: separators only (given-names, between-xrefs, between-contribs).
+    Non-contrib siblings of contrib-group are left in place.
+    """
+    text = strip_xml
+
+    gn_rules = config.separators_of("given-names")
+    if gn_rules:
+        text = _insert_given_names_pis(text, gn_rules[0])
+
+    xref_rules = config.separators_of("between-xrefs")
+    if xref_rules:
+        rule = xref_rules[0]
+
+        def _one_contrib(m: re.Match) -> str:
+            return _insert_xref_pis(m.group(0), rule)
+
+        text = _CONTRIB_RE.sub(_one_contrib, text)
+
+    bc_rules = config.separators_of("between-contribs")
+    if bc_rules:
+        text = _insert_between_contribs(text, bc_rules)
+
+    return text
+
+
+def build_compare_stub_html(
+    *,
+    original_clean: str,
+    regen: str,
+    original_clean_name: str = OUT_XML_ORIGINAL_CLEAN,
+    regen_name: str = OUT_XML_REGEN,
+    config_note: str | None = None,
+) -> str:
+    """Phase 0 stub compare page; real PI compare comes in a later phase."""
+    oc_prev = html.escape(original_clean[:_COMPARE_PREVIEW_CHARS])
+    rg_prev = html.escape(regen[:_COMPARE_PREVIEW_CHARS])
+    note_extra = ""
+    if config_note:
+        note_extra = f'<p class="note">{html.escape(config_note)}</p>\n'
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>contrib_group_compare (Phase 0 stub)</title>
+<style>
+body {{ font-family: system-ui, sans-serif; margin: 1.5rem; }}
+.note {{ background: #fff3cd; border: 1px solid #ffc107; padding: 0.75rem 1rem; }}
+pre {{ background: #f6f8fa; border: 1px solid #ddd; padding: 0.75rem; overflow: auto; white-space: pre-wrap; }}
+h2 {{ margin-top: 1.5rem; }}
+</style>
+</head>
+<body>
+<h1>contrib_group_compare</h1>
+<p class="note"><strong>Phase 0 stub</strong> - real PI / structure compare is later.
+This page only lists filenames and shows the first ~{_COMPARE_PREVIEW_CHARS} characters of
+<code>{html.escape(original_clean_name)}</code> vs <code>{html.escape(regen_name)}</code>.</p>
+{note_extra}<p>Paths (names): <code>{html.escape(original_clean_name)}</code> &nbsp;vs&nbsp; <code>{html.escape(regen_name)}</code></p>
+<h2>{html.escape(original_clean_name)}</h2>
+<pre>{oc_prev}</pre>
+<h2>{html.escape(regen_name)}</h2>
+<pre>{rg_prev}</pre>
+</body>
+</html>
+"""
+
+
+def write_phase0_chain(
+    folder: Path,
+    raw_group: str,
+    client: str | None = None,
+    shortcode: str | None = None,
+    project_base: Path | None = None,
+    suite_root: Path | None = None,
+) -> Dict[str, Path]:
+    """
+    Write Phase 0 contrib-group artifact chain for one successful per-doc extract.
+
+    When client+shortcode are provided and a pi-config loads, regen is built via
+    regen_contrib_group(strip_pi, config). Otherwise regen is a stub copy of
+    strip_pi and the compare HTML notes that config was missing.
+
+    Returns a dict of logical keys -> Paths written:
+      original, out_xml, original_clean, strip_pi, regen, compare_html
+    """
+    folder = Path(folder)
+    ensure_dir(folder)
+
+    path_original = folder / OUT_XML_ORIGINAL
+    path_out_xml = folder / _OUT_XML_CONSUMER
+    path_clean = folder / OUT_XML_ORIGINAL_CLEAN
+    path_strip = folder / OUT_XML_STRIP_PI
+    path_regen = folder / OUT_XML_REGEN
+    path_compare = folder / OUT_COMPARE_HTML
+
+    # 1-2. Master with comments + consumer copy (unchanged raw_group)
+    path_original.write_text(raw_group, encoding="utf-8")
+    path_out_xml.write_text(raw_group, encoding="utf-8")
+
+    # 3. Comment-stripped; keep PIs
+    original_clean = strip_xml_comments(raw_group)
+    path_clean.write_text(original_clean, encoding="utf-8")
+
+    # 4. Strip PIs from clean (preserve leading XML decl if any)
+    strip_pi = strip_processing_instructions(original_clean)
+    path_strip.write_text(strip_pi, encoding="utf-8")
+
+    # 5. Regen from config when available; else stub-copy strip_pi
+    config_note: str | None = None
+    cfg: PiConfig | None = None
+    if client and shortcode:
+        cfg = load_pi_config(
+            client, shortcode, project_base=project_base, suite_root=suite_root
+        )
+        if cfg is None:
+            config_note = (
+                f"pi-config missing for {client}/{shortcode} — "
+                "regen is a byte-copy of strip_pi"
+            )
+    else:
+        config_note = "no client/shortcode passed — regen is a byte-copy of strip_pi"
+
+    if cfg is not None:
+        regen = regen_contrib_group(strip_pi, cfg)
+        config_note = (
+            f"regen built from strip_pi + pi-config {client}_{shortcode}.xml"
+        )
+    else:
+        regen = strip_pi
+
+    path_regen.write_text(regen, encoding="utf-8")
+
+    # 7. Compare HTML stub (preview HTML remains in write_doc_outputs)
+    path_compare.write_text(
+        build_compare_stub_html(
+            original_clean=original_clean,
+            regen=regen,
+            config_note=config_note,
+        ),
+        encoding="utf-8",
+    )
+
+    return {
+        "original": path_original,
+        "out_xml": path_out_xml,
+        "original_clean": path_clean,
+        "strip_pi": path_strip,
+        "regen": path_regen,
+        "compare_html": path_compare,
+    }

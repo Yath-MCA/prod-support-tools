@@ -1,0 +1,46 @@
+      };
+      var fallback = function () {
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand('copy'); ok(); } catch (x) {} document.body.removeChild(ta);
+      };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(ok, fallback);
+      else fallback();
+    }
+  });
+})();
+</script>"""
+
+
+def page(title: str, chips: list, body: str, toggle: bool = False, links=None, legend: bool = True) -> str:
+    """chips: list of (label, value, style) with style in '', 'warn', 'good'."""
+    chips_html = "".join(
+        f'<span class="chip {style}"><b>{esc(label)}</b> {esc(str(value))}</span>'
+        for label, value, style in chips
+    )
+    links_html = "".join(f'<a href="{esc_attr(h)}">{esc(l)}</a>' for l, h in (links or []))
+    return (
+        '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{esc(title)}</title><script>document.documentElement.className+=' js'</script><style>{CSS}</style></head>"
+        '<body data-view="preview">'
+        f'<header id="top"><div class="ttl">{esc(title)}</div>'
+        f'<div class="chips">{chips_html}</div><div class="hlinks">{links_html}</div>{TOGGLE if toggle else ""}</header>'
+        f"<main>{LEGEND if legend else ''}{body}</main>{JS}</body></html>"
+    )
+
+
+def issue_chip(n: int) -> tuple:
+    return ("PI issues (all contribs)", n, "warn" if n else "good")
+
+
+def now() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
+def write_doc_outputs(row: dict, client: str, shortcode: str, ctx: Ctx, issues: list,
+                    project_base: Path | None = None):
+    folder: Path = row["folder"]
+    # Phase 0: original / consumer xml / clean / strip_pi / regen (or stub) / compare stub
+    write_phase0_chain(
+        folder,
+        row["raw_group"],

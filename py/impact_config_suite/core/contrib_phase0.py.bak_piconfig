@@ -1,0 +1,141 @@
+"""
+contrib_phase0.py — Phase 0 output chain for contrib-group extracts.
+
+Writes master original (with comments), consumer copy, comment-stripped clean,
+PI-stripped, regen stub, and compare HTML stub alongside existing outputs.
+
+Config-driven regeneration of contrib-group XML is intentionally deferred to a
+later phase; Phase 0 copies strip_pi bytes into contrib_group_regen.xml as a
+placeholder so downstream paths and tests can land now.
+"""
+from __future__ import annotations
+
+import html
+import re
+from pathlib import Path
+from typing import Dict
+
+# Phase 0 output filenames (per doc folder). OUT_XML / OUT_HTML remain in
+# contrib_extractor and keep their existing names/behavior for consumers.
+OUT_XML_ORIGINAL = "contrib_group_original.xml"  # master WITH comments
+OUT_XML_ORIGINAL_CLEAN = "contrib_group_original_clean.xml"
+OUT_XML_STRIP_PI = "contrib_group_strip_pi.xml"
+OUT_XML_REGEN = "contrib_group_regen.xml"
+OUT_COMPARE_HTML = "contrib_group_compare.html"
+
+# Same basename as contrib_extractor.OUT_XML — written here so the chain is atomic.
+_OUT_XML_CONSUMER = "contrib_group.xml"
+
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# Processing instructions <?...?> but NOT an XML declaration at the start of the fragment.
+_XML_DECL_RE = re.compile(r"\A(\s*<\?xml\b[^?]*\?>)", re.IGNORECASE | re.DOTALL)
+_PI_RE = re.compile(r"<\?[^?]*\?>", re.DOTALL)
+
+_COMPARE_PREVIEW_CHARS = 2000
+
+
+def ensure_dir(path: Path) -> Path:
+    """Create path (and parents) if missing; return path."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def strip_xml_comments(text: str) -> str:
+    """Remove XML comments <!-- ... --> (non-greedy, DOTALL). Keep PIs."""
+    return _COMMENT_RE.sub("", text)
+
+
+def strip_processing_instructions(text: str) -> str:
+    """Remove <?...?> PIs. Preserve a leading XML declaration if present."""
+    decl = ""
+    rest = text
+    m = _XML_DECL_RE.match(text)
+    if m:
+        decl = m.group(1)
+        rest = text[m.end() :]
+    return decl + _PI_RE.sub("", rest)
+
+
+def build_compare_stub_html(
+    *,
+    original_clean: str,
+    regen: str,
+    original_clean_name: str = OUT_XML_ORIGINAL_CLEAN,
+    regen_name: str = OUT_XML_REGEN,
+) -> str:
+    """Phase 0 stub compare page; real PI compare comes in a later phase."""
+    oc_prev = html.escape(original_clean[:_COMPARE_PREVIEW_CHARS])
+    rg_prev = html.escape(regen[:_COMPARE_PREVIEW_CHARS])
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>contrib_group_compare (Phase 0 stub)</title>
+<style>
+body {{ font-family: system-ui, sans-serif; margin: 1.5rem; }}
+.note {{ background: #fff3cd; border: 1px solid #ffc107; padding: 0.75rem 1rem; }}
+pre {{ background: #f6f8fa; border: 1px solid #ddd; padding: 0.75rem; overflow: auto; white-space: pre-wrap; }}
+h2 {{ margin-top: 1.5rem; }}
+</style>
+</head>
+<body>
+<h1>contrib_group_compare</h1>
+<p class="note"><strong>Phase 0 stub</strong> — real PI / structure compare is later.
+This page only lists filenames and shows the first ~{_COMPARE_PREVIEW_CHARS} characters of
+<code>{html.escape(original_clean_name)}</code> vs <code>{html.escape(regen_name)}</code>.</p>
+<p>Paths (names): <code>{html.escape(original_clean_name)}</code> &nbsp;vs&nbsp; <code>{html.escape(regen_name)}</code></p>
+<h2>{html.escape(original_clean_name)}</h2>
+<pre>{oc_prev}</pre>
+<h2>{html.escape(regen_name)}</h2>
+<pre>{rg_prev}</pre>
+</body>
+</html>
+"""
+
+
+def write_phase0_chain(folder: Path, raw_group: str) -> Dict[str, Path]:
+    """
+    Write Phase 0 contrib-group artifact chain for one successful per-doc extract.
+
+    Returns a dict of logical keys -> Paths written:
+      original, out_xml, original_clean, strip_pi, regen, compare_html
+    """
+    folder = Path(folder)
+    ensure_dir(folder)
+
+    path_original = folder / OUT_XML_ORIGINAL
+    path_out_xml = folder / _OUT_XML_CONSUMER
+    path_clean = folder / OUT_XML_ORIGINAL_CLEAN
+    path_strip = folder / OUT_XML_STRIP_PI
+    path_regen = folder / OUT_XML_REGEN
+    path_compare = folder / OUT_COMPARE_HTML
+
+    # 1–2. Master with comments + consumer copy (unchanged raw_group)
+    path_original.write_text(raw_group, encoding="utf-8")
+    path_out_xml.write_text(raw_group, encoding="utf-8")
+
+    # 3. Comment-stripped; keep PIs
+    original_clean = strip_xml_comments(raw_group)
+    path_clean.write_text(original_clean, encoding="utf-8")
+
+    # 4. Strip PIs from clean (preserve leading XML decl if any)
+    strip_pi = strip_processing_instructions(original_clean)
+    path_strip.write_text(strip_pi, encoding="utf-8")
+
+    # 5. Regen STUB: copy strip_pi (config-driven regen is a later phase)
+    path_regen.write_text(strip_pi, encoding="utf-8")
+
+    # 7. Compare HTML stub (preview HTML remains in write_doc_outputs)
+    path_compare.write_text(
+        build_compare_stub_html(original_clean=original_clean, regen=strip_pi),
+        encoding="utf-8",
+    )
+
+    return {
+        "original": path_original,
+        "out_xml": path_out_xml,
+        "original_clean": path_clean,
+        "strip_pi": path_strip,
+        "regen": path_regen,
+        "compare_html": path_compare,
+    }

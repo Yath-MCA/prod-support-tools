@@ -1,0 +1,426 @@
+"""Tests for article-meta-scoped aff / author-notes reporting (SCRIPT_VERSION 11)."""
+
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from core import contrib_aff as aff
+from core import contrib_extractor as ce
+
+
+MINIMAL_CG = """<contrib-group>
+<contrib contrib-type="author">
+<name><surname>Doe</surname><given-names>Jane</given-names></name>
+</contrib>
+</contrib-group>"""
+
+# Aff + author-notes AFTER contrib-group but still inside article-meta
+XML_OUTSIDE_AFF = f"""<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+<article-id pub-id-type="doi">10.1/ex</article-id>
+<title-group><article-title>T</article-title></title-group>
+{MINIMAL_CG}
+<aff id="aff1" specific-use="RINGGOLD:12345" content-type="org">
+<institution>Example University</institution>
+<city>Shanghai</city>
+<country country="cn">China</country>
+</aff>
+<author-notes>
+<corresp id="c1">Jane Doe, Example University.</corresp>
+<fn fn-type="conflict"><p>None.</p></fn>
+</author-notes>
+<abstract><p>Hello</p></abstract>
+</article-meta>
+</front>
+<body><aff id="BODY_AFF"><institution>Should Not Count</institution></aff></body>
+</article>
+"""
+
+# Compat alias used by older test names
+XML_AFTER_AFF = XML_OUTSIDE_AFF
+
+# Aff as sibling of contrib INSIDE contrib-group (LWW/MD style)
+XML_AFF_INSIDE_SIBLING = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+<article-id pub-id-type="doi">10.1/in</article-id>
+<title-group><article-title>Inside</article-title></title-group>
+<contrib-group>
+<contrib contrib-type="author">
+<name><surname>Doe</surname><given-names>Jane</given-names></name>
+</contrib>
+<aff id="AF0001">
+<institution>Inside University</institution>
+<country country="cn">China</country>
+</aff>
+</contrib-group>
+<abstract><p>No outside aff</p></abstract>
+</article-meta>
+</front>
+<body><aff id="BODY2"><institution>Ignore</institution></aff></body>
+</article>
+"""
+
+# Aff nested inside <contrib> (still inside contrib-group)
+XML_AFF_NESTED_IN_CONTRIB = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+<contrib-group>
+<contrib contrib-type="author">
+<name><surname>Doe</surname><given-names>Jane</given-names></name>
+<aff id="a1"><institution>Inside Only</institution></aff>
+</contrib>
+</contrib-group>
+<abstract><p>No outside aff</p></abstract>
+</article-meta>
+</front>
+</article>
+"""
+
+# Both inside (sibling) and outside (after cg) within article-meta
+XML_AFF_BOTH = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+<contrib-group>
+<contrib contrib-type="author">
+<name><surname>Doe</surname><given-names>Jane</given-names></name>
+</contrib>
+<aff id="AF_IN"><institution>Inside Uni</institution></aff>
+</contrib-group>
+<aff id="AF_OUT"><institution>Outside Uni</institution>
+<country country="us">USA</country>
+</aff>
+<author-notes><fn fn-type="other"><p>Note</p></fn></author-notes>
+</article-meta>
+</front>
+<back><aff id="BACK_AFF"><institution>Back</institution></aff></back>
+</article>
+"""
+
+XML_AUTHOR_NOTES_ONLY = f"""<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+{MINIMAL_CG}
+<author-notes><fn fn-type="other"><p>Note</p></fn></author-notes>
+<permissions><copyright-year>2026</copyright-year></permissions>
+</article-meta>
+</front>
+</article>
+"""
+
+XML_NO_ARTICLE_META = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<body>
+<contrib-group>
+<contrib contrib-type="author"><name><surname>X</surname></name></contrib>
+</contrib-group>
+<aff id="orphan"><institution>No meta</institution></aff>
+</body>
+</article>
+"""
+
+
+class ExtractArticleMetaAffTests(unittest.TestCase):
+    def test_outside_cg_in_article_meta(self):
+        data = aff.extract_aff_nodes(XML_OUTSIDE_AFF)
+        self.assertEqual(data["aff_count"], 1)
+        self.assertEqual(data["aff_outside_count"], 1)
+        self.assertEqual(data["aff_inside_count"], 0)
+        self.assertEqual(data["author_notes_count"], 1)
+        node = data["aff_nodes"][0]
+        self.assertEqual(node["location"], aff.LOC_OUTSIDE)
+        self.assertEqual(node["attrs"].get("id"), "aff1")
+        self.assertEqual(node["attrs"].get("specific-use"), "RINGGOLD:12345")
+        self.assertIn("institution", node["inner_tags"])
+        self.assertIn("country", node["inner_tags"])
+        self.assertIn("country/country", node["inner_attrs"])
+        self.assertIn("cn", node["inner_attrs"]["country/country"])
+        notes = data["author_notes_nodes"][0]
+        self.assertEqual(notes["location"], aff.LOC_OUTSIDE)
+        self.assertIn("corresp", notes["inner_tags"])
+        self.assertIn("fn", notes["inner_tags"])
+        # body aff must not be collected
+        ids = {n.get("node_id") for n in data["aff_nodes"]}
+        self.assertNotIn("BODY_AFF", ids)
+
+    def test_compat_extract_after_cg_alias(self):
+        data = aff.extract_after_cg_nodes(XML_OUTSIDE_AFF)
+        self.assertEqual(data["aff_count"], 1)
+        self.assertEqual(data["aff_after_count"], 1)  # outside alias
+
+    def test_aff_sibling_inside_contrib_group(self):
+        data = aff.extract_aff_nodes(XML_AFF_INSIDE_SIBLING)
+        self.assertEqual(data["aff_count"], 1)
+        self.assertEqual(data["aff_inside_count"], 1)
+        self.assertEqual(data["aff_outside_count"], 0)
+        node = data["aff_nodes"][0]
+        self.assertEqual(node["location"], aff.LOC_INSIDE)
+        self.assertEqual(node["attrs"].get("id"), "AF0001")
+        self.assertIn("institution", node["inner_tags"])
+        ids = {n.get("node_id") for n in data["aff_nodes"]}
+        self.assertNotIn("BODY2", ids)
+
+    def test_aff_nested_inside_contrib_not_selected(self):
+        """Locked path is /article-meta/contrib-group/aff only — not contrib/aff."""
+        data = aff.extract_aff_nodes(XML_AFF_NESTED_IN_CONTRIB)
+        self.assertEqual(data["aff_count"], 0)
+        self.assertEqual(data["aff_inside_count"], 0)
+        self.assertEqual(data["aff_nodes"], [])
+
+    def test_aff_both_inside_and_outside(self):
+        data = aff.extract_aff_nodes(XML_AFF_BOTH)
+        self.assertEqual(data["aff_count"], 2)
+        self.assertEqual(data["aff_inside_count"], 1)
+        self.assertEqual(data["aff_outside_count"], 1)
+        self.assertEqual(data["author_notes_count"], 1)
+        by_id = {n["attrs"].get("id"): n for n in data["aff_nodes"]}
+        self.assertEqual(by_id["AF_IN"]["location"], aff.LOC_INSIDE)
+        self.assertEqual(by_id["AF_OUT"]["location"], aff.LOC_OUTSIDE)
+        self.assertNotIn("BACK_AFF", by_id)
+
+    def test_no_article_meta_yields_zero(self):
+        data = aff.extract_aff_nodes(XML_NO_ARTICLE_META)
+        self.assertEqual(data["aff_count"], 0)
+        self.assertEqual(data["aff_nodes"], [])
+        self.assertEqual(data["author_notes_count"], 0)
+
+    def test_author_notes_outside_cg(self):
+        data = aff.extract_aff_nodes(XML_AUTHOR_NOTES_ONLY)
+        self.assertEqual(data["aff_count"], 0)
+        self.assertEqual(data["author_notes_count"], 1)
+        self.assertEqual(data["author_notes_outside_count"], 1)
+        self.assertEqual(data["author_notes_nodes"][0]["inner_tags"].get("fn"), 1)
+
+
+# Keep old class name as thin alias coverage for imports/discovery
+class ExtractAfterCgTests(ExtractArticleMetaAffTests):
+    def test_after_cg_aff_inventory(self):
+        self.test_outside_cg_in_article_meta()
+
+    def test_aff_only_inside_contrib_group_counts_zero(self):
+        # Nested contrib/aff is NOT a locked path; sibling contrib-group/aff is
+        self.test_aff_nested_inside_contrib_not_selected()
+
+    def test_author_notes_after_cg(self):
+        self.test_author_notes_outside_cg()
+
+
+
+    def test_locked_four_paths_contract(self):
+        """Exact selectors: cg under meta; cg/aff; meta/aff; meta/author-notes."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<article><front><article-meta>
+<title-group><article-title>T</article-title></title-group>
+<contrib-group>
+<contrib contrib-type="author"><name><surname>Doe</surname></name>
+<aff id="NESTED_SKIP"><institution>Skip</institution></aff>
+</contrib>
+<aff id="CG_AFF"><institution>Inside CG</institution></aff>
+</contrib-group>
+<aff id="META_AFF"><institution>Meta Aff</institution></aff>
+<author-notes><fn fn-type="other"><p>N</p></fn></author-notes>
+</article-meta></front>
+<body><aff id="BODY"><institution>B</institution></aff></body>
+</article>"""
+        data = aff.extract_aff_nodes(xml)
+        self.assertEqual(data["aff_count"], 2)
+        by_id = {n["node_id"]: n for n in data["aff_nodes"]}
+        self.assertEqual(set(by_id), {"CG_AFF", "META_AFF"})
+        self.assertEqual(by_id["CG_AFF"]["location"], aff.LOC_INSIDE)
+        self.assertEqual(by_id["META_AFF"]["location"], aff.LOC_OUTSIDE)
+        self.assertEqual(data["author_notes_count"], 1)
+        self.assertEqual(data["author_notes_nodes"][0]["location"], aff.LOC_OUTSIDE)
+        self.assertNotIn("NESTED_SKIP", by_id)
+        self.assertNotIn("BODY", by_id)
+
+
+class AffReportTests(unittest.TestCase):
+    def setUp(self):
+        self._report_td = tempfile.TemporaryDirectory()
+        self._old_report_root = ce.REPORT_ROOT
+        ce.REPORT_ROOT = Path(self._report_td.name) / "Documents" / "impact-support-log"
+        Path(ce.REPORT_ROOT).mkdir(parents=True, exist_ok=True)
+        ce.reset_session_report_dir()
+
+    def tearDown(self):
+        ce.REPORT_ROOT = self._old_report_root
+        ce.reset_session_report_dir()
+        self._report_td.cleanup()
+
+    def _row(self, docid: str, xml: str, shortcode_hint: str = "") -> dict:
+        data = aff.extract_aff_nodes(xml)
+        return {
+            "docid": docid,
+            "file_id": f"FID-{docid}",
+            "preview_rel": "",
+            **data,
+        }
+
+    def test_build_aff_report_writes_under_report_root(self):
+        rows = [self._row("N1", XML_OUTSIDE_AFF), self._row("N2", XML_AUTHOR_NOTES_ONLY)]
+        report_dir = ce.make_contrib_report_dir(timestamp="20260101_120000")
+        inv = aff.build_aff_inventory(rows)
+        html_path = aff.build_aff_report("LWW", "MD", inv, report_dir)
+        csv_path = aff.build_aff_csv("LWW", "MD", rows, report_dir)
+        self.assertTrue(html_path.exists())
+        self.assertTrue(csv_path.exists())
+        self.assertIn("_aff_v11.html", html_path.name)
+        self.assertIn("_aff_v11.csv", csv_path.name)
+        self.assertTrue(str(html_path.resolve()).startswith(str(Path(ce.REPORT_ROOT).resolve())))
+        html = html_path.read_text(encoding="utf-8")
+        self.assertIn("Aff total", html)
+        self.assertIn("Aff inside cg", html)
+        self.assertIn("Aff outside cg", html)
+        self.assertIn("article-meta", html)
+        self.assertIn("Docid-wise summary", html)
+        self.assertIn("v11", html)
+        csv_text = csv_path.read_text(encoding="utf-8-sig")
+        header = csv_text.splitlines()[0]
+        self.assertIn("node_kind", header)
+        self.assertIn("location", header)
+        self.assertIn("aff", csv_text)
+        self.assertIn("author-notes", csv_text)
+        self.assertIn("RINGGOLD:12345", csv_text)
+        self.assertIn(aff.LOC_OUTSIDE, csv_text)
+
+    def test_report_both_locations_in_chips_and_csv(self):
+        rows = [self._row("Nboth", XML_AFF_BOTH)]
+        report_dir = ce.make_contrib_report_dir(timestamp="20260101_121500")
+        inv = aff.build_aff_inventory(rows)
+        self.assertEqual(inv["n_aff"], 2)
+        self.assertEqual(inv["n_aff_inside"], 1)
+        self.assertEqual(inv["n_aff_outside"], 1)
+        html_path = aff.build_aff_report("LWW", "MD", inv, report_dir)
+        csv_path = aff.build_aff_csv("LWW", "MD", rows, report_dir)
+        html = html_path.read_text(encoding="utf-8")
+        self.assertIn("Aff total", html)
+        self.assertIn("Aff inside cg", html)
+        self.assertIn("Aff outside cg", html)
+        csv_text = csv_path.read_text(encoding="utf-8-sig")
+        self.assertIn(aff.LOC_INSIDE, csv_text)
+        self.assertIn(aff.LOC_OUTSIDE, csv_text)
+        self.assertIn("AF_IN", csv_text)
+        self.assertIn("AF_OUT", csv_text)
+        self.assertNotIn("BACK_AFF", csv_text)
+
+    def test_client_unique_rollup_two_shortcodes(self):
+        aff.reset_aff_session()
+        report_dir = ce.make_contrib_report_dir(timestamp="20260101_130000")
+        rows_md = [self._row("N1", XML_OUTSIDE_AFF)]
+        rows_gox = [
+            self._row(
+                "N2",
+                XML_OUTSIDE_AFF.replace("RINGGOLD:12345", "RINGGOLD:99999").replace(
+                    'country="cn"', 'country="us"'
+                ),
+            )
+        ]
+        aff.update_client_aff_unique("LWW", "MD", rows_md)
+        aff.update_client_aff_unique("LWW", "GOX", rows_gox)
+        unique = aff.build_client_aff_unique_report("LWW", report_dir)
+        self.assertIsNotNone(unique)
+        self.assertTrue(unique.exists())
+        self.assertIn("LWW_aff_unique_v11.html", unique.name)
+        body = unique.read_text(encoding="utf-8")
+        self.assertIn("MD", body)
+        self.assertIn("GOX", body)
+        self.assertIn("RINGGOLD:12345", body)
+        self.assertIn("RINGGOLD:99999", body)
+        self.assertIn("cn", body)
+        self.assertIn("us", body)
+
+
+class AffWiredIntoProcessGroupTests(unittest.TestCase):
+    """Smoke: process_group meta keys for aff when fixtures have article-meta markup."""
+
+    def setUp(self):
+        self._report_td = tempfile.TemporaryDirectory()
+        self._old_report_root = ce.REPORT_ROOT
+        ce.REPORT_ROOT = Path(self._report_td.name) / "Documents" / "impact-support-log"
+        Path(ce.REPORT_ROOT).mkdir(parents=True, exist_ok=True)
+        ce.reset_session_report_dir()
+
+    def tearDown(self):
+        ce.REPORT_ROOT = self._old_report_root
+        ce.reset_session_report_dir()
+        self._report_td.cleanup()
+
+    def test_process_group_aff_meta_and_elements_untouched_name(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            folder = tmp / "JATS" / "Naff1"
+            folder.mkdir(parents=True)
+            (folder / "doc.xml").write_text(XML_OUTSIDE_AFF, encoding="utf-8")
+            docs = {
+                "Naff1": {
+                    "folder": "JATS/Naff1",
+                    "files": {"xml": "JATS/Naff1/doc.xml"},
+                }
+            }
+            metas = {
+                "Naff1": {
+                    "client": "LWW",
+                    "project-shortcode": "MD",
+                    "dtd": "JATS",
+                    "file-id": "MD-1",
+                }
+            }
+            entry = ce.process_group(
+                tmp, docs, metas, "LWW", "MD", ["Naff1"], log=lambda m: None
+            )
+            self.assertEqual(ce.SCRIPT_VERSION, 11)
+            self.assertTrue(entry.get("elements_report"))
+            self.assertIn("_elements_v11.html", entry["elements_report"].replace("\\", "/"))
+            self.assertTrue(entry.get("aff_report"))
+            self.assertIn("_aff_v11.html", entry["aff_report"].replace("\\", "/"))
+            self.assertTrue(Path(entry["aff_report"]).exists())
+            self.assertTrue(entry.get("aff_csv"))
+            self.assertTrue(entry.get("aff_unique_report"))
+            el = Path(entry["elements_report"]).read_text(encoding="utf-8")
+            self.assertIn("Elements", el)
+            aff_html = Path(entry["aff_report"]).read_text(encoding="utf-8")
+            self.assertIn("institution", aff_html)
+            self.assertIn("RINGGOLD", aff_html)
+            self.assertIn("Aff total", aff_html)
+
+    def test_process_group_inside_sibling_aff_counted(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            folder = tmp / "JATS" / "NaffIn"
+            folder.mkdir(parents=True)
+            (folder / "doc.xml").write_text(XML_AFF_INSIDE_SIBLING, encoding="utf-8")
+            docs = {
+                "NaffIn": {
+                    "folder": "JATS/NaffIn",
+                    "files": {"xml": "JATS/NaffIn/doc.xml"},
+                }
+            }
+            metas = {
+                "NaffIn": {
+                    "client": "LWW",
+                    "project-shortcode": "MD",
+                    "dtd": "JATS",
+                    "file-id": "MD-2",
+                }
+            }
+            entry = ce.process_group(
+                tmp, docs, metas, "LWW", "MD", ["NaffIn"], log=lambda m: None
+            )
+            aff_csv = Path(entry["aff_csv"]).read_text(encoding="utf-8-sig")
+            self.assertIn("AF0001", aff_csv)
+            self.assertIn(aff.LOC_INSIDE, aff_csv)
+            self.assertNotIn("BODY2", aff_csv)
+            aff_html = Path(entry["aff_report"]).read_text(encoding="utf-8")
+            self.assertIn("Aff inside cg", aff_html)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,224 @@
+"""Tests for after-contrib-group aff / author-notes reporting (SCRIPT_VERSION 10)."""
+
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from core import contrib_aff as aff
+from core import contrib_extractor as ce
+
+
+MINIMAL_CG = """<contrib-group>
+<contrib contrib-type="author">
+<name><surname>Doe</surname><given-names>Jane</given-names></name>
+</contrib>
+</contrib-group>"""
+
+XML_AFTER_AFF = f"""<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+{MINIMAL_CG}
+<aff id="aff1" specific-use="RINGGOLD:12345" content-type="org">
+<institution>Example University</institution>
+<city>Shanghai</city>
+<country country="cn">China</country>
+</aff>
+<author-notes>
+<corresp id="c1">Jane Doe, Example University.</corresp>
+<fn fn-type="conflict"><p>None.</p></fn>
+</author-notes>
+<abstract><p>Hello</p></abstract>
+</article-meta>
+</front>
+</article>
+"""
+
+XML_AFF_INSIDE_ONLY = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+<contrib-group>
+<contrib contrib-type="author">
+<name><surname>Doe</surname><given-names>Jane</given-names></name>
+<aff id="a1"><institution>Inside Only</institution></aff>
+</contrib>
+</contrib-group>
+<abstract><p>No after-cg aff</p></abstract>
+</article-meta>
+</front>
+</article>
+"""
+
+XML_AUTHOR_NOTES_ONLY = f"""<?xml version="1.0" encoding="UTF-8"?>
+<article>
+<front>
+<article-meta>
+{MINIMAL_CG}
+<author-notes><fn fn-type="other"><p>Note</p></fn></author-notes>
+<permissions><copyright-year>2026</copyright-year></permissions>
+</article-meta>
+</front>
+</article>
+"""
+
+
+class ExtractAfterCgTests(unittest.TestCase):
+    def test_after_cg_aff_inventory(self):
+        data = aff.extract_after_cg_nodes(XML_AFTER_AFF)
+        self.assertEqual(data["aff_after_count"], 1)
+        self.assertEqual(data["author_notes_after_count"], 1)
+        node = data["aff_nodes"][0]
+        self.assertEqual(node["tag"], "aff")
+        self.assertEqual(node["attrs"].get("id"), "aff1")
+        self.assertEqual(node["attrs"].get("specific-use"), "RINGGOLD:12345")
+        self.assertIn("institution", node["inner_tags"])
+        self.assertIn("country", node["inner_tags"])
+        self.assertIn("country/country", node["inner_attrs"])
+        self.assertIn("cn", node["inner_attrs"]["country/country"])
+        notes = data["author_notes_nodes"][0]
+        self.assertIn("corresp", notes["inner_tags"])
+        self.assertIn("fn", notes["inner_tags"])
+
+    def test_aff_only_inside_contrib_group_counts_zero(self):
+        data = aff.extract_after_cg_nodes(XML_AFF_INSIDE_ONLY)
+        self.assertEqual(data["aff_after_count"], 0)
+        self.assertEqual(data["author_notes_after_count"], 0)
+        self.assertEqual(data["aff_nodes"], [])
+
+    def test_author_notes_after_cg(self):
+        data = aff.extract_after_cg_nodes(XML_AUTHOR_NOTES_ONLY)
+        self.assertEqual(data["aff_after_count"], 0)
+        self.assertEqual(data["author_notes_after_count"], 1)
+        self.assertEqual(data["author_notes_nodes"][0]["inner_tags"].get("fn"), 1)
+
+
+class AffReportTests(unittest.TestCase):
+    def setUp(self):
+        self._report_td = tempfile.TemporaryDirectory()
+        self._old_report_root = ce.REPORT_ROOT
+        ce.REPORT_ROOT = Path(self._report_td.name) / "Documents" / "impact-support-log"
+        Path(ce.REPORT_ROOT).mkdir(parents=True, exist_ok=True)
+        ce.reset_session_report_dir()
+
+    def tearDown(self):
+        ce.REPORT_ROOT = self._old_report_root
+        ce.reset_session_report_dir()
+        self._report_td.cleanup()
+
+    def _row(self, docid: str, xml: str, shortcode_hint: str = "") -> dict:
+        data = aff.extract_after_cg_nodes(xml)
+        return {
+            "docid": docid,
+            "file_id": f"FID-{docid}",
+            "preview_rel": "",
+            **data,
+        }
+
+    def test_build_aff_report_writes_under_report_root(self):
+        rows = [self._row("N1", XML_AFTER_AFF), self._row("N2", XML_AUTHOR_NOTES_ONLY)]
+        report_dir = ce.make_contrib_report_dir(timestamp="20260101_120000")
+        inv = aff.build_aff_inventory(rows)
+        html_path = aff.build_aff_report("LWW", "MD", inv, report_dir)
+        csv_path = aff.build_aff_csv("LWW", "MD", rows, report_dir)
+        self.assertTrue(html_path.exists())
+        self.assertTrue(csv_path.exists())
+        self.assertIn("_aff_v10.html", html_path.name)
+        self.assertIn("_aff_v10.csv", csv_path.name)
+        self.assertTrue(str(html_path.resolve()).startswith(str(Path(ce.REPORT_ROOT).resolve())))
+        html = html_path.read_text(encoding="utf-8")
+        self.assertIn("Aff after contrib-group", html)
+        self.assertIn("Author-notes after contrib-group", html)
+        self.assertIn("Docid-wise summary", html)
+        self.assertIn("v10", html)
+        csv_text = csv_path.read_text(encoding="utf-8-sig")
+        self.assertIn("node_kind", csv_text.splitlines()[0])
+        self.assertIn("aff", csv_text)
+        self.assertIn("author-notes", csv_text)
+        self.assertIn("RINGGOLD:12345", csv_text)
+
+    def test_client_unique_rollup_two_shortcodes(self):
+        aff.reset_aff_session()
+        report_dir = ce.make_contrib_report_dir(timestamp="20260101_130000")
+        rows_md = [self._row("N1", XML_AFTER_AFF)]
+        rows_gox = [
+            self._row(
+                "N2",
+                XML_AFTER_AFF.replace("RINGGOLD:12345", "RINGGOLD:99999").replace(
+                    'country="cn"', 'country="us"'
+                ),
+            )
+        ]
+        aff.update_client_aff_unique("LWW", "MD", rows_md)
+        aff.update_client_aff_unique("LWW", "GOX", rows_gox)
+        unique = aff.build_client_aff_unique_report("LWW", report_dir)
+        self.assertIsNotNone(unique)
+        self.assertTrue(unique.exists())
+        self.assertIn("LWW_aff_unique_v10.html", unique.name)
+        body = unique.read_text(encoding="utf-8")
+        self.assertIn("MD", body)
+        self.assertIn("GOX", body)
+        self.assertIn("RINGGOLD:12345", body)
+        self.assertIn("RINGGOLD:99999", body)
+        self.assertIn("cn", body)
+        self.assertIn("us", body)
+
+
+class AffWiredIntoProcessGroupTests(unittest.TestCase):
+    """Smoke: process_group meta keys for aff when fixtures have after-cg markup."""
+
+    def setUp(self):
+        self._report_td = tempfile.TemporaryDirectory()
+        self._old_report_root = ce.REPORT_ROOT
+        ce.REPORT_ROOT = Path(self._report_td.name) / "Documents" / "impact-support-log"
+        Path(ce.REPORT_ROOT).mkdir(parents=True, exist_ok=True)
+        ce.reset_session_report_dir()
+
+    def tearDown(self):
+        ce.REPORT_ROOT = self._old_report_root
+        ce.reset_session_report_dir()
+        self._report_td.cleanup()
+
+    def test_process_group_aff_meta_and_elements_untouched_name(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            folder = tmp / "JATS" / "Naff1"
+            folder.mkdir(parents=True)
+            (folder / "doc.xml").write_text(XML_AFTER_AFF, encoding="utf-8")
+            docs = {
+                "Naff1": {
+                    "folder": "JATS/Naff1",
+                    "files": {"xml": "JATS/Naff1/doc.xml"},
+                }
+            }
+            metas = {
+                "Naff1": {
+                    "client": "LWW",
+                    "project-shortcode": "MD",
+                    "dtd": "JATS",
+                    "file-id": "MD-1",
+                }
+            }
+            entry = ce.process_group(
+                tmp, docs, metas, "LWW", "MD", ["Naff1"], log=lambda m: None
+            )
+            self.assertEqual(ce.SCRIPT_VERSION, 10)
+            self.assertTrue(entry.get("elements_report"))
+            self.assertIn("_elements_v10.html", entry["elements_report"].replace("\\", "/"))
+            self.assertTrue(entry.get("aff_report"))
+            self.assertIn("_aff_v10.html", entry["aff_report"].replace("\\", "/"))
+            self.assertTrue(Path(entry["aff_report"]).exists())
+            self.assertTrue(entry.get("aff_csv"))
+            self.assertTrue(entry.get("aff_unique_report"))
+            # elements report still only about contrib-group inventory naming
+            el = Path(entry["elements_report"]).read_text(encoding="utf-8")
+            self.assertIn("Elements", el)
+            aff_html = Path(entry["aff_report"]).read_text(encoding="utf-8")
+            self.assertIn("institution", aff_html)
+            self.assertIn("RINGGOLD", aff_html)
+
+
+if __name__ == "__main__":
+    unittest.main()

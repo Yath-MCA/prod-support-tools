@@ -1,0 +1,719 @@
+# -*- coding: utf-8 -*-
+"""Write core/contrib_aff.py"""
+from pathlib import Path
+
+ROOT = Path(r"C:\_IMPACT\prod-support-tools\py\impact_config_suite")
+OUT = ROOT / "core" / "contrib_aff.py"
+
+CONTENT = r'''"""
+contrib_aff.py
+
+Affiliations and author-notes reporting for nodes that appear AFTER the last
+</contrib-group> in a document XML (sibling markup in <front>, not inside
+contrib-group).
+
+The existing *_elements_vN.html report remains the inventory for elements
+*inside* <contrib-group>. This module writes a separate report family:
+
+  {client}_{shortcode}_aff_v{SCRIPT_VERSION}.html   shortcode rollup
+  {client}_{shortcode}_aff_v{SCRIPT_VERSION}.csv    flat per-node rows
+  {client}_aff_unique_v{SCRIPT_VERSION}.html        client-wise unique patterns
+                                                    across shortcodes in the
+                                                    current extract session
+
+Hierarchy: docid-wise detail -> shortcode rollup -> client unique rollup.
+
+Public API (imported by contrib_extractor):
+    extract_after_cg_nodes, inventory_node, attach_after_cg_to_row,
+    build_aff_inventory, build_aff_report, build_aff_csv,
+    update_client_aff_unique, build_client_aff_unique_report,
+    reset_aff_session, get_client_aff_paths
+
+CSV columns:
+    client, shortcode, docid, file_id, node_kind, node_index, node_id,
+    root_attrs, inner_tags, inner_attr_pairs, text_len, empty, parse_error,
+    raw_excerpt
+
+Uses the same entity/PI-friendly fragment parse style as parse_group when
+possible; on failure keeps raw XML + error note.
+"""
+
+from __future__ import annotations
+
+import csv
+import html
+import re
+import xml.etree.ElementTree as ET
+from collections import Counter, defaultdict
+from html.entities import name2codepoint
+from pathlib import Path
+from typing import Any
+
+# ---------------------------------------------------------------------------
+# Local parse helpers (avoid circular import with contrib_extractor)
+# ---------------------------------------------------------------------------
+
+_AFF_RE = re.compile(r"<aff\b(?:[^>]*>[\s\S]*?</aff\s*>|[^>]*/>)", re.I)
+_AUTHOR_NOTES_RE = re.compile(
+    r"<author-notes\b(?:[^>]*>[\s\S]*?</author-notes\s*>|[^>]*/>)", re.I
+)
+_LAST_CG_CLOSE_RE = re.compile(r"</contrib-group\s*>", re.I)
+_NAMED_ENTITY_RE = re.compile(r"&([A-Za-z][A-Za-z0-9]*);")
+_XML_ENTITIES = {"amp", "lt", "gt", "quot", "apos"}
+_NS_DECLS = (
+    'xmlns:xlink="http://www.w3.org/1999/xlink" '
+    'xmlns:mml="http://www.w3.org/1998/Math/MathML" '
+    'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+)
+_NS_PREFIX = {
+    "http://www.w3.org/1999/xlink": "xlink",
+    "http://www.w3.org/1998/Math/MathML": "mml",
+    "http://www.w3.org/2001/XMLSchema-instance": "xsi",
+    "http://www.w3.org/XML/1998/namespace": "xml",
+}
+_PI = ET.ProcessingInstruction
+
+# Session accumulator: client -> unique-pattern buckets (shortcodes in this batch)
+_CLIENT_AFF_ACC: dict[str, dict] = {}
+
+
+def reset_aff_session() -> None:
+    """Clear client-wise unique accumulator (call with reset_session_report_dir)."""
+    global _CLIENT_AFF_ACC
+    _CLIENT_AFF_ACC = {}
+
+
+def _fix_entity(m: re.Match) -> str:
+    name = m.group(1)
+    if name in _XML_ENTITIES:
+        return m.group(0)
+    cp = name2codepoint.get(name)
+    return chr(cp) if cp else f"&amp;{name};"
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _attr_label(key: str) -> str:
+    if key.startswith("{"):
+        ns, _, name = key[1:].partition("}")
+        return f"{_NS_PREFIX.get(ns, 'ns')}:{name}"
+    return key
+
+
+def _parse_fragment(raw: str) -> ET.Element:
+    """Parse one aff / author-notes fragment; returns synthetic <root> wrapper."""
+    wrapped = f"<root {_NS_DECLS}>{_NAMED_ENTITY_RE.sub(_fix_entity, raw)}</root>"
+    parser = ET.XMLParser(target=ET.TreeBuilder(insert_pis=True))
+    return ET.fromstring(wrapped, parser=parser)
+
+
+def _after_last_contrib_group(text: str) -> str:
+    """Return file text after the last </contrib-group>, or '' if none."""
+    last = None
+    for m in _LAST_CG_CLOSE_RE.finditer(text):
+        last = m
+    if last is None:
+        return ""
+    return text[last.end() :]
+
+
+def extract_after_cg_nodes(text: str) -> dict:
+    """Find <aff> and <author-notes> that appear after the last </contrib-group>.
+
+    Returns dict with keys aff_nodes / author_notes_nodes (lists of inventory
+    dicts) and aff_after_count / author_notes_after_count.
+    """
+    after = _after_last_contrib_group(text or "")
+    aff_nodes = []
+    notes_nodes = []
+    if after:
+        for i, m in enumerate(_AFF_RE.finditer(after)):
+            aff_nodes.append(inventory_node(m.group(0), "aff", i))
+        for i, m in enumerate(_AUTHOR_NOTES_RE.finditer(after)):
+            notes_nodes.append(inventory_node(m.group(0), "author-notes", i))
+    return {
+        "aff_nodes": aff_nodes,
+        "author_notes_nodes": notes_nodes,
+        "aff_after_count": len(aff_nodes),
+        "author_notes_after_count": len(notes_nodes),
+    }
+
+
+def inventory_node(raw: str, tag: str, index: int = 0) -> dict:
+    """Per-node inventory: attrs, inner tags/attrs, emptiness, optional parse error."""
+    node: dict[str, Any] = {
+        "tag": tag,
+        "node_index": index,
+        "raw": raw,
+        "attrs": {},
+        "inner_tags": Counter(),
+        "inner_attrs": defaultdict(Counter),  # "elem/attr" -> Counter(values)
+        "empty": False,
+        "text_len": 0,
+        "has_mixed": False,
+        "parse_error": None,
+        "node_id": "",
+        "inner_sig": (),
+        "root_attr_sig": (),
+    }
+    try:
+        root = _parse_fragment(raw)
+        el = None
+        for kid in root:
+            if isinstance(kid.tag, str) and _local(kid.tag) == tag:
+                el = kid
+                break
+        if el is None:
+            # self-wrapping edge: first element child
+            for kid in root:
+                if isinstance(kid.tag, str):
+                    el = kid
+                    break
+        if el is None:
+            node["parse_error"] = "no root element after parse"
+            node["empty"] = True
+            return node
+
+        attrs = {_attr_label(k): v for k, v in el.attrib.items()}
+        node["attrs"] = attrs
+        node["node_id"] = attrs.get("id", "")
+        node["root_attr_sig"] = tuple(sorted(f"{k}={v}" for k, v in attrs.items()))
+
+        texts: list[str] = []
+        if (el.text or "").strip():
+            texts.append((el.text or "").strip())
+
+        def walk(parent: ET.Element):
+            for kid in parent:
+                if kid.tag is _PI or not isinstance(kid.tag, str):
+                    if (kid.tail or "").strip():
+                        texts.append((kid.tail or "").strip())
+                    continue
+                name = _local(kid.tag)
+                node["inner_tags"][name] += 1
+                for k, v in kid.attrib.items():
+                    node["inner_attrs"][f"{name}/{_attr_label(k)}"][v] += 1
+                has_child = any(isinstance(c.tag, str) for c in kid)
+                has_text = bool((kid.text or "").strip()) or any(
+                    (c.tail or "").strip() for c in kid
+                )
+                if (kid.text or "").strip():
+                    texts.append((kid.text or "").strip())
+                walk(kid)
+                if (kid.tail or "").strip():
+                    texts.append((kid.tail or "").strip())
+                if not has_child and not has_text:
+                    pass  # counted at rollup via empty flag on root
+
+        walk(el)
+        joined = " ".join(texts)
+        node["text_len"] = len(joined)
+        node["has_mixed"] = bool(texts) and bool(node["inner_tags"])
+        node["empty"] = not node["inner_tags"] and not joined
+        node["inner_sig"] = tuple(sorted(node["inner_tags"].keys()))
+    except ET.ParseError as e:
+        node["parse_error"] = str(e)
+        node["empty"] = not bool((raw or "").strip())
+        # best-effort tag peek for sig
+        m = re.search(r"<([A-Za-z][\w.-]*)\b", raw or "")
+        if m:
+            node["inner_sig"] = ()
+    return node
+
+
+def attach_after_cg_to_row(row: dict, source_text: str | None) -> None:
+    """Mutate row with after-cg aff / author-notes fields."""
+    data = extract_after_cg_nodes(source_text or "")
+    row["aff_nodes"] = data["aff_nodes"]
+    row["author_notes_nodes"] = data["author_notes_nodes"]
+    row["aff_after_count"] = data["aff_after_count"]
+    row["author_notes_after_count"] = data["author_notes_after_count"]
+
+
+def _empty_node_fields(row: dict) -> None:
+    row.setdefault("aff_nodes", [])
+    row.setdefault("author_notes_nodes", [])
+    row.setdefault("aff_after_count", 0)
+    row.setdefault("author_notes_after_count", 0)
+
+
+def build_aff_inventory(rows: list[dict]) -> dict:
+    """Aggregate after-cg aff / author-notes across good rows for one shortcode."""
+    aff_inner: dict = {}
+    aff_root_attrs: dict = defaultdict(Counter)  # attr -> Counter(values)
+    aff_specific_use: Counter = Counter()
+    aff_country_attr: Counter = Counter()
+    notes_inner: dict = {}
+    notes_root_attrs: dict = defaultdict(Counter)
+    doc_summaries: list[dict] = []
+    ids = {}
+    n_aff = 0
+    n_notes = 0
+
+    def entry(bucket: dict, name: str) -> dict:
+        return bucket.setdefault(
+            name,
+            {
+                "files": set(),
+                "occ": 0,
+                "attrs": defaultdict(Counter),
+                "empty": 0,
+            },
+        )
+
+    for r in rows:
+        _empty_node_fields(r)
+        docid = r["docid"]
+        ids[docid] = r.get("file_id") or ""
+        affs = r.get("aff_nodes") or []
+        notes = r.get("author_notes_nodes") or []
+        n_aff += len(affs)
+        n_notes += len(notes)
+        tag_set = sorted({t for n in affs for t in (n.get("inner_tags") or {})})
+        doc_summaries.append(
+            {
+                "docid": docid,
+                "file_id": ids[docid],
+                "aff_count": len(affs),
+                "author_notes_count": len(notes),
+                "inner_tag_set": tag_set,
+                "preview_rel": r.get("preview_rel") or "",
+            }
+        )
+        for n in affs:
+            for name, cnt in (n.get("inner_tags") or {}).items():
+                e = entry(aff_inner, name)
+                e["files"].add(docid)
+                e["occ"] += cnt
+            for pair, vals in (n.get("inner_attrs") or {}).items():
+                # pair like "country/country"
+                elem, _, attr = pair.partition("/")
+                if elem in aff_inner or True:
+                    e = entry(aff_inner, elem)
+                    for v, c in vals.items():
+                        e["attrs"][attr][v] += c
+                        if elem == "country" and attr == "country":
+                            aff_country_attr[v] += c
+                        if attr == "specific-use":
+                            aff_specific_use[v] += c
+            for k, v in (n.get("attrs") or {}).items():
+                aff_root_attrs[k][v] += 1
+                if k == "specific-use":
+                    aff_specific_use[v] += 1
+            if n.get("empty"):
+                # attribute emptiness on a synthetic "" entry
+                e = entry(aff_inner, "(aff-root)")
+                e["files"].add(docid)
+                e["occ"] += 1
+                e["empty"] += 1
+            elif not n.get("inner_tags"):
+                pass
+        for n in notes:
+            for name, cnt in (n.get("inner_tags") or {}).items():
+                e = entry(notes_inner, name)
+                e["files"].add(docid)
+                e["occ"] += cnt
+            for pair, vals in (n.get("inner_attrs") or {}).items():
+                elem, _, attr = pair.partition("/")
+                e = entry(notes_inner, elem)
+                for v, c in vals.items():
+                    e["attrs"][attr][v] += c
+            for k, v in (n.get("attrs") or {}).items():
+                notes_root_attrs[k][v] += 1
+
+    return {
+        "aff_inner": aff_inner,
+        "aff_root_attrs": aff_root_attrs,
+        "aff_specific_use": aff_specific_use,
+        "aff_country_attr": aff_country_attr,
+        "notes_inner": notes_inner,
+        "notes_root_attrs": notes_root_attrs,
+        "doc_summaries": doc_summaries,
+        "total": len(rows),
+        "n_aff": n_aff,
+        "n_notes": n_notes,
+        "ids": ids,
+        "unique_inner": sorted(aff_inner.keys()),
+    }
+
+
+def _ce():
+    """Lazy import to reuse page/esc helpers without circular import at load."""
+    from core import contrib_extractor as ce
+
+    return ce
+
+
+def _flags_for(e: dict, total: int, rare_ok: bool, rare_max: int) -> list:
+    out = []
+    n = len(e["files"])
+    if n < total:
+        out.append(("partial", "partial", f"in {n} of {total} files"))
+    if rare_ok and n <= rare_max:
+        out.append(("rare", "rare", f"only in {n} file{'' if n == 1 else 's'}"))
+    if e.get("empty"):
+        every = e["empty"] == e["occ"]
+        out.append(
+            (
+                "empty",
+                "empty" if every else "some empty",
+                f"{e['empty']} of {e['occ']} empty-ish roots",
+            )
+        )
+    return out
+
+
+def _section_inner_table(title: str, bucket: dict, total: int, ids: dict, ce) -> str:
+    rare_ok = total > 2 * ce.RARE_MAX
+    rows = []
+    for name, e in sorted(bucket.items(), key=lambda x: x[0].lower()):
+        fl = _flags_for(e, total, rare_ok, ce.RARE_MAX)
+        rows.append(
+            f'<tr><td><code class="tok">&lt;{ce.esc(name)}&gt;</code></td>'
+            f'<td>{ce._files_cell(e["files"], total, ids)}</td><td>{e["occ"]}</td>'
+            f'<td>{ce._flags_html(fl)}</td>'
+            f'<td>{ce._attrs_html(e["attrs"], rare_ok)}</td></tr>'
+        )
+    if not rows:
+        rows.append('<tr><td colspan="5"><span class="none">none found</span></td></tr>')
+    return (
+        f"<h3>{ce.esc(title)} - {len(bucket)} unique inner tags in {total} files</h3>"
+        '<table class="elem"><tr><th>Element</th><th>Files</th><th>Occurrences</th>'
+        "<th>Flags</th><th>Attributes</th></tr>"
+        + "".join(rows)
+        + "</table>"
+    )
+
+
+def _counter_block(title: str, counter: Counter, ce) -> str:
+    if not counter:
+        return f"<h3>{ce.esc(title)}</h3><p><span class='none'>none</span></p>"
+    parts = []
+    for v, n in counter.most_common(80):
+        shown = ce.esc(v) or "(empty)"
+        parts.append(f"<div><code class='tok'>{shown}</code> <small>&times;{n}</small></div>")
+    more = f"<div>... +{len(counter) - 80} more</div>" if len(counter) > 80 else ""
+    return f"<h3>{ce.esc(title)} - {len(counter)} distinct</h3>" + "".join(parts) + more
+
+
+def _root_attrs_block(title: str, attrs: dict, ce) -> str:
+    if not attrs:
+        return f"<h3>{ce.esc(title)}</h3><p><span class='none'>none</span></p>"
+    # reuse _attrs_html shape: attrs is dict[str, Counter]
+    return (
+        f"<h3>{ce.esc(title)}</h3>"
+        + ce._attrs_html(attrs, rare_ok=True)
+    )
+
+
+def _doc_summary_table(summaries: list[dict], ce) -> str:
+    rows = []
+    for s in summaries:
+        tags = ", ".join(f"&lt;{ce.esc(t)}&gt;" for t in s["inner_tag_set"][:12]) or "-"
+        if len(s["inner_tag_set"]) > 12:
+            tags += f" +{len(s['inner_tag_set']) - 12}"
+        prev = ""
+        if s.get("preview_rel"):
+            prev = f'<a href="{ce.esc_attr(s["preview_rel"])}">preview</a>'
+        rows.append(
+            f"<tr><td>{ce.esc(s['docid'])}</td><td>{ce.esc(s['file_id'])}</td>"
+            f"<td>{s['aff_count']}</td><td>{s['author_notes_count']}</td>"
+            f"<td>{tags}</td><td>{prev or '-'}</td></tr>"
+        )
+    if not rows:
+        rows.append('<tr><td colspan="6"><span class="none">no documents</span></td></tr>')
+    return (
+        "<h3>Docid-wise summary</h3>"
+        '<table class="elem"><tr><th>Docid</th><th>File-id</th><th>#aff</th>'
+        "<th>#author-notes</th><th>Sample inner tags (aff)</th><th>Preview</th></tr>"
+        + "".join(rows)
+        + "</table>"
+    )
+
+
+def build_aff_report(
+    client: str, shortcode: str, inv: dict, report_dir: Path
+) -> Path:
+    """Write {client}_{shortcode}_aff_vN.html under report_dir."""
+    ce = _ce()
+    chips = [
+        ("Client", client, ""),
+        ("Project shortcode", shortcode, ""),
+        ("Documents", inv["total"], ""),
+        ("Aff after cg", inv["n_aff"], ""),
+        ("Author-notes after cg", inv["n_notes"], ""),
+        ("Unique aff inner tags", len(inv["aff_inner"]), ""),
+        ("Script version", f"v{ce.SCRIPT_VERSION}", ""),
+        ("Generated", ce.now(), ""),
+    ]
+    legend = (
+        '<div class="legend">After-&lt;contrib-group&gt; only: affiliations and '
+        "author-notes that follow the last &lt;/contrib-group&gt;. Inside-group "
+        "aff remains in the elements report. Flags: "
+        '<span class="flag partial">partial</span> / '
+        '<span class="flag rare">rare</span> / '
+        '<span class="flag empty">empty</span>.</div>'
+    )
+    body = (
+        '<div class="elems">'
+        + _section_inner_table(
+            "Aff after contrib-group — inner tags",
+            inv["aff_inner"],
+            inv["total"],
+            inv["ids"],
+            ce,
+        )
+        + _root_attrs_block("Aff root attributes", inv["aff_root_attrs"], ce)
+        + _counter_block("Aff specific-use values", inv["aff_specific_use"], ce)
+        + _counter_block("Aff country/@country values", inv["aff_country_attr"], ce)
+        + _section_inner_table(
+            "Author-notes after contrib-group — inner tags",
+            inv["notes_inner"],
+            inv["total"],
+            inv["ids"],
+            ce,
+        )
+        + _root_attrs_block("Author-notes root attributes", inv["notes_root_attrs"], ce)
+        + _doc_summary_table(inv["doc_summaries"], ce)
+        + "</div>"
+    )
+    out = report_dir / f"{ce.safe_name(client)}_{ce.safe_name(shortcode)}_aff_v{ce.SCRIPT_VERSION}.html"
+    ce.ensure_dir(out.parent)
+    out.write_text(
+        ce.page(f"{client} / {shortcode} - aff / author-notes after contrib-group", chips, legend + body, legend=False),
+        encoding="utf-8",
+    )
+    return out
+
+
+def _attrs_flat(attrs: dict) -> str:
+    if not attrs:
+        return ""
+    return "; ".join(f"{k}={v}" for k, v in sorted(attrs.items()))
+
+
+def _inner_tags_flat(tags: Counter) -> str:
+    if not tags:
+        return ""
+    return "; ".join(f"{k}:{n}" for k, n in sorted(tags.items()))
+
+
+def _inner_attr_pairs_flat(inner_attrs: dict) -> str:
+    parts = []
+    for pair, vals in sorted(inner_attrs.items()):
+        for v, n in vals.most_common():
+            parts.append(f"{pair}={v}x{n}")
+    return "; ".join(parts)
+
+
+def build_aff_csv(
+    client: str, shortcode: str, rows: list[dict], report_dir: Path
+) -> Path:
+    """Write flat CSV of each after-cg aff / author-notes node."""
+    ce = _ce()
+    out = report_dir / f"{ce.safe_name(client)}_{ce.safe_name(shortcode)}_aff_v{ce.SCRIPT_VERSION}.csv"
+    ce.ensure_dir(out.parent)
+    fields = [
+        "client",
+        "shortcode",
+        "docid",
+        "file_id",
+        "node_kind",
+        "node_index",
+        "node_id",
+        "root_attrs",
+        "inner_tags",
+        "inner_attr_pairs",
+        "text_len",
+        "empty",
+        "parse_error",
+        "raw_excerpt",
+    ]
+    with open(out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        for r in rows:
+            _empty_node_fields(r)
+            for kind, key in (("aff", "aff_nodes"), ("author-notes", "author_notes_nodes")):
+                for n in r.get(key) or []:
+                    raw = n.get("raw") or ""
+                    excerpt = raw if len(raw) <= 500 else raw[:500] + "…"
+                    w.writerow(
+                        {
+                            "client": client,
+                            "shortcode": shortcode,
+                            "docid": r.get("docid", ""),
+                            "file_id": r.get("file_id", ""),
+                            "node_kind": kind,
+                            "node_index": n.get("node_index", 0),
+                            "node_id": n.get("node_id", ""),
+                            "root_attrs": _attrs_flat(n.get("attrs") or {}),
+                            "inner_tags": _inner_tags_flat(n.get("inner_tags") or Counter()),
+                            "inner_attr_pairs": _inner_attr_pairs_flat(n.get("inner_attrs") or {}),
+                            "text_len": n.get("text_len", 0),
+                            "empty": bool(n.get("empty")),
+                            "parse_error": n.get("parse_error") or "",
+                            "raw_excerpt": excerpt.replace("\r", " ").replace("\n", " "),
+                        }
+                    )
+    return out
+
+
+def _acc_bucket(client: str) -> dict:
+    if client not in _CLIENT_AFF_ACC:
+        _CLIENT_AFF_ACC[client] = {
+            "shortcodes": set(),
+            "inner_sig": {},  # sig -> {shortcodes, occ, files}
+            "root_attr_sig": {},
+            "specific_use": {},
+            "country_attr": {},
+            "notes_inner_sig": {},
+        }
+    return _CLIENT_AFF_ACC[client]
+
+
+def _add_unique(bucket: dict, key, shortcode: str, docid: str):
+    e = bucket.setdefault(key, {"shortcodes": set(), "occ": 0, "files": set()})
+    e["shortcodes"].add(shortcode)
+    e["occ"] += 1
+    e["files"].add(docid)
+
+
+def update_client_aff_unique(client: str, shortcode: str, rows: list[dict]) -> None:
+    """Fold this shortcode's after-cg patterns into the session client accumulator."""
+    acc = _acc_bucket(client)
+    acc["shortcodes"].add(shortcode)
+    for r in rows:
+        _empty_node_fields(r)
+        docid = r["docid"]
+        for n in r.get("aff_nodes") or []:
+            sig = n.get("inner_sig") or ()
+            _add_unique(acc["inner_sig"], sig, shortcode, docid)
+            ras = n.get("root_attr_sig") or ()
+            if ras:
+                _add_unique(acc["root_attr_sig"], ras, shortcode, docid)
+            for k, v in (n.get("attrs") or {}).items():
+                if k == "specific-use":
+                    _add_unique(acc["specific_use"], v, shortcode, docid)
+            for pair, vals in (n.get("inner_attrs") or {}).items():
+                elem, _, attr = pair.partition("/")
+                if elem == "country" and attr == "country":
+                    for v in vals:
+                        _add_unique(acc["country_attr"], v, shortcode, docid)
+                if attr == "specific-use":
+                    for v in vals:
+                        _add_unique(acc["specific_use"], v, shortcode, docid)
+        for n in r.get("author_notes_nodes") or []:
+            sig = n.get("inner_sig") or ()
+            _add_unique(acc["notes_inner_sig"], sig, shortcode, docid)
+
+
+def _unique_table(title: str, bucket: dict, key_label: str, ce, fmt_key) -> str:
+    rows = []
+    for key, e in sorted(bucket.items(), key=lambda x: (-len(x[1]["shortcodes"]), str(x[0]))):
+        scs = ", ".join(sorted(e["shortcodes"]))
+        rows.append(
+            f"<tr><td><code class='tok'>{ce.esc(fmt_key(key))}</code></td>"
+            f"<td>{ce.esc(scs)}</td><td>{e['occ']}</td><td>{len(e['files'])}</td></tr>"
+        )
+    if not rows:
+        rows.append(f'<tr><td colspan="4"><span class="none">none</span></td></tr>')
+    return (
+        f"<h3>{ce.esc(title)} - {len(bucket)} unique</h3>"
+        f'<table class="elem"><tr><th>{ce.esc(key_label)}</th><th>Shortcodes</th>'
+        "<th>Occurrences</th><th>Files</th></tr>"
+        + "".join(rows)
+        + "</table>"
+    )
+
+
+def build_client_aff_unique_report(client: str, report_dir: Path) -> Path | None:
+    """Write {client}_aff_unique_vN.html from session accumulator."""
+    ce = _ce()
+    acc = _CLIENT_AFF_ACC.get(client)
+    if not acc:
+        return None
+
+    def sig_fmt(sig) -> str:
+        if not sig:
+            return "(no inner tags)"
+        if isinstance(sig, tuple):
+            return "{" + ", ".join(sig) + "}"
+        return str(sig)
+
+    def attr_fmt(sig) -> str:
+        if not sig:
+            return "(no attrs)"
+        if isinstance(sig, tuple):
+            return "; ".join(sig)
+        return str(sig)
+
+    chips = [
+        ("Client", client, ""),
+        ("Shortcodes in session", len(acc["shortcodes"]), ""),
+        ("Unique aff inner-tag sets", len(acc["inner_sig"]), ""),
+        ("Unique specific-use", len(acc["specific_use"]), ""),
+        ("Unique country attrs", len(acc["country_attr"]), ""),
+        ("Script version", f"v{ce.SCRIPT_VERSION}", ""),
+        ("Generated", ce.now(), ""),
+    ]
+    body = (
+        '<div class="elems">'
+        + _unique_table(
+            "Unique aff inner-tag signatures",
+            acc["inner_sig"],
+            "Inner-tag set",
+            ce,
+            sig_fmt,
+        )
+        + _unique_table(
+            "Unique aff root attribute patterns",
+            acc["root_attr_sig"],
+            "Root attrs",
+            ce,
+            attr_fmt,
+        )
+        + _unique_table(
+            "Unique specific-use values",
+            acc["specific_use"],
+            "specific-use",
+            ce,
+            str,
+        )
+        + _unique_table(
+            "Unique country/@country values",
+            acc["country_attr"],
+            "country",
+            ce,
+            str,
+        )
+        + _unique_table(
+            "Unique author-notes inner-tag signatures",
+            acc["notes_inner_sig"],
+            "Inner-tag set",
+            ce,
+            sig_fmt,
+        )
+        + f"<p>Shortcodes: {ce.esc(', '.join(sorted(acc['shortcodes'])) or '-')}</p>"
+        + "</div>"
+    )
+    out = report_dir / f"{ce.safe_name(client)}_aff_unique_v{ce.SCRIPT_VERSION}.html"
+    ce.ensure_dir(out.parent)
+    out.write_text(
+        ce.page(f"{client} - aff unique (session)", chips, body, legend=False),
+        encoding="utf-8",
+    )
+    return out
+
+
+def get_client_aff_paths(client: str, report_dir: Path) -> dict:
+    """Paths for meta (may not exist yet)."""
+    ce = _ce()
+    unique = report_dir / f"{ce.safe_name(client)}_aff_unique_v{ce.SCRIPT_VERSION}.html"
+    return {"aff_unique_report": unique}
+'''
+
+OUT.write_text(CONTENT, encoding="utf-8")
+print("wrote", OUT, "bytes", OUT.stat().st_size)

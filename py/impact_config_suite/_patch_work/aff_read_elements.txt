@@ -1,0 +1,226 @@
+    return key
+
+
+def build_inventory(rows: list[dict]) -> dict:
+    """Unique element names (+ attributes, parents, per-contrib counts, emptiness) and PI targets."""
+    elems: dict = {}
+    pis: dict = {}
+    comments = {"files": set(), "occ": 0}
+    n_contribs = 0
+
+    def entry(name: str) -> dict:
+        return elems.setdefault(
+            name,
+            {
+                "files": set(),
+                "occ": 0,
+                "parents": Counter(),
+                "attrs": defaultdict(Counter),
+                "per": Counter(),
+                "empty": 0,
+            },
+        )
+
+    def walk(el: ET.Element, parent: str, docid: str):
+        for kid in el:
+            if kid.tag is PI:
+                data = (kid.text or "").strip()
+                target = data.split(None, 1)[0] if data else "(empty)"
+                e = pis.setdefault(target, {"files": set(), "occ": 0})
+                e["files"].add(docid)
+                e["occ"] += 1
+                continue
+            if not isinstance(kid.tag, str):
+                continue
+            name = local(kid.tag)
+            e = entry(name)
+            e["files"].add(docid)
+            e["occ"] += 1
+            e["parents"][parent] += 1
+            for k, v in kid.attrib.items():
+                e["attrs"][attr_label(k)][v] += 1
+            has_child = any(isinstance(c.tag, str) for c in kid)
+            has_text = bool((kid.text or "").strip()) or any((c.tail or "").strip() for c in kid)
+            if not has_child and not has_text:
+                e["empty"] += 1
+            walk(kid, name, docid)
+
+    for r in rows:
+        walk(r["group_root"], "(document)", r["docid"])
+        n_comments = r["raw_group"].count("<!--")
+        if n_comments:
+            comments["files"].add(r["docid"])
+            comments["occ"] += n_comments
+        for c in r["contribs"]:
+            n_contribs += 1
+            cnt = Counter(local(d.tag) for d in c.iter() if d is not c and isinstance(d.tag, str))
+            for name, k in cnt.items():
+                entry(name)["per"][k] += 1
+
+    return {
+        "elems": elems,
+        "pis": pis,
+        "comments": comments,
+        "n_contribs": n_contribs,
+        "total": len(rows),
+        "ids": {r["docid"]: r["file_id"] for r in rows},
+    }
+
+
+def _flags(e: dict, total: int, rare_ok: bool) -> list:
+    """[(css class, label, tooltip)] for one element entry."""
+    out = []
+    n = len(e["files"])
+    if n < total:
+        out.append(("partial", "partial", f"in {n} of {total} files"))
+    if rare_ok and n <= RARE_MAX:
+        out.append(("rare", "rare", f"only in {n} file{'' if n == 1 else 's'}"))
+    if e.get("per") and max(e["per"]) > 1:
+        out.append(("repeats", f"repeats x{max(e['per'])}", "more than one per contrib (highest count shown)"))
+    if e.get("empty"):
+        every = e["empty"] == e["occ"]
+        out.append(
+            (
+                "empty",
+                "empty" if every else "some empty",
+                f"{e['empty']} of {e['occ']} occurrences have no text and no child element",
+            )
+        )
+    return out
+
+
+def _flags_html(flags: list) -> str:
+    return "".join(
+        f'<span class="flag {cls}" title="{esc_attr(tip)}">{esc(label)}</span>' for cls, label, tip in flags
+    ) or '<span class="none">-</span>'
+
+
+def flagged_count(inv: dict) -> int:
+    total = inv["total"]
+    rare_ok = total > 2 * RARE_MAX
+    return sum(1 for e in inv["elems"].values() if _flags(e, total, rare_ok))
+
+
+def _files_cell(files: set, total: int, ids: dict) -> str:
+    n = len(files)
+    if n == total:
+        return f"{n}/{total}"
+    names = sorted(files, key=lambda d: (ids.get(d) or d).lower())
+    shown = "".join(f"<div>{esc(ids.get(d) or d)} <small>{esc(d)}</small></div>" for d in names[:40])
+    more = f"<div>... +{n - 40} more</div>" if n > 40 else ""
+    return f'<details><summary>{n}/{total}</summary>{shown}{more}</details>'
+
+
+def _per_contrib(e: dict, n_contribs: int) -> str:
+    per = e["per"]
+    if not per:
+        return "-"
+    items = dict(per)
+    zeros = n_contribs - sum(per.values())
+    if zeros > 0:
+        items[0] = zeros
+    if len(items) > 8:
+        return f"{min(items)} - {max(items)}"
+    return " &middot; ".join(f"<b>{k}</b>: {v}" for k, v in sorted(items.items()))
+
+
+def _attrs_html(attrs: dict, rare_ok: bool) -> str:
+    if not attrs:
+        return '<span class="none">-</span>'
+    out = []
+    for name, vals in attrs.items():
+        if len(vals) <= 8:
+            parts = []
+            for v, n in vals.most_common():
+                shown = esc(v) or "(empty)"
+                if rare_ok and len(vals) > 1 and n <= RARE_MAX:
+                    parts.append(f'<span class="rv" title="rare value">{shown}<small>&times;{n}</small></span>')
+                else:
+                    parts.append(f"{shown}<small>&times;{n}</small>")
+            shown = ", ".join(parts)
+        else:
+            sample = ", ".join(esc(v) or "(empty)" for v, _ in vals.most_common(3))
+            shown = f"{len(vals)} distinct, e.g. {sample}"
+        out.append(f'<div><code class="tok">{esc(name)}</code> {shown}</div>')
+    return "".join(out)
+
+
+ELEM_LEGEND = (
+    '<div class="legend">Flags: <span class="flag partial">partial</span> not in every file (open the file count to see which) &middot; '
+    f'<span class="flag rare">rare</span> in {RARE_MAX} files or fewer &middot; '
+    '<span class="flag repeats">repeats xN</span> more than one per contrib &middot; '
+    '<span class="flag empty">empty</span> no text and no child element (e.g. an &lt;email&gt; that only holds a PI) &middot; '
+    '<span class="rv">value</span> rare attribute value. '
+    "Processing instructions and comments are listed as flags only - their values are in the contrib report.</div>"
+)
+
+
+def elements_block(inv: dict) -> str:
+    total, nc, ids = inv["total"], inv["n_contribs"], inv["ids"]
+    rare_ok = total > 2 * RARE_MAX
+    rows = []
+    for name, e in inv["elems"].items():
+        parents = ", ".join(esc(p) for p, _ in e["parents"].most_common())
+        rows.append(
+            f'<tr><td><code class="tok">&lt;{esc(name)}&gt;</code></td>'
+            f'<td>{_files_cell(e["files"], total, ids)}</td><td>{e["occ"]}</td>'
+            f'<td>{_per_contrib(e, nc)}</td><td>{_flags_html(_flags(e, total, rare_ok))}</td>'
+            f'<td>{parents}</td><td>{_attrs_html(e["attrs"], rare_ok)}</td></tr>'
+        )
+    pi_rows = []
+    for target, e in inv["pis"].items():
+        fl = _flags({"files": e["files"], "occ": e["occ"]}, total, rare_ok)
+        pi_rows.append(
+            f'<tr><td><code class="tok">&lt;?{esc(target)}?&gt;</code></td>'
+            f'<td>{_files_cell(e["files"], total, ids)}</td><td>{e["occ"]}</td><td>{_flags_html(fl)}</td></tr>'
+        )
+    c = inv["comments"]
+    if c["occ"]:
+        fl = _flags({"files": c["files"], "occ": c["occ"]}, total, rare_ok)
+        pi_rows.append(
+            '<tr><td><code class="tok">&lt;!-- comment --&gt;</code></td>'
+            f'<td>{_files_cell(c["files"], total, ids)}</td><td>{c["occ"]}</td><td>{_flags_html(fl)}</td></tr>'
+        )
+    return (
+        '<div class="elems">'
+        f'<h3>Elements - {len(inv["elems"])} unique names in {total} files ({nc} contribs)</h3>'
+        '<table class="elem"><tr><th>Element</th><th>Files</th><th>Occurrences</th>'
+        '<th>Per contrib (count: contribs)</th><th>Flags</th><th>Parent element(s)</th><th>Attributes</th></tr>'
+        + "".join(rows)
+        + "</table>"
+        f'<h3>Processing instructions / comments - {len(inv["pis"])} PI targets</h3>'
+        '<table class="elem"><tr><th>Target</th><th>Files</th><th>Occurrences</th><th>Flags</th></tr>'
+        + "".join(pi_rows)
+        + "</table></div>"
+    )
+
+
+def build_elements_report(client: str, shortcode: str, inv: dict, report_dir: Path) -> Path:
+    chips = [
+        ("Client", client, ""),
+        ("Project shortcode", shortcode, ""),
+        ("Documents", inv["total"], ""),
+        ("Contribs", inv["n_contribs"], ""),
+        ("Unique elements", len(inv["elems"]), ""),
+        ("Flagged elements", flagged_count(inv), "warn" if flagged_count(inv) else "good"),
+        ("Script version", f"v{SCRIPT_VERSION}", ""),
+        ("Generated", now(), ""),
+    ]
+    out = report_dir / f"{safe_name(client)}_{safe_name(shortcode)}_elements_v{SCRIPT_VERSION}.html"
+    ensure_dir(out.parent)  # parent may be gone even if make_contrib_report_dir ran earlier
+    out.write_text(
+        page(f"{client} / {shortcode} - element list", chips, ELEM_LEGEND + elements_block(inv), legend=False),
+        encoding="utf-8",
+    )
+    return out
+
+
+# ----------------------------------------------------------------- rendering
+
+def esc(s: str) -> str:
+    return html.escape(s, quote=False)
+
+
+def esc_attr(s: str) -> str:
+    return html.escape(s, quote=True).replace("\n", "&#10;")
+

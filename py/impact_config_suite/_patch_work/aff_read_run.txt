@@ -1,0 +1,211 @@
+    """Sleep in small slices so Cancel / Ctrl+C can interrupt promptly."""
+    if seconds <= 0:
+        return
+    log(f"  ... pausing {seconds:g}s before {why} (Cancel / Ctrl+C to stop)")
+    end = time.time() + seconds
+    while time.time() < end:
+        if cancel_check():
+            return
+        time.sleep(min(0.25, max(0.0, end - time.time())))
+
+def run_contrib_extract(
+    root: Path | str,
+    clients: Optional[Iterable[str]] = None,
+    shortcodes: Optional[Iterable[tuple[str, str]]] = None,
+    delay_sc: float = DELAY_SHORTCODE_SEC,
+    delay_cl: float = DELAY_CLIENT_SEC,
+    regenerate_all: bool = False,
+    log_callback: LogFn = _noop_log,
+    progress_callback: ProgressFn = _noop_progress,
+    cancel_check: CancelFn = _noop_cancel,
+) -> dict:
+    """Batch-run contrib extraction for selected clients/shortcodes.
+
+    Parameters
+    ----------
+    root : project root containing documents.json + meta.json
+    clients : optional client name filter (used when shortcodes is None)
+    shortcodes : optional explicit list of (client, shortcode) pairs in run order
+    delay_sc / delay_cl : pause seconds between shortcodes / clients (0 = none)
+    regenerate_all : when shortcodes is None, include already-filled shortcodes
+    log_callback / progress_callback / cancel_check : GUI/CLI hooks
+
+    Returns summary dict with keys: finished, total, cancelled, done_path, overview (pre-run).
+    """
+    base = Path(root)
+    reset_session_report_dir()
+    log = log_callback or _noop_log
+    progress = progress_callback or _noop_progress
+    cancelled = cancel_check or _noop_cancel
+
+    if not (base / DOCS_NAME).exists() or not (base / META_NAME).exists():
+        raise FileNotFoundError(f"Missing {DOCS_NAME} or {META_NAME} in {base}")
+
+    docs = load_json(base / DOCS_NAME)
+    metas = load_json(base / META_NAME)
+    index = build_index(docs, metas)
+    if not index:
+        raise ValueError(f"No {RUN_DTD} documents found in {META_NAME}")
+
+    done = load_done(base)
+    overview = build_overview(docs, metas, index, done)
+
+    if shortcodes is not None:
+        pairs = [(c, sc) for c, sc in shortcodes]
+    else:
+        client_list = list(clients) if clients is not None else sorted(index, key=str.lower)
+        for c in client_list:
+            if c not in index:
+                raise KeyError(f"Unknown client: {c}")
+        pairs = pending_pairs(client_list, index, done, regenerate_all=regenerate_all)
+
+    # Validate pairs and keep only those that exist
+    valid = []
+    for c, sc in pairs:
+        if c not in index or sc not in index[c]:
+            log(f"[SKIP] unknown pair {c}/{sc}")
+            continue
+        valid.append((c, sc))
+    pairs = valid
+
+    total = len(pairs)
+    if total == 0:
+        log(
+            f"\nNothing to generate (everything selected is already in {DONE_NAME}; "
+            "pick filled shortcodes or enable regenerate-all)."
+        )
+        return {
+            "finished": [],
+            "total": 0,
+            "cancelled": False,
+            "done_path": str(base / DONE_NAME),
+            "overview": overview,
+            "last_report": None,
+        }
+
+    left: Counter = Counter(c for c, _ in pairs)
+    finished = []
+    last_report = None
+    was_cancelled = False
+
+    try:
+        for i, (client, shortcode) in enumerate(pairs, 1):
+            if cancelled():
+                was_cancelled = True
+                log(f"\nStopped by user. Finished shortcodes are already saved in {DONE_NAME}")
+                break
+
+            ids = index[client][shortcode]
+            msg = f"=== [{i}/{total}] {RUN_DTD} / {client} / {shortcode} ({cnt(len(ids))}) ==="
+            log(f"\n{msg}")
+            progress(i - 1, total, msg)
+            pending_shortcodes = total - i  # remaining after current
+            clients_left = sorted({c for c, _ in pairs[i - 1:]})  # including current
+            cl_list = ", ".join(clients_left) if clients_left else "-"
+            queue_msg = (
+                f"[QUEUE] pending_shortcodes={pending_shortcodes}  "
+                f"pending_clients={len(clients_left)} ({cl_list})  "
+                f"current={client}/{shortcode}"
+            )
+            log(queue_msg)
+            progress(i - 1, total, queue_msg)
+
+            try:
+                entry = process_group(
+                    base, docs, metas, client, shortcode, ids,
+                    log=log, progress=progress, cancel_check=cancelled,
+                )
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                # One shortcode crash must not abort the multi-shortcode run
+                log(f"[ERROR] {client}/{shortcode}: {e}")
+                traceback.print_exc()
+                finished.append((client, shortcode, {
+                    "documents": 0,
+                    "failed": 0,
+                    "off_pattern_files": 0,
+                    "report": f"ERROR: {e}",
+                    "error": str(e),
+                }))
+                progress(i, total, f"{client}/{shortcode} ERROR")
+                left[client] -= 1
+                if left[client] == 0:
+                    log(f"[CLIENT COMPLETE] {client}")
+                if i < total and not cancelled():
+                    nxt_client, nxt_sc = pairs[i]
+                    if nxt_client != client:
+                        pause(delay_cl, f"client {nxt_client}", log=log, cancel_check=cancelled)
+                    else:
+                        pause(delay_sc, f"shortcode {nxt_client}/{nxt_sc}", log=log, cancel_check=cancelled)
+                if cancelled() and i < total:
+                    was_cancelled = True
+                    log(f"\nStopped by user. Finished shortcodes are already saved in {DONE_NAME}")
+                    break
+                continue
+
+            if cancelled():
+                was_cancelled = True
+
+            if entry.get("cancelled"):
+                log(f"[SKIP RECORD] {shortcode} cancelled mid-run, not marked as filled")
+            elif entry["failed"] == entry["documents"] and entry["documents"] > 0:
+                log(f"[SKIP RECORD] every document failed, {shortcode} not marked as filled")
+            elif entry["documents"] == 0:
+                log(f"[SKIP RECORD] no documents processed for {shortcode}")
+            else:
+                done.setdefault(RUN_DTD, {}).setdefault(client, {})[shortcode] = entry
+                save_done(base, done)
+                if entry.get("report"):
+                    resolved = resolve_meta_path(base, entry["report"])
+                    last_report = str(resolved) if resolved else None
+
+            finished.append((client, shortcode, entry))
+            progress(i, total, f"{client}/{shortcode} done")
+
+            left[client] -= 1
+            if left[client] == 0:
+                log(f"[CLIENT COMPLETE] {client}")
+            if i < total and not cancelled():
+                nxt_client, nxt_sc = pairs[i]
+                if nxt_client != client:
+                    pause(delay_cl, f"client {nxt_client}", log=log, cancel_check=cancelled)
+                else:
+                    pause(delay_sc, f"shortcode {nxt_client}/{nxt_sc}", log=log, cancel_check=cancelled)
+            if cancelled() and i < total:
+                was_cancelled = True
+                log(f"\nStopped by user. Finished shortcodes are already saved in {DONE_NAME}")
+                break
+    except KeyboardInterrupt:
+        was_cancelled = True
+        log(f"\nStopped by user. Finished shortcodes are already saved in {DONE_NAME}")
+
+    log(f"\nSummary ({len(finished)}/{total} shortcodes processed):")
+    for client, shortcode, e in finished:
+        extra = ""
+        if e.get("issues_csv"):
+            extra = f"  issues={e['issues_csv']}"
+        log(
+            f"  {client} / {shortcode:<12} {e.get('documents', 0):>5} docs  {e.get('failed', 0):>3} failed  "
+            f"{e.get('off_pattern_files', 0):>3} off-pattern  -> {e.get('report', '')}{extra}"
+        )
+    log(f"Progress saved in {DONE_NAME}")
+
+    return {
+        "finished": finished,
+        "total": total,
+        "cancelled": was_cancelled,
+        "done_path": str(base / DONE_NAME),
+        "overview": overview,
+        "last_report": last_report,
+    }
+
+def load_project(root: Path | str) -> tuple[Path, dict, dict, dict, dict]:
+    """Load documents.json, meta.json, index, and meta-contrib.json for a project root."""
+    base = Path(root)
+    docs = load_json(base / DOCS_NAME)
+    metas = load_json(base / META_NAME)
+    index = build_index(docs, metas)
+    done = load_done(base)
+    return base, docs, metas, index, done
+
