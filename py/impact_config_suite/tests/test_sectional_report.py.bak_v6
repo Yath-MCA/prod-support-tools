@@ -1,0 +1,354 @@
+"""Tests for core.sectional_report — section scoping and unique keys."""
+from __future__ import annotations
+
+import csv
+import tempfile
+import unittest
+from pathlib import Path
+
+from core import sectional_report as sr
+
+
+SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<article xmlns:xlink="http://www.w3.org/1999/xlink">
+  <front>
+    <article-meta>
+      <article-id pub-id-type="doi">10.1000/front-doi</article-id>
+      <ext-link ext-link-type="uri" xlink:href="https://example.com/front">Front URI</ext-link>
+      <uri>https://example.com/front-uri</uri>
+    </article-meta>
+  </front>
+  <body>
+    <p>
+      <ext-link ext-link-type="doi" xlink:href="https://doi.org/10.1000/body-doi">10.1000/body-doi</ext-link>
+      <ext-link ext-link-type="uri" xlink:href="https://example.com/body">Body link</ext-link>
+    </p>
+  </body>
+  <back>
+    <ref-list>
+      <ref>
+        <pub-id pub-id-type="doi">10.1000/ref-doi</pub-id>
+        <ext-link ext-link-type="doi" xlink:href="https://doi.org/10.1000/ref-ext">10.1000/ref-ext</ext-link>
+        <uri>https://example.com/ref-uri</uri>
+      </ref>
+    </ref-list>
+    <app-group>
+      <app>
+        <p>
+          <pub-id pub-id-type="doi">10.1000/other-doi</pub-id>
+          <ext-link ext-link-type="uri" xlink:href="https://example.com/other">Other</ext-link>
+        </p>
+      </app>
+    </app-group>
+    <fn-group>
+      <fn>
+        <p>
+          <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1000/fn-uri">fn link</ext-link>
+        </p>
+      </fn>
+    </fn-group>
+  </back>
+</article>
+"""
+
+# Two docs with different hrefs but same tag+type+section — must merge.
+SAMPLE_XML_A = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+  <front><article-meta>
+    <ext-link ext-link-type="uri" href="https://aaa.example/1">A1</ext-link>
+  </article-meta></front>
+  <body><p>x</p></body>
+  <back><ref-list><ref><p>r</p></ref></ref-list></back>
+</article>
+"""
+
+SAMPLE_XML_B = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+  <front><article-meta>
+    <ext-link ext-link-type="uri" href="https://bbb.example/2">B2</ext-link>
+  </article-meta></front>
+  <body><p>y</p></body>
+  <back><ref-list><ref><p>r</p></ref></ref-list></back>
+</article>
+"""
+
+
+
+BITS_SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<book xmlns:xlink="http://www.w3.org/1999/xlink">
+  <front-matter>
+    <book-meta>
+      <book-id book-id-type="doi">10.1000/bits-front-doi</book-id>
+    </book-meta>
+    <uri>https://example.com/bits-front-uri</uri>
+  </front-matter>
+  <book-body>
+    <book-part>
+      <body>
+        <p>
+          <ext-link ext-link-type="uri" xlink:href="https://example.com/bits-body">Body</ext-link>
+        </p>
+      </body>
+      <back>
+        <ref-list>
+          <ref>
+            <ext-link ext-link-type="doi" xlink:href="https://doi.org/10.1000/bits-ref">10.1000/bits-ref</ext-link>
+          </ref>
+        </ref-list>
+        <ack>
+          <p>thanks</p>
+        </ack>
+      </back>
+    </book-part>
+  </book-body>
+</book>
+"""
+
+
+class TestSectionalReport(unittest.TestCase):
+    def setUp(self):
+        self._prev_root = sr.REPORT_ROOT
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmpdir.name)
+        sr.REPORT_ROOT = self.tmp / "reports"
+
+    def tearDown(self):
+        sr.REPORT_ROOT = self._prev_root
+        self._tmpdir.cleanup()
+
+    def _write(self, name: str, content: str) -> Path:
+        p = self.tmp / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def test_section_counts_and_ref_vs_other_scoping(self):
+        xml = self._write("doc1.xml", SAMPLE_XML)
+        result = sr.extract_file(xml)
+
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["section_counts"]["FRONT"], 1)
+        self.assertEqual(result["section_counts"]["BODY"], 1)
+        self.assertEqual(result["section_counts"]["REF"], 1)
+        self.assertEqual(result["section_counts"]["OTHER"], 2)  # app-group + fn-group under back
+
+        # REF gets ref-list DOIs; OTHER gets app-group DOI — not swapped
+        self.assertEqual(result["per_section"]["REF"]["doi_id"]["count"], 1)
+        self.assertEqual(result["per_section"]["OTHER"]["doi_id"]["count"], 1)
+        ref_texts = [h["text"] for h in result["per_section"]["REF"]["doi_id"]["hits"]]
+        other_texts = [h["text"] for h in result["per_section"]["OTHER"]["doi_id"]["hits"]]
+        self.assertTrue(any("ref-doi" in t for t in ref_texts))
+        self.assertTrue(any("other-doi" in t for t in other_texts))
+        self.assertFalse(any("other-doi" in t for t in ref_texts))
+        self.assertFalse(any("ref-doi" in t for t in other_texts))
+
+        # FRONT doi_id
+        self.assertEqual(result["per_section"]["FRONT"]["doi_id"]["count"], 1)
+        # BODY extlink_doi
+        self.assertEqual(result["per_section"]["BODY"]["extlink_doi"]["count"], 1)
+        # REF also has extlink_doi
+        self.assertEqual(result["per_section"]["REF"]["extlink_doi"]["count"], 1)
+
+        # Aggregate query totals = sum across ALL sections (incl. FOOTNOTES/APPENDIX).
+        # APPENDIX may overlap OTHER when app-group sits under back — intentional.
+        self.assertEqual(
+            result["query_totals"]["doi_id"],
+            sum(result["per_section"][s]["doi_id"]["count"] for s in sr.SECTIONS),
+        )
+        # FRONT1 + REF1 + OTHER1 + APPENDIX(app-group+app) >= 4
+        self.assertGreaterEqual(result["query_totals"]["doi_id"], 4)
+
+    def test_tsv_headers_and_row_sums(self):
+        xml = self._write("folder/a.xml", SAMPLE_XML)
+        out = sr.run_sectional_report(xml.parent, folder_mode=True, log=lambda m: None)
+        tsv = Path(out["tsv_path"])
+        self.assertTrue(tsv.is_file())
+        with open(tsv, encoding="utf-8", newline="") as f:
+            reader = csv.reader(f, delimiter="\t")
+            headers = next(reader)
+            row = next(reader)
+        self.assertEqual(headers, sr.TSV_HEADERS)
+        # Docid = stem, File_id/Client/Shortcode/Doc_type empty in folder mode
+        self.assertEqual(row[0], "a")
+        self.assertEqual(row[1], "")
+        self.assertEqual(row[2], "")  # Client
+        self.assertEqual(row[3], "")  # Shortcode
+        self.assertEqual(row[4], "")  # Doc_type
+        # FRONT BODY REF OTHER FootNotes Appendix
+        self.assertEqual(int(row[5]), 1)   # FRONT
+        self.assertEqual(int(row[6]), 1)   # BODY
+        self.assertEqual(int(row[7]), 1)   # REF
+        self.assertEqual(int(row[8]), 2)   # OTHER: app-group + fn-group children of back
+        self.assertEqual(int(row[9]), 1)   # FootNotes (fn-group)
+        self.assertGreaterEqual(int(row[10]), 1)  # Appendix (app-group and/or app)
+        # query cols
+        self.assertGreaterEqual(int(row[11]), 4)  # doi_id sum (incl. APPENDIX overlap)
+        self.assertGreaterEqual(int(row[12]), 1)  # extlink_doi
+        self.assertGreaterEqual(int(row[13]), 1)  # extlink_uri
+        self.assertGreaterEqual(int(row[14]), 1)  # uri
+
+    def test_client_unique_merges_without_href(self):
+        a = self._write("proj/JATS/D1/doc.xml", SAMPLE_XML_A)
+        b = self._write("proj/JATS/D2/doc.xml", SAMPLE_XML_B)
+        # Build minimal project
+        proj = self.tmp / "proj"
+        docs = {
+            "D1": {"folder": "JATS/D1", "files": {"xml": "JATS/D1/doc.xml"}},
+            "D2": {"folder": "JATS/D2", "files": {"xml": "JATS/D2/doc.xml"}},
+        }
+        metas = {
+            "D1": {
+                "dtd": "JATS",
+                "client": "ClientX",
+                "project-shortcode": "SC1",
+                "file-id": "F1",
+            },
+            "D2": {
+                "dtd": "JATS",
+                "client": "ClientX",
+                "project-shortcode": "SC1",
+                "file-id": "F2",
+            },
+        }
+        import json
+
+        (proj / "documents.json").write_text(json.dumps(docs), encoding="utf-8")
+        (proj / "meta.json").write_text(json.dumps(metas), encoding="utf-8")
+
+        out = sr.run_sectional_report(proj, log=lambda m: None)
+        self.assertEqual(out["n_files"], 2)
+        rows = out["rows"]
+        self.assertEqual(rows[0]["file_id"], "F1")
+        self.assertEqual(rows[1]["file_id"], "F2")
+
+        merged = sr._merge_client_unique(rows)
+        self.assertIn("ClientX", merged)
+        # Both FRONT ext-link uri should be one bucket despite different hrefs
+        front_uri = [
+            e
+            for e in merged["ClientX"]
+            if e["section"] == "FRONT"
+            and e["tag"] == "ext-link"
+            and e["type_attr"] == "ext-link-type"
+            and e["type_value"] == "uri"
+        ]
+        self.assertEqual(len(front_uri), 1)
+        self.assertEqual(front_uri[0]["count"], 2)
+        self.assertEqual(sorted(front_uri[0]["sample_docids"]), ["D1", "D2"])
+
+        # CSV exists and has no href column
+        cu_csv = Path(out["client_unique_csv"])
+        with open(cu_csv, encoding="utf-8", newline="") as f:
+            headers = next(csv.reader(f))
+        self.assertNotIn("href", headers)
+        self.assertIn("type_attr", headers)
+        self.assertIn("section", headers)
+
+    def test_missing_file_id_still_emits_docid(self):
+        xml = self._write("lonely.xml", SAMPLE_XML)
+        result = sr.extract_file(xml)
+        out_rows = [
+            {
+                "docid": "lonely",
+                "file_id": "",
+                "client": "",
+                "shortcode": "",
+                **result,
+            }
+        ]
+        tsv = sr.write_tsv(out_rows, self.tmp / "out.tsv")
+        with open(tsv, encoding="utf-8", newline="") as f:
+            rows = list(csv.reader(f, delimiter="\t"))
+        self.assertEqual(rows[1][0], "lonely")
+        self.assertEqual(rows[1][1], "")
+
+
+    def test_bits_front_matter_and_ref_scoping(self):
+        """BITS book: front-matter counts as FRONT; doi ext-link under ref-list is REF not OTHER."""
+        xml = self._write("bits_book.xml", BITS_SAMPLE_XML)
+        result = sr.extract_file(xml)
+
+        self.assertIsNone(result["error"])
+        # front-matter (+ nested book-meta also matches FRONT roots set)
+        self.assertGreaterEqual(result["section_counts"]["FRONT"], 1)
+        self.assertGreaterEqual(result["section_counts"]["BODY"], 1)
+        self.assertEqual(result["section_counts"]["REF"], 1)
+        self.assertEqual(result["section_counts"]["OTHER"], 1)  # ack under back
+
+        # uri under front-matter counts under FRONT
+        self.assertGreaterEqual(result["per_section"]["FRONT"]["uri"]["count"], 1)
+        front_uri_texts = [h["text"] for h in result["per_section"]["FRONT"]["uri"]["hits"]]
+        self.assertTrue(any("bits-front-uri" in t for t in front_uri_texts))
+
+        # doi ext-link under ref-list -> REF, not OTHER
+        self.assertEqual(result["per_section"]["REF"]["extlink_doi"]["count"], 1)
+        self.assertEqual(result["per_section"]["OTHER"]["extlink_doi"]["count"], 0)
+        ref_texts = [h["text"] for h in result["per_section"]["REF"]["extlink_doi"]["hits"]]
+        self.assertTrue(any("bits-ref" in t for t in ref_texts))
+
+
+    def test_footnotes_and_appendix_sections(self):
+        """fn-group -> FOOTNOTES; app-group/app -> APPENDIX (may overlap OTHER)."""
+        xml = self._write("fn_app.xml", SAMPLE_XML)
+        result = sr.extract_file(xml)
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["section_counts"]["FOOTNOTES"], 1)
+        # app-group + nested app both match APPENDIX selectors
+        self.assertGreaterEqual(result["section_counts"]["APPENDIX"], 1)
+        # query under footnotes: extlink_uri with doi.org
+        self.assertGreaterEqual(result["per_section"]["FOOTNOTES"]["extlink_uri"]["count"], 1)
+        fn_hits = result["per_section"]["FOOTNOTES"]["extlink_uri"]["hits"]
+        self.assertTrue(any(h.get("doi_org_in_href") for h in fn_hits))
+        # appendix gets the other-doi pub-id
+        self.assertGreaterEqual(result["per_section"]["APPENDIX"]["doi_id"]["count"], 1)
+
+    def test_report_version_and_html_filters(self):
+        self.assertEqual(sr.REPORT_VERSION, 6)
+        xml = self._write("folder/b.xml", SAMPLE_XML)
+        # synthetic meta-bearing row via project
+        proj = self.tmp / "proj_filters"
+        proj.mkdir()
+        doc_path = proj / "JATS" / "D9"
+        doc_path.mkdir(parents=True)
+        (doc_path / "doc.xml").write_text(SAMPLE_XML, encoding="utf-8")
+        import json
+        docs = {"D9": {"folder": "JATS/D9", "files": {"xml": "JATS/D9/doc.xml"}}}
+        metas = {
+            "D9": {
+                "dtd": "JATS",
+                "client": "TNF",
+                "project-shortcode": "pubkittnf",
+                "file-id": "67053_test",
+                "type": "Books",
+            }
+        }
+        (proj / "documents.json").write_text(json.dumps(docs), encoding="utf-8")
+        (proj / "meta.json").write_text(json.dumps(metas), encoding="utf-8")
+        out = sr.run_sectional_report(proj, log=lambda m: None)
+        html = Path(out["html_path"]).read_text(encoding="utf-8")
+        self.assertIn("filterClient", html)
+        self.assertIn("filterProjectShortcode", html)
+        self.assertIn("data-client=", html)
+        self.assertIn('data-client="TNF"', html)
+        self.assertIn("filterDocType", html)
+        self.assertIn("filterElementKind", html)
+        self.assertIn("FOOTNOTES", html)
+        self.assertIn("APPENDIX", html)
+        # folder mode still works with empty filters
+        out2 = sr.run_sectional_report(xml.parent, folder_mode=True, log=lambda m: None)
+        self.assertGreaterEqual(out2["n_files"], 1)
+        html2 = Path(out2["html_path"]).read_text(encoding="utf-8")
+        self.assertIn("filterClient", html2)
+        self.assertIn("filterProjectShortcode", html2)
+
+    def test_tsv_has_client_shortcode_doctype_columns(self):
+        self.assertIn("Client", sr.TSV_HEADERS)
+        self.assertIn("Shortcode", sr.TSV_HEADERS)
+        self.assertIn("Doc_type", sr.TSV_HEADERS)
+        self.assertIn("FootNotes", sr.TSV_HEADERS)
+        self.assertIn("Appendix", sr.TSV_HEADERS)
+
+
+
+if __name__ == "__main__":
+    unittest.main()

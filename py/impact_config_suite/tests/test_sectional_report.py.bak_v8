@@ -334,7 +334,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(result["per_section"]["OTHER"]["doi_id"]["count"], 0)
 
     def test_report_version_and_html_filters(self):
-        self.assertEqual(sr.REPORT_VERSION, 11)
+        self.assertEqual(sr.REPORT_VERSION, 8)
         xml = self._write("folder/b.xml", SAMPLE_XML)
         # synthetic meta-bearing row via project
         proj = self.tmp / "proj_filters"
@@ -403,7 +403,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(docs[0]["file_id"], "9781041023784_reverted_impact")
         self.assertEqual(
             sr._combined_id_text(docs[0]["file_id"], docs[0]["docid"]),
-            f"9781041023784_reverted_impact\n{docid}",
+            f"9781041023784_reverted_impact ({docid})",
         )
         out = sr.run_sectional_report(bits, folder_mode=True, log=lambda m: None)
         html = Path(out["html_path"]).read_text(encoding="utf-8")
@@ -412,10 +412,6 @@ class TestSectionalReport(unittest.TestCase):
         tsv = Path(out["tsv_path"]).read_text(encoding="utf-8")
         self.assertIn("TNF", tsv)
         self.assertIn("9781041023784_reverted_impact", tsv)
-        self.assertIn(
-            f"<td><div>9781041023784_reverted_impact</div><div><small>{docid}</small></div></td>",
-            html,
-        )
 
     def test_other_excludes_fn_group_and_appendix_roots(self):
         """OTHER roots are residual back children only - never fn-group or app*."""
@@ -472,111 +468,8 @@ class TestSectionalReport(unittest.TestCase):
         self.assertIn("Appendix", sr.TSV_HEADERS)
         self.assertEqual(
             sr._combined_id_text("F1", "D1"),
-            "F1\nD1",
+            "F1 (D1)",
         )
-        self.assertEqual(
-            sr._combined_id_cell("F1", "D1"),
-            "<div>F1</div><div><small>D1</small></div>",
-        )
-
-
-    def test_cross_query_inconsistency_and_text_sample_toggle(self):
-        per = {
-            section: {query: {"count": 0, "hits": []} for query in sr.QUERY_KEYS}
-            for section in sr.SECTIONS
-        }
-        doi = "10.5281/zenodo.17376602"
-        per["BODY"]["extlink_doi"] = {
-            "count": 1,
-            "hits": [{
-                "tag": "ext-link",
-                "text": f"https://doi.org (https://doi.org/{doi})",
-                "href": f"https://doi.org/{doi}",
-                "raw_xml": f'<ext-link ext-link-type="doi">{doi}</ext-link>',
-            }],
-        }
-        per["BODY"]["uri"] = {
-            "count": 1,
-            "hits": [{
-                "tag": "uri",
-                "text": f"https://doi.org/{doi}",
-                "href": "",
-                "raw_xml": f"<uri>https://doi.org/{doi}</uri>",
-            }],
-        }
-        row = {
-            "client": "ClientA",
-            "file_id": "F1",
-            "docid": "D1",
-            "xml_path": str(self.tmp / "D1.xml"),
-            "per_section": per,
-            "section_counts": {section: 0 for section in sr.SECTIONS},
-            "query_totals": {query: 0 for query in sr.QUERY_KEYS},
-            "error": None,
-        }
-        issues = sr.find_cross_query_inconsistencies([row])
-        self.assertEqual(len(issues), 1)
-        self.assertEqual(issues[0]["doi"], doi)
-        self.assertEqual(set(issues[0]["queries"]), {"extlink_doi", "uri"})
-
-        html_path = sr.write_html_report([row], self.tmp / "sectional.html")
-        page = html_path.read_text(encoding="utf-8")
-        self.assertIn("Cross-query DOI inconsistencies", page)
-        self.assertIn("ClientA", page)
-        self.assertIn("HTML Preview", page)
-        self.assertIn("Raw XML", page)
-        self.assertIn("&lt;ext-link", page)
-        self.assertNotIn("View HTML", page)
-        self.assertNotIn("View Raw XML", page)
-        inc_html, inc_csv = sr.write_inconsistency_report([row], self.tmp / "reports")
-        self.assertTrue(inc_html.is_file())
-        self.assertTrue(inc_csv.is_file())
-        inc_text = inc_html.read_text(encoding="utf-8")
-        self.assertIn("ClientA", inc_text)
-        self.assertIn("Client-wise summary", inc_text)
-        self.assertIn("Scanned document count", inc_text)
-        self.assertIn("Issue document count", inc_text)
-
-        clean = {
-            "client": "ClientB",
-            "file_id": "F2",
-            "docid": "D2",
-            "xml_path": str(self.tmp / "D2.xml"),
-            "per_section": {
-                section: {query: {"count": 0, "hits": []} for query in sr.QUERY_KEYS}
-                for section in sr.SECTIONS
-            },
-            "section_counts": {section: 0 for section in sr.SECTIONS},
-            "query_totals": {query: 0 for query in sr.QUERY_KEYS},
-            "error": None,
-        }
-        summary = sr.compute_client_summary([row, clean])
-        by_client = {item["client"]: item for item in summary}
-        self.assertEqual(by_client["ClientA"]["scanned_document_count"], 1)
-        self.assertEqual(by_client["ClientA"]["issue_document_count"], 1)
-        self.assertEqual(by_client["ClientB"]["scanned_document_count"], 1)
-        self.assertEqual(by_client["ClientB"]["issue_document_count"], 0)
-        self.assertEqual(
-            sr.CLIENT_SUMMARY_HEADERS,
-            ["Client", "Scanned document count", "Issue document count"],
-        )
-
-        cs_html, cs_csv = sr.write_client_summary([row, clean], self.tmp / "reports")
-        self.assertTrue(cs_html.is_file())
-        self.assertTrue(cs_csv.is_file())
-        cs_text = cs_html.read_text(encoding="utf-8")
-        self.assertIn("Client-wise summary", cs_text)
-        self.assertIn("cause-bar", cs_text)
-        self.assertIn("ClientA", cs_text)
-        self.assertIn("ClientB", cs_text)
-        csv_text = cs_csv.read_text(encoding="utf-8")
-        self.assertIn("Client,Scanned document count,Issue document count", csv_text)
-        self.assertIn("ClientA,1,1", csv_text)
-        self.assertIn("ClientB,1,0", csv_text)
-
-        # Main sectional HTML also embeds the shareable summary panel
-        self.assertIn("Client-wise summary", page)
-        self.assertIn("Scanned document count", page)
 
 
 if __name__ == "__main__":

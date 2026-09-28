@@ -1,0 +1,1229 @@
+"""Sectional Report — FRONT/BODY/REF/OTHER section + DOI/URI query counts.
+
+Supports JATS articles (<front>/<body>/<back>) and BITS books
+(<front-matter>/<book-meta>/<book-body> with nested book-part body/back/ref-list).
+
+REPORT_VERSION is bumped on every behaviour change that affects outputs.
+"""
+from __future__ import annotations
+
+import csv
+import html
+import json
+import os
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Iterable, Optional
+
+from lxml import etree
+
+REPORT_VERSION = 7
+REPORT_DIR = "sectional_reports"
+SUPPORT_LOG_NAME = "impact-support-log"
+# Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
+REPORT_ROOT: Path | None = None
+
+SECTIONS = ("FRONT", "BODY", "REF", "OTHER", "FOOTNOTES", "APPENDIX")
+QUERY_KEYS = ("doi_id", "extlink_doi", "extlink_uri", "uri")
+
+# Relative XPath under each section root (namespace-safe via local-name()).
+QUERY_XPATH: dict[str, str] = {
+    "doi_id": ".//*[@pub-id-type='doi']",
+    "extlink_doi": ".//*[local-name()='ext-link' and @ext-link-type='doi']",
+    "extlink_uri": ".//*[local-name()='ext-link' and @ext-link-type='uri']",
+    "uri": ".//*[local-name()='uri']",
+}
+
+# Unique-key type metadata per query (never includes href).
+QUERY_TYPE_META: dict[str, tuple[str, str]] = {
+    # type_attr, type_value  (tag comes from the matched element)
+    "doi_id": ("pub-id-type", "doi"),
+    "extlink_doi": ("ext-link-type", "doi"),
+    "extlink_uri": ("ext-link-type", "uri"),
+    "uri": ("", ""),
+}
+
+TSV_HEADERS = [
+    "Docid",
+    "File_id",
+    "Client",
+    "Shortcode",
+    "Doc_type",
+    "FRONT",
+    "BODY",
+    "REF",
+    "OTHER",
+    "FootNotes",
+    "Appendix",
+    "doi_id",
+    "extlink_doi",
+    "extlink_uri",
+    "uri",
+]
+
+SAMPLE_LIMIT = 5
+MAX_SAMPLE_TEXT = 200
+
+LogFn = Callable[[str], None]
+ProgressFn = Callable[[int, int, str], None]
+CancelFn = Callable[[], bool]
+
+
+def _noop_log(msg: str) -> None:
+    pass
+
+
+def _noop_progress(current: int, total: int, message: str) -> None:
+    pass
+
+
+def _noop_cancel() -> bool:
+    return False
+
+
+def ensure_dir(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def default_report_root() -> Path:
+    if REPORT_ROOT is not None:
+        return Path(REPORT_ROOT)
+    return Path.home() / "Documents" / SUPPORT_LOG_NAME
+
+
+def make_report_dir(timestamp: str | None = None) -> Path:
+    ts = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_dir = default_report_root() / f"{ts}_{REPORT_DIR}"
+    return ensure_dir(report_dir)
+
+
+def local_name(tag: str | None) -> str:
+    if not tag:
+        return ""
+    if isinstance(tag, bytes):
+        tag = tag.decode("utf-8", errors="replace")
+    return tag.rsplit("}", 1)[-1]
+
+
+def _parse_xml(xml_path: Path) -> etree._Element:
+    parser = etree.XMLParser(recover=True, resolve_entities=False, huge_tree=True)
+    tree = etree.parse(str(xml_path), parser)
+    return tree.getroot()
+
+
+def _find_all_by_local(root: etree._Element, name: str) -> list[etree._Element]:
+    return [el for el in root.iter() if isinstance(el.tag, str) and local_name(el.tag) == name]
+
+
+def _direct_children(el: etree._Element) -> list[etree._Element]:
+    return [c for c in el if isinstance(c.tag, str)]
+
+
+def _section_roots(root: etree._Element) -> dict[str, list[etree._Element]]:
+    # FRONT: JATS <front> / BITS <front-matter> / BITS <book-meta>
+    front: list[etree._Element] = []
+    for name in ("front", "front-matter", "book-meta"):
+        front.extend(_find_all_by_local(root, name))
+    # BODY: <body> only (nested book-part bodies are fine; non-overlapping with back)
+    body = _find_all_by_local(root, "body")
+    # Containers whose direct children feed REF / residual OTHER:
+    # JATS/BITS <back> and BITS book-level <book-back> (may have multiple).
+    back_containers = _find_all_by_local(root, "back") + _find_all_by_local(
+        root, "book-back"
+    )
+    # Exclusive owners (never OTHER roots; avoids double-counting):
+    #   REF        -> ref-list (direct child of back/book-back)
+    #   FOOTNOTES  -> fn-group (anywhere; see below)
+    #   APPENDIX   -> app-group|book-app-group|book-app|app (anywhere; see below)
+    _OTHER_EXCLUDED = frozenset(
+        {
+            "ref-list",
+            "fn-group",
+            "app-group",
+            "book-app-group",
+            "book-app",
+            "app",
+        }
+    )
+    ref: list[etree._Element] = []
+    other: list[etree._Element] = []
+    for back in back_containers:
+        for child in _direct_children(back):
+            ln = local_name(child.tag)
+            if ln == "ref-list":
+                ref.append(child)
+            elif ln not in _OTHER_EXCLUDED:
+                # OTHER = residual direct children of back/book-back only.
+                # fn-group / appendix-like are owned by FOOTNOTES / APPENDIX and
+                # must not also be OTHER roots (no OTHER/fn-group or OTHER/APPENDIX
+                # root overlap).
+                other.append(child)
+    # FOOTNOTES: all fn-group roots anywhere in the document
+    footnotes = _find_all_by_local(root, "fn-group")
+    # APPENDIX: app-group / book-app-group / book-app / app (local-name)
+    appendix: list[etree._Element] = []
+    for name in ("app-group", "book-app-group", "book-app", "app"):
+        appendix.extend(_find_all_by_local(root, name))
+    return {
+        "FRONT": front,
+        "BODY": body,
+        "REF": ref,
+        "OTHER": other,
+        "FOOTNOTES": footnotes,
+        "APPENDIX": appendix,
+    }
+
+
+
+def _element_text(el: etree._Element) -> str:
+    text = "".join(el.itertext())
+    text = " ".join(text.split())
+    if len(text) > MAX_SAMPLE_TEXT:
+        text = text[: MAX_SAMPLE_TEXT - 1] + "…"
+    return text
+
+
+
+def _element_href(el: etree._Element) -> str:
+    """Return href / xlink:href regardless of namespace prefix."""
+    for key, value in el.attrib.items():
+        if key == "href" or key.endswith("}href"):
+            return str(value or "")
+    return ""
+
+
+def _is_under_comment(el: etree._Element) -> bool:
+    """True when the element's immediate parent is a comment-like node."""
+    parent = el.getparent()
+    if parent is None or not isinstance(parent.tag, str):
+        return False
+    if local_name(parent.tag) == "comment":
+        return True
+    if (parent.get("data-name") or "") == "comment":
+        return True
+    cls = parent.get("class") or ""
+    return "comment" in str(cls).split()
+
+
+def _hit_flags(el: etree._Element, text: str) -> dict[str, Any]:
+    href = _element_href(el)
+    return {
+        "href": href,
+        "under_comment": _is_under_comment(el),
+        "doi_org_in_href": "doi.org" in href.lower(),
+        "doi_org_in_text": "doi.org" in (text or "").lower(),
+    }
+
+
+def _unique_key(section: str, query_key: str, el: etree._Element) -> tuple[str, str, str, str]:
+    type_attr, type_value = QUERY_TYPE_META[query_key]
+    tag = local_name(el.tag)
+    if query_key == "doi_id":
+        # Prefer actual element tag; type is always pub-id-type=doi
+        return (section, tag, type_attr, type_value)
+    if query_key == "uri":
+        return (section, "uri", "", "")
+    # ext-link variants
+    return (section, "ext-link", type_attr, type_value)
+
+
+def _run_query(
+    section_root: etree._Element,
+    query_key: str,
+) -> list[etree._Element]:
+    xpath = QUERY_XPATH[query_key]
+    try:
+        hits = section_root.xpath(xpath)
+    except etree.XPathError:
+        hits = []
+    return [h for h in hits if isinstance(h, etree._Element)]
+
+
+def extract_file(xml_path: str | Path) -> dict[str, Any]:
+    """Extract section counts, per-section query hits, aggregates, and unique keys.
+
+    Returns a dict:
+      section_counts: {FRONT|BODY|REF|OTHER: int}
+      per_section: {section: {query_key: {count, hits:[{tag,text}]}}}
+      query_totals: {query_key: int}  # sum across sections
+      unique: {(section, tag, type_attr, type_value): {count, sample_texts: [...]}}
+      error: optional str
+    """
+    path = Path(xml_path)
+    empty_section = {
+        qk: {"count": 0, "hits": []} for qk in QUERY_KEYS
+    }
+    result: dict[str, Any] = {
+        "xml_path": str(path),
+        "section_counts": {s: 0 for s in SECTIONS},
+        "per_section": {s: {qk: {"count": 0, "hits": []} for qk in QUERY_KEYS} for s in SECTIONS},
+        "query_totals": {qk: 0 for qk in QUERY_KEYS},
+        "unique": {},
+        "error": None,
+    }
+    try:
+        root = _parse_xml(path)
+    except Exception as exc:  # noqa: BLE001 — surface parse errors in row
+        result["error"] = str(exc)
+        return result
+
+    roots = _section_roots(root)
+    unique: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+
+    for section in SECTIONS:
+        section_els = roots[section]
+        result["section_counts"][section] = len(section_els)
+        for sec_el in section_els:
+            for qk in QUERY_KEYS:
+                hits = _run_query(sec_el, qk)
+                bucket = result["per_section"][section][qk]
+                for el in hits:
+                    text = _element_text(el)
+                    tag = local_name(el.tag)
+                    flags = _hit_flags(el, text)
+                    bucket["hits"].append(
+                        {
+                            "tag": tag,
+                            "text": text,
+                            "query_key": qk,
+                            "section": section,
+                            **flags,
+                        }
+                    )
+                    key = _unique_key(section, qk, el)
+                    entry = unique.setdefault(
+                        key, {"count": 0, "sample_texts": [], "query_key": qk}
+                    )
+                    entry["count"] += 1
+                    if len(entry["sample_texts"]) < SAMPLE_LIMIT and text:
+                        if text not in entry["sample_texts"]:
+                            entry["sample_texts"].append(text)
+                bucket["count"] += len(hits)
+                result["query_totals"][qk] += len(hits)
+
+    # Serialize unique keys as list of dicts for JSON-friendliness
+    result["unique"] = [
+        {
+            "section": k[0],
+            "tag": k[1],
+            "type_attr": k[2],
+            "type_value": k[3],
+            "count": v["count"],
+            "sample_texts": v["sample_texts"],
+            "query_key": v["query_key"],
+        }
+        for k, v in sorted(unique.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2], kv[0][3]))
+    ]
+    return result
+
+
+def _iter_project_docs(
+    project_root: Path,
+    shortcodes: Optional[Iterable[str]] = None,
+) -> list[dict[str, Any]]:
+    """Load project docs for all DTDs (JATS + BITS); return doc descriptors.
+
+    Unlike contrib_extractor.build_index (JATS-only via RUN_DTD), sectional report
+    includes BITS books so front-matter / book-body documents are covered.
+    """
+    from core import contrib_extractor as ce
+
+    base = Path(project_root)
+    docs = ce.load_json(base / ce.DOCS_NAME)
+    metas = ce.load_json(base / ce.META_NAME)
+    sc_filter: set[str] | None = None
+    if shortcodes:
+        sc_filter = {s.strip() for s in shortcodes if s and str(s).strip()}
+
+    # Index all DTDs: {client: {shortcode: [docid, ...]}}
+    index: dict[str, dict[str, list[str]]] = {}
+    for docid, meta in metas.items():
+        item = docs.get(docid)
+        if item is None:
+            continue
+        client = meta.get("client") or "unknown"
+        shortcode = meta.get("project-shortcode") or "unknown"
+        index.setdefault(client, {}).setdefault(shortcode, []).append(docid)
+
+    rows: list[dict[str, Any]] = []
+    for client, sc_map in index.items():
+        for shortcode, docids in sc_map.items():
+            if sc_filter is not None and shortcode not in sc_filter:
+                continue
+            for docid in docids:
+                meta = metas.get(docid) or {}
+                item = docs.get(docid) or {}
+                folder = ce.doc_folder(base, docid, item, meta)
+                candidates = ce.candidate_xml_files(base, folder, item)
+                xml_path = _pick_document_xml(candidates)
+                rows.append(
+                    {
+                        "docid": docid,
+                        "file_id": meta.get("file-id", "") or "",
+                        "client": meta.get("client") or client or "",
+                        "shortcode": meta.get("project-shortcode") or shortcode or "",
+                        "doc_type": meta.get("type", "") or "",
+                        "xml_path": xml_path,
+                    }
+                )
+    return rows
+
+
+
+def _pick_document_xml(candidates: list[Path]) -> Path | None:
+    if not candidates:
+        return None
+    # Prefer a full document: JATS front/body or BITS front-matter/book-meta/book-body.
+    prefer_names = ("front", "front-matter", "book-meta", "body", "book-body")
+    for p in candidates:
+        try:
+            root = _parse_xml(p)
+            if any(_find_all_by_local(root, name) for name in prefer_names):
+                return p
+        except Exception:
+            continue
+    return candidates[0]
+
+
+
+def _iter_folder_xmls(folder: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for p in sorted(folder.rglob("*.xml")):
+        if not p.is_file():
+            continue
+        name = p.name.lower()
+        if name in {"impact_config.xml", "contrib_group.xml"}:
+            continue
+        rows.append(
+            {
+                "docid": p.stem,
+                "file_id": "",
+                "client": "",
+                "shortcode": "",
+                "doc_type": "",
+                "xml_path": p,
+            }
+        )
+    return rows
+
+
+def collect_docs(
+    project_root: Path | str,
+    shortcodes: Optional[Iterable[str]] = None,
+    folder_mode: bool = False,
+) -> list[dict[str, Any]]:
+    """Return list of {docid, file_id, client, shortcode, doc_type, xml_path}."""
+    root = Path(project_root)
+    if folder_mode:
+        return _iter_folder_xmls(root)
+    docs_json = root / "documents.json"
+    meta_json = root / "meta.json"
+    if docs_json.is_file() and meta_json.is_file():
+        try:
+            return _iter_project_docs(root, shortcodes=shortcodes)
+        except Exception:
+            # Fall through to folder scan if project load fails
+            pass
+    return _iter_folder_xmls(root)
+
+
+def write_tsv(rows: list[dict[str, Any]], out_path: Path) -> Path:
+    ensure_dir(out_path.parent)
+    with open(out_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, delimiter="\t")
+        writer.writerow(TSV_HEADERS)
+        for r in rows:
+            sc = r.get("section_counts") or {}
+            qt = r.get("query_totals") or {}
+            writer.writerow(
+                [
+                    r.get("docid", ""),
+                    r.get("file_id", ""),
+                    r.get("client", ""),
+                    r.get("shortcode", ""),
+                    r.get("doc_type", ""),
+                    sc.get("FRONT", 0),
+                    sc.get("BODY", 0),
+                    sc.get("REF", 0),
+                    sc.get("OTHER", 0),
+                    sc.get("FOOTNOTES", 0),
+                    sc.get("APPENDIX", 0),
+                    qt.get("doi_id", 0),
+                    qt.get("extlink_doi", 0),
+                    qt.get("extlink_uri", 0),
+                    qt.get("uri", 0),
+                ]
+            )
+    return out_path
+
+
+def _esc(s: Any) -> str:
+    return html.escape("" if s is None else str(s))
+
+
+
+def _file_url(path_str: str) -> str:
+    """Build a file:/// URL for Open HTML links."""
+    if not path_str:
+        return ""
+    p = Path(path_str)
+    try:
+        return p.resolve().as_uri()
+    except Exception:
+        s = str(path_str).replace("\\", "/")
+        if len(s) >= 2 and s[1] == ":":
+            return "file:///" + s
+        return "file://" + s
+
+
+def _row_card_flags(row: dict[str, Any], section: str | None = None) -> dict[str, bool]:
+    """OR of hit-level under_comment / doi.org flags (optionally scoped to section)."""
+    under = doi_href = doi_text = False
+    per = row.get("per_section") or {}
+    sections = [section] if section else list(SECTIONS)
+    for s in sections:
+        for qk in QUERY_KEYS:
+            bucket = (per.get(s) or {}).get(qk) or {}
+            for hit in bucket.get("hits") or []:
+                under = under or bool(hit.get("under_comment"))
+                doi_href = doi_href or bool(hit.get("doi_org_in_href"))
+                doi_text = doi_text or bool(hit.get("doi_org_in_text"))
+    return {
+        "under_comment": under,
+        "doi_org_href": doi_href,
+        "doi_org_text": doi_text,
+    }
+
+
+def _section_hit_count(row: dict[str, Any], section: str) -> int:
+    per = row.get("per_section") or {}
+    total = 0
+    for qk in QUERY_KEYS:
+        bucket = (per.get(section) or {}).get(qk) or {}
+        total += int(bucket.get("count") or 0)
+    return total
+
+
+def _build_match_item(hit: dict[str, Any], section: str, match_n: int) -> str:
+    qk = hit.get("query_key") or ""
+    text = hit.get("text") or ""
+    tag = hit.get("tag") or ""
+    href = hit.get("href") or ""
+    uc = "true" if hit.get("under_comment") else "false"
+    dh = "true" if hit.get("doi_org_in_href") else "false"
+    dt = "true" if hit.get("doi_org_in_text") else "false"
+    flag_bits = []
+    if hit.get("under_comment"):
+        flag_bits.append("under-comment")
+    if hit.get("doi_org_in_href"):
+        flag_bits.append("doi.org@href")
+    if hit.get("doi_org_in_text"):
+        flag_bits.append("doi.org@text")
+    flag_html = (
+        " ".join(f'<span class="match-badge">{_esc(b)}</span>' for b in flag_bits)
+        if flag_bits
+        else ""
+    )
+    href_block = (
+        f'<span class="section-lbl">Href</span><div class="text-box">{_esc(href)}</div>'
+        if href
+        else ""
+    )
+    return (
+        f'<div class="match-item"'
+        f' data-kind="{_esc(qk)}"'
+        f' data-section="{_esc(section)}"'
+        f' data-tag="{_esc(tag)}"'
+        f' data-text="{_esc(text)}"'
+        f' data-under-comment="{uc}"'
+        f' data-doi-org-href="{dh}"'
+        f' data-doi-org-text="{dt}">'
+        f'<div class="match-header"><div class="match-meta">'
+        f'<span class="match-number">#{match_n}</span>'
+        f'<span class="match-tag-badge">{_esc(qk)}</span>'
+        f'<span class="match-badge">{_esc(tag)}</span>'
+        f'{flag_html}</div></div>'
+        f'<span class="section-lbl">Text</span><div class="text-box">{_esc(text)}</div>'
+        f'{href_block}</div>'
+    )
+
+
+def _build_file_card(row: dict[str, Any], section: str, card_id: str) -> str:
+    """One file-card for a section tab (DOI_PubID_By_Ref chip header pattern)."""
+    docid = row.get("docid") or ""
+    file_id = row.get("file_id") or ""
+    client = row.get("client") or ""
+    shortcode = row.get("shortcode") or ""
+    doc_type = row.get("doc_type") or ""
+    xml_path = row.get("xml_path") or ""
+    filename = Path(xml_path).name if xml_path else docid
+    err = row.get("error") or ""
+    flags = _row_card_flags(row, section)
+    n_hits = _section_hit_count(row, section)
+    chip_parts = [p for p in (doc_type, client, shortcode, file_id) if p]
+    chips = " | ".join(chip_parts) if chip_parts else "(no meta)"
+    open_href = _file_url(xml_path) if xml_path else ""
+    open_btn = (
+        f"<a class='file-action-btn' href='{_esc(open_href)}' target='_blank' "
+        f"rel='noopener noreferrer' onclick='event.stopPropagation()'>Open HTML</a>"
+        if open_href else ""
+    )
+    copy_btn = (
+        f"<button class='file-action-btn' "
+        f"onclick='copyFilePath({_esc(json.dumps(xml_path))}, this, event)'>"
+        f"Copy Path</button>"
+        if xml_path else ""
+    )
+    if err:
+        badge = '<span class="file-badge badge-error">Error</span>'
+        body = f'<div class="error-box">{_esc(err)}</div>'
+        err_class = " error-card"
+    else:
+        badge = f'<span class="file-badge badge-success">{n_hits} Match(es)</span>'
+        match_parts: list[str] = []
+        per = row.get("per_section") or {}
+        match_n = 0
+        for qk in QUERY_KEYS:
+            bucket = (per.get(section) or {}).get(qk) or {}
+            for hit in bucket.get("hits") or []:
+                match_n += 1
+                match_parts.append(_build_match_item(hit, section, match_n))
+        body = (
+            f'<div class="matches-list">{"".join(match_parts)}</div>'
+            if match_parts
+            else '<div class="no-results">No hits in this section.</div>'
+        )
+        err_class = ""
+    uc = 'true' if flags['under_comment'] else 'false'
+    dh = 'true' if flags['doi_org_href'] else 'false'
+    dt = 'true' if flags['doi_org_text'] else 'false'
+    return (
+        f'<div class="file-card{err_class}"'
+        f' data-filename="{_esc(filename)}"'
+        f' data-doc-type="{_esc(doc_type)}"'
+        f' data-client="{_esc(client)}"'
+        f' data-identifier="{_esc(file_id)}"'
+        f' data-shortcode="{_esc(shortcode)}"'
+        f' data-file-id="{_esc(file_id)}"'
+        f' data-section="{_esc(section)}"'
+        f' data-under-comment="{uc}"'
+        f' data-doi-org-href="{dh}"'
+        f' data-doi-org-text="{dt}">'
+        f'<div class="file-header" onclick="toggleCard(\'{_esc(card_id)}\')">'
+        f'<div class="file-header-main"><div class="file-title">'
+        f'<span class="toggle-icon">&#9662;</span>{badge} '
+        f'<strong>{_esc(filename)}</strong></div>'
+        f'<div class="file-actions">{open_btn}{copy_btn}</div></div>'
+        f'<div class="file-path">{_esc(xml_path)}</div>'
+        f'<div class="file-metadata">{_esc(chips)}</div></div>'
+        f'<div id="{_esc(card_id)}" class="file-content">{body}</div></div>'
+    )
+
+def write_html_report(
+    rows: list[dict[str, Any]],
+    out_path: Path,
+    *,
+    title: str = "Sectional Report",
+) -> Path:
+    ensure_dir(out_path.parent)
+    n_files = len(rows)
+    n_ok = sum(1 for r in rows if not r.get("error"))
+    totals = {qk: sum((r.get('query_totals') or {}).get(qk, 0) for r in rows) for qk in QUERY_KEYS}
+    sec_hit_totals = {s: sum(_section_hit_count(r, s) for r in rows) for s in SECTIONS}
+
+    tab_buttons = ''.join(
+        f'<button class="tab-btn{" active" if i == 0 else ""}" data-tab="{s}">{s}'
+        f'<span class="badge">{sec_hit_totals[s]}</span></button>'
+        for i, s in enumerate(SECTIONS)
+    )
+
+    panels: list[str] = []
+    card_counter = 0
+    for i, s in enumerate(SECTIONS):
+        cards: list[str] = []
+        for r in rows:
+            n = _section_hit_count(r, s)
+            err = r.get("error")
+            has_meta = any(
+                [
+                    r.get("client"),
+                    r.get("shortcode"),
+                    r.get("file_id"),
+                    r.get("doc_type"),
+                    err,
+                ]
+            )
+            # Always show cards with hits; show zero-hit only when meta/error present
+            # (folder_mode empty filters still render identity rows on FRONT).
+            if n == 0 and not has_meta:
+                continue
+            if n == 0 and err and i != 0:
+                continue  # errors once under first tab
+            if n == 0 and not err and i != 0 and not has_meta:
+                continue
+            # zero-hit meta cards: show under every tab so filters stay useful
+            card_id = f'file-{s}-{card_counter}'
+            card_counter += 1
+            cards.append(_build_file_card(r, s, card_id))
+        body = ''.join(cards) or '<div class="no-results">No files for this section.</div>'
+        panels.append(
+            f'<div class="tab-panel{" active" if i == 0 else ""}" id="panel-{s}" data-section="{s}">'
+            + body
+            + '</div>'
+        )
+
+    file_rows = ''.join(
+        '<tr>'
+        f"<td>{_esc(r.get('docid',''))}</td>"
+        f"<td>{_esc(r.get('file_id',''))}</td>"
+        f"<td>{_esc(r.get('client',''))}</td>"
+        f"<td>{_esc(r.get('shortcode',''))}</td>"
+        f"<td>{_esc(r.get('doc_type',''))}</td>"
+        f"<td>{(r.get('section_counts') or {}).get('FRONT',0)}</td>"
+        f"<td>{(r.get('section_counts') or {}).get('BODY',0)}</td>"
+        f"<td>{(r.get('section_counts') or {}).get('REF',0)}</td>"
+        f"<td>{(r.get('section_counts') or {}).get('OTHER',0)}</td>"
+        f"<td>{(r.get('section_counts') or {}).get('FOOTNOTES',0)}</td>"
+        f"<td>{(r.get('section_counts') or {}).get('APPENDIX',0)}</td>"
+        f"<td>{(r.get('query_totals') or {}).get('doi_id',0)}</td>"
+        f"<td>{(r.get('query_totals') or {}).get('extlink_doi',0)}</td>"
+        f"<td>{(r.get('query_totals') or {}).get('extlink_uri',0)}</td>"
+        f"<td>{(r.get('query_totals') or {}).get('uri',0)}</td>"
+        f"<td class='err'>{_esc(r.get('error') or '')}</td>"
+        '</tr>'
+        for r in rows
+    )
+
+    kpi = ''.join(
+        f'<div class="kpi"><div class="kpi-n">{totals[qk]}</div><div class="kpi-l">{qk}</div></div>'
+        for qk in QUERY_KEYS
+    )
+    kind_options = ''.join(f'<option value="{qk}">{qk}</option>' for qk in QUERY_KEYS)
+
+    # CSS/JS kept as plain strings; __PLACEHOLDERS__ filled below.
+    css = r'''
+:root {
+  --bg-main:#0b0f19; --bg-card:#111827; --bg-code:#030712; --bg-input:#1f2937;
+  --border:#374151; --text:#f3f4f6; --muted:#9ca3af; --primary:#6366f1;
+  --success:#10b981; --error:#ef4444; --tag:#38bdf8;
+}
+* { box-sizing:border-box; }
+body { margin:0; font-family:Segoe UI, system-ui, sans-serif; background:var(--bg-main); color:var(--text); padding:24px; }
+h1 { color:#a5b4fc; margin:0 0 8px; }
+.meta { color:var(--muted); margin-bottom:20px; }
+.kpis { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.kpi { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:14px 18px; min-width:110px; }
+.kpi-n { font-size:22px; font-weight:700; color:var(--success); }
+.kpi-l { font-size:12px; color:var(--muted); }
+.controls-panel {
+  display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:16px;
+}
+.filter-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; width:100%; }
+.search-container { position:relative; flex:1; min-width:220px; }
+.search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); }
+.search-input {
+  width:100%; padding:10px 12px 10px 36px; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg-input); color:var(--text);
+}
+.filter-select {
+  background:var(--bg-input); color:var(--text); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; min-width:140px;
+}
+.button-group { display:flex; gap:8px; }
+.action-btn, .file-action-btn {
+  background:rgba(99,102,241,0.15); color:var(--text); border:1px solid var(--primary);
+  border-radius:6px; padding:8px 12px; cursor:pointer; font-size:0.85rem; text-decoration:none;
+}
+.file-action-btn.copied { background:rgba(16,185,129,0.2); border-color:var(--success); }
+.tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+.tab-btn { background:#334155; color:#e2e8f0; border:0; border-radius:8px 8px 0 0; padding:10px 16px; cursor:pointer; font-weight:600; }
+.tab-btn.active { background:#4f46e5; }
+.badge { background:#0f172a; color:#a5b4fc; border-radius:999px; padding:1px 8px; font-size:11px; margin-left:6px; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+.file-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; margin-bottom:14px; overflow:hidden;
+}
+.file-card.error-card { border-color:var(--error); }
+.file-header { padding:14px 16px; cursor:pointer; }
+.file-header-main { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.file-title { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.file-path, .file-metadata { color:var(--muted); font-size:0.85rem; margin-top:6px; word-break:break-all; }
+.file-badge { font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; }
+.badge-success { background:rgba(16,185,129,0.2); color:var(--success); }
+.badge-error { background:rgba(239,68,68,0.2); color:var(--error); }
+.file-content { padding:0 16px 16px; }
+.match-item {
+  border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:10px; background:#0f172a;
+}
+.match-header { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.match-meta { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.match-number, .match-badge, .match-tag-badge {
+  font-size:0.75rem; padding:2px 8px; border-radius:4px; background:rgba(99,102,241,0.2);
+}
+.match-tag-badge { color:var(--tag); }
+.section-lbl { display:block; color:var(--muted); font-size:0.75rem; margin:8px 0 4px; }
+.text-box {
+  background:var(--bg-code); border:1px solid var(--border); border-radius:6px; padding:10px; overflow:auto;
+}
+.error-box { color:#fecaca; background:rgba(239,68,68,0.1); padding:12px; border-radius:8px; }
+.no-results { color:var(--muted); padding:24px; text-align:center; }
+.summary { margin-top:28px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { border-bottom:1px solid #334155; padding:6px 8px; text-align:left; vertical-align:top; }
+th { color:#94a3b8; font-weight:600; }
+.err { color:#f87171; }
+.toast {
+  position:fixed; bottom:24px; right:24px; background:var(--bg-card); border:1px solid var(--primary);
+  color:var(--text); padding:12px 20px; border-radius:8px; opacity:0; transform:translateY(40px);
+  transition:all .25s ease; z-index:1000;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+'''
+
+    js = r'''
+function fillSelect(id, values, blankLabel) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">' + blankLabel + '</option>';
+  (values || []).forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+  if (cur) sel.value = cur;
+}
+function collectFilterOptions() {
+  const cards = [...document.querySelectorAll('.file-card')];
+  const docTypes = [...new Set(cards.map(c => c.getAttribute('data-doc-type')).filter(Boolean))].sort();
+  const clients = [...new Set(cards.map(c => c.getAttribute('data-client')).filter(Boolean))].sort();
+  const idents = [...new Set(cards.map(c => c.getAttribute('data-identifier')).filter(Boolean))].sort();
+  const shortcodes = [...new Set(cards.map(c => c.getAttribute('data-shortcode')).filter(Boolean))].sort();
+  fillSelect('filterDocType', docTypes, 'All types (Books/Journals.)');
+  fillSelect('filterClient', clients, 'All clients');
+  fillSelect('filterIdentifier', idents, 'All identifiers');
+  fillSelect('filterProjectShortcode', shortcodes, 'All project-shortcodes');
+}
+function toggleCard(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const card = el.closest('.file-card');
+  const icon = card ? card.querySelector('.toggle-icon') : null;
+  const hidden = el.style.display === 'none';
+  el.style.display = hidden ? 'block' : 'none';
+  if (icon) icon.textContent = hidden ? '\u25BE' : '\u25B8';
+}
+function toggleAll(expand) {
+  document.querySelectorAll('.tab-panel.active .file-content').forEach(el => {
+    el.style.display = expand ? 'block' : 'none';
+    const card = el.closest('.file-card');
+    const icon = card ? card.querySelector('.toggle-icon') : null;
+    if (icon) icon.textContent = expand ? '\u25BE' : '\u25B8';
+  });
+}
+function copyFilePath(path, btn, evt) {
+  if (evt) evt.stopPropagation();
+  const done = () => {
+    if (btn) { btn.classList.add('copied'); btn.textContent = 'Copied';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy Path'; }, 1200); }
+    const t = document.getElementById('toast');
+    if (t) { t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1200); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(path).then(done).catch(() => {
+      const ta = document.createElement('textarea'); ta.value = path; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta); done();
+    });
+  } else {
+    const ta = document.createElement('textarea'); ta.value = path; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); done();
+  }
+}
+function applyFilters() {
+  const searchVal = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const docType = document.getElementById('filterDocType').value;
+  const client = document.getElementById('filterClient').value;
+  const identifier = document.getElementById('filterIdentifier').value;
+  const projectShortcode = document.getElementById('filterProjectShortcode').value;
+  const elementKind = document.getElementById('filterElementKind').value;
+  const underComment = document.getElementById('filterUnderComment').value;
+  const doiOrgHref = document.getElementById('filterDoiOrgHref').value;
+  const doiOrgText = document.getElementById('filterDoiOrgText').value;
+  document.querySelectorAll('.file-card').forEach(card => {
+    if (docType && card.getAttribute('data-doc-type') !== docType) { card.style.display = 'none'; return; }
+    if (client && card.getAttribute('data-client') !== client) { card.style.display = 'none'; return; }
+    if (identifier && card.getAttribute('data-identifier') !== identifier) { card.style.display = 'none'; return; }
+    if (projectShortcode && card.getAttribute('data-shortcode') !== projectShortcode) { card.style.display = 'none'; return; }
+    const filename = (card.getAttribute('data-filename') || '').toLowerCase();
+    const meta = (card.querySelector('.file-metadata')?.textContent || '').toLowerCase();
+    const pathTxt = (card.querySelector('.file-path')?.textContent || '').toLowerCase();
+    if (card.classList.contains('error-card')) {
+      const hay = filename + ' ' + meta + ' ' + pathTxt;
+      card.style.display = (!searchVal || hay.includes(searchVal)) ? 'block' : 'none';
+      return;
+    }
+    let anyVisible = false;
+    card.querySelectorAll('.match-item').forEach(item => {
+      if (elementKind && item.getAttribute('data-kind') !== elementKind) { item.style.display = 'none'; return; }
+      if (underComment && item.getAttribute('data-under-comment') !== underComment) { item.style.display = 'none'; return; }
+      if (doiOrgHref && item.getAttribute('data-doi-org-href') !== doiOrgHref) { item.style.display = 'none'; return; }
+      if (doiOrgText && item.getAttribute('data-doi-org-text') !== doiOrgText) { item.style.display = 'none'; return; }
+      const kind = (item.getAttribute('data-kind') || '').toLowerCase();
+      const tag = (item.getAttribute('data-tag') || '').toLowerCase();
+      const txt = (item.getAttribute('data-text') || '').toLowerCase();
+      const hay = [filename, meta, pathTxt, kind, tag, txt].join(' ');
+      const ok = !searchVal || hay.includes(searchVal);
+      item.style.display = ok ? 'block' : 'none';
+      if (ok) anyVisible = true;
+    });
+    const hasItems = card.querySelectorAll('.match-item').length > 0;
+    if (!hasItems) {
+      const hay = filename + ' ' + meta + ' ' + pathTxt;
+      const flagOk = (!underComment || card.getAttribute('data-under-comment') === underComment)
+        && (!doiOrgHref || card.getAttribute('data-doi-org-href') === doiOrgHref)
+        && (!doiOrgText || card.getAttribute('data-doi-org-text') === doiOrgText)
+        && !elementKind;
+      card.style.display = (flagOk && (!searchVal || hay.includes(searchVal))) ? 'block' : 'none';
+      return;
+    }
+    card.style.display = anyVisible ? 'block' : 'none';
+  });
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    applyFilters();
+  });
+});
+collectFilterOptions();
+applyFilters();
+'''
+
+    generated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    page = (
+        '<!DOCTYPE html>\n<html lang="en"><head>\n<meta charset="utf-8"/>\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>\n'
+        f'<title>{_esc(title)} v{REPORT_VERSION}</title>\n<style>\n{css}\n</style>\n'
+        '</head><body>\n'
+        f'<h1>{_esc(title)}</h1>\n'
+        f'<div class="meta">REPORT_VERSION={REPORT_VERSION} · files={n_files} (ok={n_ok})'
+        f' · generated {generated}</div>\n'
+        f'<div class="kpis">{kpi}'
+        f'<div class="kpi"><div class="kpi-n">{n_files}</div><div class="kpi-l">files</div></div></div>\n'
+        '<div class="controls-panel"><div class="filter-row">\n'
+        '<div class="search-container">'
+        '<svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"'
+        ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<circle cx="11" cy="11" r="8"></circle>'
+        '<line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>'
+        '<input type="text" id="searchInput" class="search-input"'
+        ' placeholder="Search matches by kind, text, filename, or markup..."'
+        ' oninput="applyFilters()"/></div>\n'
+        '<select id="filterDocType" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All types (Books/Journals.)</option></select>\n'
+        '<select id="filterClient" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All clients</option></select>\n'
+        '<select id="filterIdentifier" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All identifiers</option></select>\n'
+        '<select id="filterProjectShortcode" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All project-shortcodes</option></select>\n'
+        '<select id="filterElementKind" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All kinds (doi_id / extlink / uri)</option>'
+        f'{kind_options}</select>\n'
+        '<select id="filterUnderComment" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All - Under comment</option>'
+        '<option value="true">Yes</option><option value="false">No</option></select>\n'
+        '<select id="filterDoiOrgHref" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All - doi.org href</option>'
+        '<option value="true">Yes</option><option value="false">No</option></select>\n'
+        '<select id="filterDoiOrgText" class="filter-select" onchange="applyFilters()">'
+        '<option value="">All - doi.org text</option>'
+        '<option value="true">Yes</option><option value="false">No</option></select>\n'
+        '<div class="button-group">'
+        '<button class="action-btn" onclick="toggleAll(false)">Collapse All</button>'
+        '<button class="action-btn" onclick="toggleAll(true)">Expand All</button>'
+        '</div></div></div>\n'
+        f'<div class="tabs">{tab_buttons}</div>\n'
+        + ''.join(panels) + '\n'
+        '<div class="summary"><h2>Per-file summary</h2><table><thead><tr>'
+        '<th>Docid</th><th>File_id</th><th>Client</th><th>Shortcode</th><th>Doc_type</th>'
+        '<th>FRONT</th><th>BODY</th><th>REF</th><th>OTHER</th><th>FootNotes</th><th>Appendix</th>'
+        '<th>doi_id</th><th>extlink_doi</th><th>extlink_uri</th><th>uri</th><th>Error</th>'
+        f'</tr></thead><tbody>{file_rows}</tbody></table></div>\n'
+        '<div id="toast" class="toast"><span id="toastMsg">Copied!</span></div>\n'
+        f'<script>\n{js}\n</script>\n</body></html>\n'
+    )
+    out_path.write_text(page, encoding="utf-8")
+    return out_path
+
+
+def _merge_client_unique(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Per client: merge unique keys by (section, tag, type_attr, type_value)."""
+    by_client: dict[str, dict[tuple, dict[str, Any]]] = defaultdict(dict)
+    for r in rows:
+        client = r.get("client") or "unknown"
+        docid = r.get("docid") or ""
+        shortcode = r.get("shortcode") or ""
+        for u in r.get("unique") or []:
+            key = (u["section"], u["tag"], u["type_attr"], u["type_value"])
+            entry = by_client[client].setdefault(
+                key,
+                {
+                    "section": u["section"],
+                    "tag": u["tag"],
+                    "type_attr": u["type_attr"],
+                    "type_value": u["type_value"],
+                    "count": 0,
+                    "sample_docids": [],
+                    "shortcodes": set(),
+                    "sample_texts": [],
+                },
+            )
+            entry["count"] += int(u.get("count") or 0)
+            if docid and docid not in entry["sample_docids"] and len(entry["sample_docids"]) < 20:
+                entry["sample_docids"].append(docid)
+            if shortcode:
+                entry["shortcodes"].add(shortcode)
+            for t in u.get("sample_texts") or []:
+                if t not in entry["sample_texts"] and len(entry["sample_texts"]) < SAMPLE_LIMIT:
+                    entry["sample_texts"].append(t)
+
+    out: dict[str, list[dict[str, Any]]] = {}
+    for client, keyed in by_client.items():
+        items = []
+        for entry in keyed.values():
+            items.append(
+                {
+                    **{k: entry[k] for k in ("section", "tag", "type_attr", "type_value", "count", "sample_docids", "sample_texts")},
+                    "shortcodes": sorted(entry["shortcodes"]),
+                }
+            )
+        items.sort(key=lambda e: (e["section"], e["tag"], e["type_attr"], e["type_value"]))
+        out[client] = items
+    return out
+
+
+def write_client_unique(
+    rows: list[dict[str, Any]],
+    report_dir: Path,
+    *,
+    basename: str = "client_unique",
+) -> tuple[Path, Path]:
+    merged = _merge_client_unique(rows)
+    html_path = report_dir / f"{basename}.html"
+    csv_path = report_dir / f"{basename}.csv"
+
+    # CSV
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(
+            [
+                "client",
+                "section",
+                "tag",
+                "type_attr",
+                "type_value",
+                "count",
+                "sample_docids",
+                "shortcodes",
+            ]
+        )
+        for client, items in sorted(merged.items()):
+            for e in items:
+                w.writerow(
+                    [
+                        client,
+                        e["section"],
+                        e["tag"],
+                        e["type_attr"],
+                        e["type_value"],
+                        e["count"],
+                        ";".join(e["sample_docids"]),
+                        ";".join(e["shortcodes"]),
+                    ]
+                )
+
+    # HTML
+    sections_html = []
+    for client, items in sorted(merged.items()):
+        rows_html = "".join(
+            f"<tr>"
+            f"<td>{_esc(e['section'])}</td>"
+            f"<td>{_esc(e['tag'])}</td>"
+            f"<td>{_esc(e['type_attr'])}</td>"
+            f"<td>{_esc(e['type_value'])}</td>"
+            f"<td>{e['count']}</td>"
+            f"<td>{_esc(', '.join(e['sample_docids']))}</td>"
+            f"<td>{_esc(', '.join(e['shortcodes']))}</td>"
+            f"</tr>"
+            for e in items
+        ) or "<tr><td colspan='7'><em>No unique keys</em></td></tr>"
+        sections_html.append(
+            f'<div class="client-block" data-client="{_esc(client)}">'
+            f"<h2>{_esc(client)}</h2>"
+            f"<table><thead><tr>"
+            f"<th>section</th><th>tag</th><th>type_attr</th><th>type_value</th>"
+            f"<th>count</th><th>sample docids</th><th>shortcodes</th>"
+            f"</tr></thead><tbody>{rows_html}</tbody></table></div>"
+        )
+
+    client_options = "".join(
+        f'<option value="{_esc(c)}">{_esc(c)}</option>' for c in sorted(merged.keys())
+    )
+    body_blocks = "".join(sections_html) or "<p>No data.</p>"
+    page_parts = [
+        "<!DOCTYPE html>",
+        '<html lang="en"><head>',
+        '<meta charset="utf-8"/>',
+        f"<title>Client Unique - Sectional Report v{REPORT_VERSION}</title>",
+        "<style>",
+        "body { font-family: Segoe UI, system-ui, sans-serif; background:#0f172a; color:#e2e8f0; margin:0; padding:24px; }",
+        "h1 { color:#a5b4fc; } h2 { color:#c7d2fe; margin-top:28px; }",
+        "table { width:100%; border-collapse:collapse; font-size:13px; background:#1e293b; border-radius:8px; }",
+        "th, td { border-bottom:1px solid #334155; padding:6px 8px; text-align:left; }",
+        "th { color:#94a3b8; }",
+        ".meta { color:#94a3b8; margin-bottom:16px; }",
+        ".controls-panel { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px;",
+        "  background:#1e293b; border:1px solid #334155; border-radius:10px; padding:12px 16px; }",
+        ".filter-select, .search-input { background:#0f172a; color:#e2e8f0; border:1px solid #334155;",
+        "  border-radius:8px; padding:8px 10px; }",
+        ".search-input { min-width:220px; flex:1; }",
+        "</style></head><body>",
+        "<h1>Client Unique</h1>",
+        f'<div class="meta">Keyed by (section, tag, type_attr, type_value) - href never included · v{REPORT_VERSION}</div>',
+        '<div class="controls-panel">',
+        '<input id="searchInput" class="search-input" placeholder="Search client, tag, type..." oninput="applyFilters()"/>',
+        '<select id="filterClient" class="filter-select" onchange="applyFilters()">',
+        '<option value="">All clients</option>',
+        client_options,
+        "</select></div>",
+        body_blocks,
+        "<script>",
+        "function applyFilters() {",
+        "  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();",
+        "  const client = document.getElementById('filterClient').value;",
+        "  document.querySelectorAll('.client-block').forEach(block => {",
+        "    if (client && block.getAttribute('data-client') !== client) {",
+        "      block.style.display = 'none'; return;",
+        "    }",
+        "    const hay = (block.textContent || '').toLowerCase();",
+        "    block.style.display = (!q || hay.includes(q)) ? 'block' : 'none';",
+        "  });",
+        "}",
+        "</script>",
+        "</body></html>",
+    ]
+    html_path.write_text("\n".join(page_parts), encoding="utf-8")
+    return html_path, csv_path
+
+
+
+def run_sectional_report(
+    project_root: Path | str,
+    shortcodes: Optional[Iterable[str]] = None,
+    report_dir: Path | str | None = None,
+    *,
+    folder_mode: bool = False,
+    log: LogFn = _noop_log,
+    progress: ProgressFn = _noop_progress,
+    cancel_check: CancelFn = _noop_cancel,
+) -> dict[str, Any]:
+    """Run extraction over a project (or folder of XMLs) and write reports.
+
+    Returns dict with report_dir, tsv_path, html_path, client_unique_html,
+    client_unique_csv, rows, n_files.
+    """
+    root = Path(project_root)
+    out_dir = Path(report_dir) if report_dir else make_report_dir()
+    ensure_dir(out_dir)
+
+    docs = collect_docs(root, shortcodes=shortcodes, folder_mode=folder_mode)
+    log(f"Sectional Report v{REPORT_VERSION}: {len(docs)} file(s) from {root}")
+
+    rows: list[dict[str, Any]] = []
+    total = len(docs)
+    for i, doc in enumerate(docs, start=1):
+        if cancel_check():
+            log("Cancelled.")
+            break
+        xml_path = doc.get("xml_path")
+        progress(i, total, f"{doc.get('docid', '')}")
+        if not xml_path or not Path(xml_path).is_file():
+            row = {
+                **{k: doc.get(k, "") for k in ("docid", "file_id", "client", "shortcode", "doc_type")},
+                "xml_path": str(xml_path) if xml_path else "",
+                "section_counts": {s: 0 for s in SECTIONS},
+                "per_section": {
+                    s: {qk: {"count": 0, "hits": []} for qk in QUERY_KEYS} for s in SECTIONS
+                },
+                "query_totals": {qk: 0 for qk in QUERY_KEYS},
+                "unique": [],
+                "error": "xml not found",
+            }
+            rows.append(row)
+            log(f"[MISSING] {doc.get('docid')} — xml not found")
+            continue
+        extracted = extract_file(xml_path)
+        row = {
+            **{k: doc.get(k, "") for k in ("docid", "file_id", "client", "shortcode", "doc_type")},
+            **extracted,
+        }
+        rows.append(row)
+        if extracted.get("error"):
+            log(f"[ERROR] {doc.get('docid')} — {extracted['error']}")
+        else:
+            log(
+                f"[OK] {doc.get('docid')} FRONT={extracted['section_counts']['FRONT']} "
+                f"BODY={extracted['section_counts']['BODY']} "
+                f"REF={extracted['section_counts']['REF']} "
+                f"OTHER={extracted['section_counts']['OTHER']} "
+                f"FOOTNOTES={extracted['section_counts']['FOOTNOTES']} "
+                f"APPENDIX={extracted['section_counts']['APPENDIX']}"
+            )
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tsv_path = write_tsv(rows, out_dir / f"sectional_summary_{ts}_v{REPORT_VERSION}.tsv")
+    html_path = write_html_report(rows, out_dir / f"sectional_report_{ts}_v{REPORT_VERSION}.html")
+    cu_html, cu_csv = write_client_unique(rows, out_dir, basename=f"client_unique_{ts}_v{REPORT_VERSION}")
+
+    log(f"Wrote TSV: {tsv_path}")
+    log(f"Wrote HTML: {html_path}")
+    log(f"Wrote client unique: {cu_html}")
+
+    return {
+        "report_dir": str(out_dir),
+        "tsv_path": str(tsv_path),
+        "html_path": str(html_path),
+        "client_unique_html": str(cu_html),
+        "client_unique_csv": str(cu_csv),
+        "rows": rows,
+        "n_files": len(rows),
+        "report_version": REPORT_VERSION,
+    }
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python -m core.sectional_report <project_or_folder> [--folder] [shortcode ...]")
+        raise SystemExit(2)
+    target = sys.argv[1]
+    folder = "--folder" in sys.argv
+    scs = [a for a in sys.argv[2:] if a != "--folder"]
+    result = run_sectional_report(
+        target,
+        shortcodes=scs or None,
+        folder_mode=folder,
+        log=print,
+    )
+    print(json.dumps({k: result[k] for k in ("report_dir", "tsv_path", "html_path", "n_files")}, indent=2))

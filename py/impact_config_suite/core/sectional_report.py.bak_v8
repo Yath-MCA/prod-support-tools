@@ -11,7 +11,6 @@ import csv
 import html
 import json
 import os
-import re
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +18,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 11
+REPORT_VERSION = 8
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -184,12 +183,6 @@ def _element_text(el: etree._Element) -> str:
 
 
 
-def _element_xml(el: etree._Element) -> str:
-    try:
-        return etree.tostring(el, encoding="unicode", with_tail=False)
-    except Exception:
-        return ""
-
 def _element_href(el: etree._Element) -> str:
     """Return href / xlink:href regardless of namespace prefix."""
     for key, value in el.attrib.items():
@@ -293,7 +286,6 @@ def extract_file(xml_path: str | Path) -> dict[str, Any]:
                             "text": text,
                             "query_key": qk,
                             "section": section,
-                            "raw_xml": _element_xml(el),
                             **flags,
                         }
                     )
@@ -463,363 +455,23 @@ def _esc(s: Any) -> str:
 
 
 def _combined_id_text(file_id: str, docid: str) -> str:
-    """Return the TSV-safe combined identity text."""
+    """Single-column identity like contrib_aff: 'file_id (docid)'."""
     file_id = file_id or ""
     docid = docid or ""
     if file_id and docid:
-        return f"{file_id}\n{docid}"
+        return f"{file_id} ({docid})"
     return file_id or docid
 
 
 def _combined_id_cell(file_id: str, docid: str) -> str:
-    """HTML identity cell with file-id and docid on separate lines."""
+    """HTML identity cell matching aff report style."""
     file_id = file_id or ""
     docid = docid or ""
     if file_id and docid:
-        return f"<div>{_esc(file_id)}</div><div><small>{_esc(docid)}</small></div>"
+        return f"<div>{_esc(file_id)} <small>{_esc(docid)}</small></div>"
     return f"<div>{_esc(file_id or docid)}</div>"
 
 
-_DOI_TOKEN_RE = re.compile(
-    r"(?i)(?:https?://(?:dx\.)?doi\.org/|doi:\s*)?(10\.\d{4,9}/[^\s\"'<>]+)"
-)
-
-
-def _doi_tokens_from_hit(hit: dict[str, Any]) -> set[str]:
-    """Extract normalized DOI values from hit text and href."""
-    values: set[str] = set()
-    for raw in (hit.get("text") or "", hit.get("href") or ""):
-        for match in _DOI_TOKEN_RE.finditer(str(raw)):
-            token = match.group(1).rstrip(".,;:!?)]}>").rstrip("/").lower()
-            if token:
-                values.add(token)
-    return values
-
-
-CLIENT_SUMMARY_HEADERS = [
-    "Client",
-    "Scanned document count",
-    "Issue document count",
-]
-
-
-def _doc_identity(row_or_issue: dict[str, Any]) -> tuple[str, str, str]:
-    """Stable identity for counting unique documents."""
-    return (
-        str(row_or_issue.get("file_id") or ""),
-        str(row_or_issue.get("docid") or ""),
-        str(row_or_issue.get("xml_path") or ""),
-    )
-
-
-def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per-client scanned docs vs docs with cross-query DOI inconsistencies.
-
-    Returns list of dicts with keys:
-      client, scanned_document_count, issue_document_count
-    sorted by issue_document_count desc, then client name.
-    """
-    issues = find_cross_query_inconsistencies(rows)
-    scanned: dict[str, int] = defaultdict(int)
-    for row in rows:
-        scanned[str(row.get("client") or "unknown")] += 1
-    issue_docs: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
-    for issue in issues:
-        client = str(issue.get("client") or "unknown")
-        issue_docs[client].add(_doc_identity(issue))
-    clients = sorted(set(scanned) | set(issue_docs), key=lambda c: c.lower())
-    summary = [
-        {
-            "client": client,
-            "scanned_document_count": scanned.get(client, 0),
-            "issue_document_count": len(issue_docs.get(client, set())),
-        }
-        for client in clients
-    ]
-    summary.sort(key=lambda item: (-item["issue_document_count"], item["client"].lower()))
-    return summary
-
-
-def _client_summary_panel_html(
-    summary: list[dict[str, Any]],
-    *,
-    title: str = "Client-wise summary",
-) -> str:
-    """Shareable table + bar chart: scanned docs vs issue docs per client."""
-    total_scanned = sum(int(item["scanned_document_count"]) for item in summary)
-    total_issues = sum(int(item["issue_document_count"]) for item in summary)
-    n_clients = len(summary)
-    max_scanned = max((int(item["scanned_document_count"]) for item in summary), default=1) or 1
-
-    kpi = (
-        '<div class="client-summary-kpis">'
-        f'<div class="kpi"><div class="kpi-n">{n_clients}</div><div class="kpi-l">clients</div></div>'
-        f'<div class="kpi"><div class="kpi-n">{total_scanned}</div><div class="kpi-l">scanned docs</div></div>'
-        f'<div class="kpi warn"><div class="kpi-n">{total_issues}</div>'
-        '<div class="kpi-l">issue docs</div></div>'
-        "</div>"
-    )
-
-    if summary:
-        bars = "".join(
-            (
-                f'<div class="cause-bar" style="--pct-scanned:'
-                f'{round(int(item["scanned_document_count"]) / max_scanned * 100, 1)}%;'
-                f'--pct-issue:'
-                f'{round(int(item["issue_document_count"]) / max_scanned * 100, 1)}%">'
-                f'<span class="cause-bar-label">{_esc(item["client"])}</span>'
-                f'<span class="cause-bar-track">'
-                f'<span class="cause-bar-fill scanned"></span>'
-                f'<span class="cause-bar-fill issue"></span>'
-                f"</span>"
-                f'<span class="cause-bar-value">'
-                f'{int(item["issue_document_count"])} issue / '
-                f'{int(item["scanned_document_count"])} scanned'
-                f"</span></div>"
-            )
-            for item in summary
-        )
-    else:
-        bars = "<p><em>No documents scanned.</em></p>"
-
-    chart = (
-        f'<div class="cause-chart"><h3>{_esc(title)} chart</h3>'
-        '<p class="cause-chart-note">Amber = issue documents; teal track fill = scanned scale. '
-        "Issue document = any file with a cross-query DOI inconsistency.</p>"
-        f"{bars}</div>"
-    )
-
-    table_rows = "".join(
-        f'<tr><td>{_esc(item["client"])}</td>'
-        f'<td>{int(item["scanned_document_count"])}</td>'
-        f'<td>{int(item["issue_document_count"])}</td></tr>'
-        for item in summary
-    ) or "<tr><td colspan='3'><em>No clients.</em></td></tr>"
-
-    table = (
-        '<table class="client-summary-table"><thead><tr>'
-        "<th>Client</th><th>Scanned document count</th><th>Issue document count</th>"
-        f"</tr></thead><tbody>{table_rows}</tbody></table>"
-    )
-
-    return (
-        f'<section class="client-summary-panel" aria-label="{_esc(title)}">'
-        f"<h2>{_esc(title)}</h2>"
-        '<p class="inconsistency-note">Shareable overview for production / XML teams: '
-        "scanned documents vs documents with DOI cross-query inconsistencies.</p>"
-        f"{kpi}{chart}{table}</section>"
-    )
-
-
-def write_client_summary(
-    rows: list[dict[str, Any]],
-    report_dir: Path,
-    *,
-    basename: str = "client_summary",
-) -> tuple[Path, Path]:
-    """Write shareable client-wise scanned/issue summary HTML + CSV."""
-    ensure_dir(report_dir)
-    summary = compute_client_summary(rows)
-    html_path = report_dir / f"{basename}.html"
-    csv_path = report_dir / f"{basename}.csv"
-    with open(csv_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(CLIENT_SUMMARY_HEADERS)
-        for item in summary:
-            writer.writerow(
-                [
-                    item["client"],
-                    item["scanned_document_count"],
-                    item["issue_document_count"],
-                ]
-            )
-    css = (
-        "body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
-        "h1,h2,h3{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}"
-        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;max-width:960px}"
-        ".client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}"
-        ".kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;"
-        "border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}"
-        ".kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}"
-        ".kpi-l{font-size:12px;color:#94a3b8}"
-        ".cause-chart{margin:0 0 20px}.cause-bar{display:grid;"
-        "grid-template-columns:minmax(120px,180px) 1fr auto;align-items:center;gap:10px;margin:8px 0}"
-        ".cause-bar-label{font-size:13px;font-weight:600}"
-        ".cause-bar-track{height:18px;background:#334155;position:relative;overflow:hidden;border-radius:6px}"
-        ".cause-bar-fill{display:block;height:100%;position:absolute;left:0;top:0;border-radius:6px}"
-        ".cause-bar-fill.scanned{width:var(--pct-scanned);background:#0ea5e9;opacity:.35}"
-        ".cause-bar-fill.issue{width:var(--pct-issue);background:#f59e0b}"
-        ".cause-bar-value{font-size:12px;color:#94a3b8;white-space:nowrap}"
-        "table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a}"
-        "th,td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left}"
-        "th{color:#94a3b8;font-weight:600}"
-    )
-    page = "\n".join(
-        [
-            "<!DOCTYPE html>",
-            '<html lang="en"><head><meta charset="utf-8"/>',
-            f"<title>Sectional Report Client Summary v{REPORT_VERSION}</title>",
-            f"<style>{css}</style></head><body>",
-            "<h1>Sectional Report — Client-wise summary</h1>",
-            f'<div class="meta">REPORT_VERSION={REPORT_VERSION}</div>',
-            _client_summary_panel_html(summary),
-            "</body></html>",
-        ]
-    )
-    html_path.write_text(page, encoding="utf-8")
-    return html_path, csv_path
-
-
-def find_cross_query_inconsistencies(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Find DOI values that occur in more than one query bucket per file."""
-    issues: list[dict[str, Any]] = []
-    for row in rows:
-        by_doi: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
-        per = row.get("per_section") or {}
-        for section in SECTIONS:
-            for query_key in QUERY_KEYS:
-                bucket = (per.get(section) or {}).get(query_key) or {}
-                for hit in bucket.get("hits") or []:
-                    for doi in _doi_tokens_from_hit(hit):
-                        entry = by_doi[doi].setdefault(
-                            query_key,
-                            {"sections": set(), "samples": []},
-                        )
-                        entry["sections"].add(section)
-                        sample = {
-                            "section": section,
-                            "query": query_key,
-                            "text": str(hit.get("text") or ""),
-                            "href": str(hit.get("href") or ""),
-                        }
-                        if sample not in entry["samples"] and len(entry["samples"]) < SAMPLE_LIMIT:
-                            entry["samples"].append(sample)
-        for doi, buckets in by_doi.items():
-            if len(buckets) < 2:
-                continue
-            queries = sorted(buckets)
-            samples = []
-            sections = set()
-            for query_key in queries:
-                sections.update(buckets[query_key]["sections"])
-                samples.extend(buckets[query_key]["samples"])
-            issues.append(
-                {
-                    "client": row.get("client") or "unknown",
-                    "file_id": row.get("file_id") or "",
-                    "docid": row.get("docid") or "",
-                    "xml_path": row.get("xml_path") or "",
-                    "doi": doi,
-                    "queries": queries,
-                    "sections": sorted(sections),
-                    "samples": samples[: SAMPLE_LIMIT * 2],
-                }
-            )
-    return sorted(
-        issues,
-        key=lambda i: (
-            str(i["client"]).lower(),
-            str(i["file_id"] or i["docid"]).lower(),
-            i["doi"],
-        ),
-    )
-
-
-def _inconsistency_section_html(
-    issues: list[dict[str, Any]],
-    *,
-    title: str = "Cross-query DOI inconsistencies",
-    rows: list[dict[str, Any]] | None = None,
-    summary: list[dict[str, Any]] | None = None,
-) -> str:
-    """Render client summary (scanned vs issue docs) + issue-count bars + detail table."""
-    if summary is None:
-        if rows is not None:
-            summary = compute_client_summary(rows)
-        elif issues:
-            issue_docs: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
-            for issue in issues:
-                client = str(issue.get("client") or "unknown")
-                issue_docs[client].add(_doc_identity(issue))
-            summary = [
-                {
-                    "client": client,
-                    "scanned_document_count": len(docs),
-                    "issue_document_count": len(docs),
-                }
-                for client, docs in sorted(
-                    issue_docs.items(), key=lambda kv: (-len(kv[1]), kv[0].lower())
-                )
-            ]
-        else:
-            summary = []
-
-    summary_panel = (
-        _client_summary_panel_html(summary) if (summary or rows is not None) else ""
-    )
-
-    counts: dict[str, int] = defaultdict(int)
-    for issue in issues:
-        counts[str(issue.get("client") or "unknown")] += 1
-    max_count = max(counts.values(), default=1)
-    bars = "".join(
-        f'<div class="client-bar"><span class="client-bar-label">{_esc(client)}</span>'
-        f'<span class="client-bar-track"><span class="client-bar-fill" style="width:{round(count / max_count * 100)}%"></span></span>'
-        f'<b>{count}</b></div>'
-        for client, count in sorted(counts.items(), key=lambda item: (-item[1], item[0].lower()))
-    ) or "<p><em>No cross-query DOI overlaps found.</em></p>"
-    detail_rows = "".join(
-        f'<tr><td>{_esc(issue["client"])}</td>'
-        f'<td>{_combined_id_cell(issue["file_id"], issue["docid"])}</td>'
-        f'<td>{_esc(issue["doi"])}</td>'
-        f'<td>{_esc(", ".join(issue["queries"]))}</td>'
-        f'<td>{_esc(", ".join(issue["sections"]))}</td>'
-        f'<td>{_esc(" | ".join((s["text"] or s["href"]) for s in issue["samples"]))}</td></tr>'
-        for issue in issues
-    ) or "<tr><td colspan='6'><em>No inconsistencies.</em></td></tr>"
-    return (
-        f"{summary_panel}"
-        f'<section class="inconsistency-report"><h2>{_esc(title)} '
-        f'<span class="badge">{len(issues)}</span></h2>'
-        '<p class="inconsistency-note">A DOI appearing in multiple query buckets in one document is flagged as cross-bucket inconsistent.</p>'
-        f'<div class="client-bars"><h3>Client-wise inconsistency count</h3>{bars}</div>'
-        '<table><thead><tr><th>Client</th><th>File-id / Docid</th><th>DOI</th>'
-        '<th>Queries</th><th>Sections</th><th>Samples</th></tr></thead>'
-        f'<tbody>{detail_rows}</tbody></table></section>'
-    )
-
-
-def write_inconsistency_report(
-    rows: list[dict[str, Any]],
-    report_dir: Path,
-    *,
-    basename: str = "inconsistency_report",
-) -> tuple[Path, Path]:
-    """Write client-wise cross-query DOI inconsistency HTML and CSV."""
-    ensure_dir(report_dir)
-    issues = find_cross_query_inconsistencies(rows)
-    html_path = report_dir / f"{basename}.html"
-    csv_path = report_dir / f"{basename}.csv"
-    with open(csv_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["client", "file_id", "docid", "doi", "queries", "sections", "samples"])
-        for issue in issues:
-            writer.writerow([
-                issue["client"], issue["file_id"], issue["docid"], issue["doi"],
-                ";".join(issue["queries"]), ";".join(issue["sections"]),
-                " | ".join((s["text"] or s["href"]) for s in issue["samples"]),
-            ])
-    page = "\n".join([
-        "<!DOCTYPE html>", '<html lang="en"><head><meta charset="utf-8"/>',
-        f"<title>Sectional Report Inconsistency Report v{REPORT_VERSION}</title>",
-        "<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
-        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.cause-chart{margin:0 0 20px}.cause-bar{display:grid;grid-template-columns:minmax(120px,180px) 1fr auto;align-items:center;gap:10px;margin:8px 0}.cause-bar-label{font-size:13px;font-weight:600}.cause-bar-track{height:18px;background:#334155;position:relative;overflow:hidden;border-radius:6px}.cause-bar-fill{display:block;height:100%;position:absolute;left:0;top:0;border-radius:6px}.cause-bar-fill.scanned{width:var(--pct-scanned);background:#0ea5e9;opacity:.35}.cause-bar-fill.issue{width:var(--pct-issue);background:#f59e0b}.cause-bar-value{font-size:12px;color:#94a3b8;white-space:nowrap}.client-bar{display:flex;gap:10px;align-items:center;margin:6px 0}.client-bar-label{width:160px}.client-bar-track{background:#334155;display:inline-block;flex:1;height:12px;border-radius:8px}.client-bar-fill{background:#f59e0b;display:block;height:100%;border-radius:8px}table{width:100%;border-collapse:collapse;font-size:13px;background:#1e293b}th,td{border-bottom:1px solid #334155;padding:6px 8px;text-align:left;vertical-align:top}small{color:#94a3b8}</style></head><body>",
-        f"<h1>Sectional Report Inconsistency Report</h1><div class=\"meta\">REPORT_VERSION={REPORT_VERSION}</div>",
-        _inconsistency_section_html(issues, rows=rows),
-        "</body></html>",
-    ])
-    html_path.write_text(page, encoding="utf-8")
-    return html_path, csv_path
 def write_tsv(rows: list[dict[str, Any]], out_path: Path) -> Path:
     ensure_dir(out_path.parent)
     with open(out_path, "w", encoding="utf-8", newline="") as f:
@@ -901,7 +553,6 @@ def write_html_report(
                                 "docid": docid,
                                 "tag": hit.get("tag", ""),
                                 "text": hit.get("text", ""),
-                                "raw_xml": hit.get("raw_xml", ""),
                                 "xml_path": xml_path,
                             }
                         )
@@ -924,7 +575,7 @@ def write_html_report(
                 f'<td>{_esc(h.get("client") or "")}</td>'
                 f'<td>{_combined_id_cell(h.get("file_id") or "", h.get("docid") or "")}</td>'
                 f'<td>{_esc(h["tag"])}</td>'
-                 f'<td class="text-sample"><span class="sample-preview">{_esc(h.get("text") or "")}</span><span class="sample-raw" hidden>{_esc(h.get("raw_xml") or h.get("text") or "")}</span></td>'
+                f'<td>{_esc(h["text"])}</td>'
                 "</tr>"
                 for h in samples
             ) or "<tr><td colspan='4'><em>No hits</em></td></tr>"
@@ -987,8 +638,6 @@ def write_html_report(
     clients = sorted({(r.get("client") or "") for r in rows if r.get("client")})
     client_opts = "".join(f'<option value="{_esc(c)}">{_esc(c)}</option>' for c in clients)
 
-    inconsistencies = find_cross_query_inconsistencies(rows)
-    inconsistency_html = _inconsistency_section_html(inconsistencies, rows=rows)
     generated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     page = f"""<!DOCTYPE html>
 <html lang="en"><head>
@@ -1031,29 +680,6 @@ th {{ color:#94a3b8; font-weight:600; }}
 }}
 .file-action-btn.copied {{ background:rgba(16,185,129,0.2); border-color:#10b981; }}
 small {{ color:#94a3b8; }}
-.view-label {{ color:#94a3b8; margin-left:8px; }}
-.view-toggle {{ background:#334155; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:7px 10px; cursor:pointer; }}
-.view-toggle.active {{ background:#4f46e5; }}
-.sample-raw[hidden] {{ display:none; }}
-.client-summary-panel {{ margin-top:28px; background:#1e293b; border-radius:10px; padding:16px; }}
-.client-summary-kpis {{ display:flex; gap:12px; flex-wrap:wrap; margin:12px 0 18px; }}
-.kpi.warn {{ border-left:4px solid #f59e0b; }}
-.kpi.warn .kpi-n {{ color:#fbbf24; }}
-.cause-chart {{ margin:0 0 20px; }}
-.cause-chart-note {{ color:#94a3b8; font-size:12px; }}
-.cause-bar {{ display:grid; grid-template-columns:minmax(120px,180px) 1fr auto; align-items:center; gap:10px; margin:8px 0; }}
-.cause-bar-label {{ font-size:13px; font-weight:600; }}
-.cause-bar-track {{ height:18px; background:#334155; position:relative; overflow:hidden; border-radius:6px; }}
-.cause-bar-fill {{ display:block; height:100%; position:absolute; left:0; top:0; border-radius:6px; }}
-.cause-bar-fill.scanned {{ width:var(--pct-scanned); background:#0ea5e9; opacity:.35; }}
-.cause-bar-fill.issue {{ width:var(--pct-issue); background:#f59e0b; }}
-.cause-bar-value {{ font-size:12px; color:#94a3b8; white-space:nowrap; }}
-.inconsistency-report {{ margin-top:28px; background:#1e293b; border-radius:10px; padding:16px; }}
-.inconsistency-report h2 {{ color:#fbbf24; }}
-.client-bar {{ display:flex; gap:10px; align-items:center; margin:6px 0; }}
-.client-bar-label {{ width:160px; }}
-.client-bar-track {{ background:#334155; display:inline-block; flex:1; height:12px; border-radius:8px; }}
-.client-bar-fill {{ background:#f59e0b; display:block; height:100%; border-radius:8px; }}
 .toast {{
   position:fixed; bottom:24px; right:24px; background:#1e293b; border:1px solid #6366f1;
   color:#e2e8f0; padding:12px 20px; border-radius:8px; opacity:0; transform:translateY(40px);
@@ -1073,13 +699,9 @@ small {{ color:#94a3b8; }}
     <option value="">All clients</option>
     {client_opts}
   </select>
-   <span class="view-label">Text Sample View</span>
-   <button type="button" class="view-toggle active" id="previewToggle" onclick="setTextSampleMode('preview')">HTML Preview</button>
-   <button type="button" class="view-toggle" id="rawToggle" onclick="setTextSampleMode('raw')">Raw XML</button>
 </div>
 <div class="tabs">{tab_buttons}</div>
 {"".join(panels)}
-{inconsistency_html}
 <div class="summary">
   <h2>Per-file summary</h2>
   <table>
@@ -1093,13 +715,6 @@ small {{ color:#94a3b8; }}
 </div>
 <div id="toast" class="toast"><span id="toastMsg">Copied!</span></div>
 <script>
-function setTextSampleMode(mode) {{
-  const raw = mode === 'raw';
-  document.querySelectorAll('.sample-preview').forEach(el => {{ el.hidden = raw; }});
-  document.querySelectorAll('.sample-raw').forEach(el => {{ el.hidden = !raw; }});
-  document.getElementById('previewToggle').classList.toggle('active', !raw);
-  document.getElementById('rawToggle').classList.toggle('active', raw);
-}}
 function applyFilters() {{
   const client = (document.getElementById('filterClient').value || '');
   document.querySelectorAll('.tab-panel tr[data-client]').forEach(tr => {{
@@ -1322,8 +937,7 @@ def run_sectional_report(
     """Run extraction over a project (or folder of XMLs) and write reports.
 
     Returns dict with report_dir, tsv_path, html_path, client_unique_html,
-    client_unique_csv, inconsistency_html, inconsistency_csv,
-    client_summary_html, client_summary_csv, rows, n_files.
+    client_unique_csv, rows, n_files.
     """
     root = Path(project_root)
     out_dir = Path(report_dir) if report_dir else make_report_dir()
@@ -1377,14 +991,10 @@ def run_sectional_report(
     tsv_path = write_tsv(rows, out_dir / f"sectional_summary_{ts}_v{REPORT_VERSION}.tsv")
     html_path = write_html_report(rows, out_dir / f"sectional_report_{ts}_v{REPORT_VERSION}.html")
     cu_html, cu_csv = write_client_unique(rows, out_dir, basename=f"client_unique_{ts}_v{REPORT_VERSION}")
-    inc_html, inc_csv = write_inconsistency_report(rows, out_dir, basename=f"inconsistency_{ts}_v{REPORT_VERSION}")
-    cs_html, cs_csv = write_client_summary(rows, out_dir, basename=f"client_summary_{ts}_v{REPORT_VERSION}")
 
     log(f"Wrote TSV: {tsv_path}")
     log(f"Wrote HTML: {html_path}")
     log(f"Wrote client unique: {cu_html}")
-    log(f"Wrote inconsistency report: {inc_html}")
-    log(f"Wrote client summary: {cs_html}")
 
     return {
         "report_dir": str(out_dir),
@@ -1392,10 +1002,6 @@ def run_sectional_report(
         "html_path": str(html_path),
         "client_unique_html": str(cu_html),
         "client_unique_csv": str(cu_csv),
-        "inconsistency_html": str(inc_html),
-        "inconsistency_csv": str(inc_csv),
-        "client_summary_html": str(cs_html),
-        "client_summary_csv": str(cs_csv),
         "rows": rows,
         "n_files": len(rows),
         "report_version": REPORT_VERSION,
