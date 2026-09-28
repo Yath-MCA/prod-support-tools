@@ -19,7 +19,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 13
+REPORT_VERSION = 12
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -909,327 +909,6 @@ def write_client_summary(
     return html_path, csv_path
 
 
-
-UNIQUE_FINDINGS_HEADERS = [
-    "#",
-    "Kind",
-    "Pattern (tag/attrs)",
-    "DOI/sample",
-    "Clients",
-    "Issue docs",
-    "Example file-id(s)",
-]
-
-
-def _strip_href_from_attrs(attrs: str) -> str:
-    """Drop href=... tokens so signatures stay mail-sized and stable."""
-    parts: list[str] = []
-    for token in str(attrs or "").split():
-        low = token.lower()
-        if low.startswith("href=") or low.startswith("xlink:href="):
-            continue
-        parts.append(token)
-    return " ".join(parts)
-
-
-def _pattern_signature(pat: dict[str, Any]) -> str:
-    """Left/right tag+attr signature (href stripped) for display and fallback key."""
-    left_attrs = _strip_href_from_attrs(str(pat.get("attr_l") or ""))
-    right_attrs = _strip_href_from_attrs(str(pat.get("attr_r") or ""))
-    left = str(pat.get("tag_l") or "").strip()
-    right = str(pat.get("tag_r") or "").strip()
-    if left_attrs:
-        left = f"{left} [{left_attrs}]" if left else f"[{left_attrs}]"
-    if right_attrs:
-        right = f"{right} [{right_attrs}]" if right else f"[{right_attrs}]"
-    arrow = "\u2194"
-    if left and right:
-        return f"{left} {arrow} {right}"
-    return left or right or "-"
-
-
-def _unique_finding_key(pat: dict[str, Any]) -> tuple[str, ...]:
-    """Unique key = kind + normalized DOI; fallback kind + L/R tag+attr signature."""
-    kind = str(pat.get("kind") or KIND_V1)
-    doi = str(pat.get("doi") or "").strip().lower().rstrip("/")
-    if doi:
-        return ("doi", kind, doi)
-    return ("sig", kind, _pattern_signature(pat))
-
-
-def _file_id_label(pat: dict[str, Any]) -> str:
-    """Prefer file_id; fall back to docid."""
-    fid = str(pat.get("file_id") or "").strip()
-    if fid:
-        return fid
-    return str(pat.get("docid") or "").strip() or "-"
-
-
-def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Collapse Kind-v1 patterns into mail-sized unique findings.
-
-    Unique key = kind + normalized DOI (fallback kind + L/R tag+attr signature).
-    File-ids collapsed to count + 1-2 examples; full per-file detail stays in
-    client_summary / inconsistency reports on disk.
-    """
-    patterns = find_kind_v1_patterns(rows)
-    buckets: dict[tuple[str, ...], dict[str, Any]] = {}
-    for pat in patterns:
-        key = _unique_finding_key(pat)
-        entry = buckets.get(key)
-        if entry is None:
-            entry = {
-                "kind": str(pat.get("kind") or KIND_V1),
-                "doi": str(pat.get("doi") or "").strip(),
-                "pattern": _pattern_signature(pat),
-                "sample": (
-                    str(pat.get("sample_l") or "").strip()
-                    or str(pat.get("sample_r") or "").strip()
-                ),
-                "clients": set(),
-                "docs": set(),
-                "file_ids": [],
-                "_file_id_seen": set(),
-            }
-            buckets[key] = entry
-        client = str(pat.get("client") or "unknown")
-        entry["clients"].add(client)
-        doc_key = _doc_identity(pat)
-        entry["docs"].add(doc_key)
-        label = _file_id_label(pat)
-        if label and label not in entry["_file_id_seen"]:
-            entry["_file_id_seen"].add(label)
-            entry["file_ids"].append(label)
-        # Prefer a richer pattern/sample if current is sparse
-        if not entry["pattern"] or entry["pattern"] == "-":
-            entry["pattern"] = _pattern_signature(pat)
-        if not entry["sample"]:
-            entry["sample"] = (
-                str(pat.get("sample_l") or "").strip()
-                or str(pat.get("sample_r") or "").strip()
-            )
-        if not entry["doi"] and pat.get("doi"):
-            entry["doi"] = str(pat.get("doi") or "").strip()
-
-    findings: list[dict[str, Any]] = []
-    for entry in buckets.values():
-        file_ids = list(entry["file_ids"])
-        examples = file_ids[:2]
-        extra = len(file_ids) - len(examples)
-        if examples and extra > 0:
-            example_display = f"{', '.join(examples)} (+{extra})"
-        elif examples:
-            example_display = ", ".join(examples)
-        else:
-            example_display = "-"
-        doi_or_sample = entry["doi"] or entry["sample"] or "-"
-        findings.append(
-            {
-                "kind": entry["kind"],
-                "pattern": entry["pattern"],
-                "doi_or_sample": doi_or_sample,
-                "doi": entry["doi"],
-                "clients": sorted(entry["clients"], key=lambda c: c.lower()),
-                "issue_docs": len(entry["docs"]),
-                "example_file_ids": example_display,
-                "example_file_id_list": examples,
-                "file_id_count": len(file_ids),
-            }
-        )
-
-    findings.sort(
-        key=lambda f: (
-            -int(f["issue_docs"]),
-            str(f["kind"]).lower(),
-            str(f["doi_or_sample"]).lower(),
-        )
-    )
-    for i, item in enumerate(findings, start=1):
-        item["num"] = i
-    return findings
-
-
-def _format_example_file_ids_cell(finding: dict[str, Any]) -> str:
-    """Human cell: count + 1-2 examples (already collapsed in finding)."""
-    n = int(finding.get("file_id_count") or finding.get("issue_docs") or 0)
-    examples = str(finding.get("example_file_ids") or "-")
-    if n <= 0:
-        return "-"
-    if n == 1:
-        return f"1: {examples}"
-    return f"{n}: {examples}"
-
-
-def format_unique_findings_mail_body(
-    findings: list[dict[str, Any]],
-    *,
-    generated: str | None = None,
-) -> str:
-    """Plain-text unique findings digest suitable for pasting into mail."""
-    when = generated or datetime.now().strftime("%Y-%m-%d %H:%M")
-    n = len(findings)
-    total_docs = sum(int(f["issue_docs"]) for f in findings)
-    clients = sorted(
-        {c for f in findings for c in (f.get("clients") or [])},
-        key=lambda c: c.lower(),
-    )
-    lines = [
-        f"Sectional Report — Unique Findings Digest v{REPORT_VERSION}",
-        f"Generated: {when}",
-        (
-            f"Unique findings: {n}  |  "
-            f"Issue-doc occurrences: {total_docs}  |  "
-            f"Clients: {len(clients)}"
-        ),
-        (
-            "Unique key = kind + normalized DOI "
-            "(fallback kind + left/right tag+attr signature). "
-            "File-ids collapsed to count + 1–2 examples; full reports on disk."
-        ),
-        "",
-        "\t".join(UNIQUE_FINDINGS_HEADERS),
-    ]
-    if not findings:
-        lines.append("(no unique findings)")
-    for f in findings:
-        lines.append(
-            "\t".join(
-                [
-                    str(f["num"]),
-                    str(f["kind"]),
-                    str(f["pattern"]),
-                    str(f["doi_or_sample"]),
-                    ", ".join(f.get("clients") or []),
-                    str(f["issue_docs"]),
-                    _format_example_file_ids_cell(f),
-                ]
-            )
-        )
-    lines.append("")
-    lines.append(
-        "Full reports (client_summary / inconsistency / sectional) remain on disk."
-    )
-    return "\n".join(lines) + "\n"
-
-
-def _unique_findings_table_html(findings: list[dict[str, Any]]) -> str:
-    rows = "".join(
-        (
-            f"<tr>"
-            f"<td>{int(f['num'])}</td>"
-            f"<td>{_esc(f['kind'])}</td>"
-            f"<td><code>{_esc(f['pattern'])}</code></td>"
-            f"<td><code>{_esc(f['doi_or_sample'])}</code></td>"
-            f"<td>{_esc(', '.join(f.get('clients') or []))}</td>"
-            f"<td>{int(f['issue_docs'])}</td>"
-            f"<td>{_esc(_format_example_file_ids_cell(f))}</td>"
-            f"</tr>"
-        )
-        for f in findings
-    ) or (
-        f"<tr><td colspan='{len(UNIQUE_FINDINGS_HEADERS)}'>"
-        "<em>No unique findings.</em></td></tr>"
-    )
-    headers = "".join(f"<th>{_esc(h)}</th>" for h in UNIQUE_FINDINGS_HEADERS)
-    return (
-        '<table class="unique-findings-table"><thead><tr>'
-        f"{headers}</tr></thead><tbody>{rows}</tbody></table>"
-    )
-
-
-def write_unique_findings(
-    rows: list[dict[str, Any]],
-    report_dir: Path,
-    *,
-    basename: str = "unique_findings",
-) -> tuple[Path, Path, Path]:
-    """Write mail-sized unique findings HTML + CSV + plain-text body.
-
-    Returns (html_path, csv_path, txt_path).
-    """
-    ensure_dir(report_dir)
-    findings = compute_unique_findings(rows)
-    html_path = report_dir / f"{basename}.html"
-    csv_path = report_dir / f"{basename}.csv"
-    txt_path = report_dir / f"{basename}.txt"
-    generated = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    with open(csv_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(UNIQUE_FINDINGS_HEADERS)
-        for item in findings:
-            writer.writerow(
-                [
-                    item["num"],
-                    item["kind"],
-                    item["pattern"],
-                    item["doi_or_sample"],
-                    ";".join(item.get("clients") or []),
-                    item["issue_docs"],
-                    _format_example_file_ids_cell(item),
-                ]
-            )
-
-    mail_body = format_unique_findings_mail_body(findings, generated=generated)
-    txt_path.write_text(mail_body, encoding="utf-8")
-
-    n = len(findings)
-    total_docs = sum(int(f["issue_docs"]) for f in findings)
-    clients = sorted(
-        {c for f in findings for c in (f.get("clients") or [])},
-        key=lambda c: c.lower(),
-    )
-    kpi = (
-        '<div class="client-summary-kpis">'
-        f'<div class="kpi"><div class="kpi-n">{n}</div>'
-        '<div class="kpi-l">unique findings</div></div>'
-        f'<div class="kpi warn"><div class="kpi-n">{total_docs}</div>'
-        '<div class="kpi-l">issue-doc hits</div></div>'
-        f'<div class="kpi"><div class="kpi-n">{len(clients)}</div>'
-        '<div class="kpi-l">clients</div></div>'
-        "</div>"
-    )
-    css = (
-        "body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;"
-        "margin:0;padding:24px}"
-        "h1,h2{color:#a5b4fc}.meta,.note{color:#94a3b8;margin-bottom:12px}"
-        ".client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}"
-        ".kpi{background:#1e293b;border-radius:10px;padding:14px 18px;min-width:110px;"
-        "border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}"
-        ".kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}"
-        ".kpi-l{font-size:12px;color:#94a3b8}"
-        "table{width:100%;border-collapse:collapse;font-size:13px;background:#1e293b;"
-        "border-radius:8px;overflow:hidden}"
-        "th,td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;"
-        "vertical-align:top}th{color:#94a3b8;font-weight:600}"
-        "code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px;"
-        "word-break:break-word}"
-        "pre.mail-body{background:#0f172a;border:1px solid #334155;border-radius:8px;"
-        "padding:14px;white-space:pre-wrap;font-size:12px;color:#cbd5e1;margin-top:18px}"
-    )
-    page = "\n".join(
-        [
-            "<!DOCTYPE html>",
-            '<html lang="en"><head><meta charset="utf-8"/>',
-            f"<title>Unique Findings Digest v{REPORT_VERSION}</title>",
-            f"<style>{css}</style></head><body>",
-            "<h1>Unique Findings Digest</h1>",
-            f'<div class="meta">REPORT_VERSION={REPORT_VERSION} · mail-sized · '
-            "full client_summary / inconsistency reports stay on disk</div>",
-            '<p class="note">Unique key = kind + normalized DOI '
-            "(fallback kind + left/right tag+attr signature). "
-            "File-ids collapsed to count + 1–2 examples.</p>",
-            kpi,
-            _unique_findings_table_html(findings),
-            "<h2>Plain-text body (paste into mail)</h2>",
-            f'<pre class="mail-body">{_esc(mail_body)}</pre>',
-            "</body></html>",
-        ]
-    )
-    html_path.write_text(page, encoding="utf-8")
-    return html_path, csv_path, txt_path
-
-
 def find_cross_query_inconsistencies(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Find DOI values that occur in more than one query bucket per file."""
     issues: list[dict[str, Any]] = []
@@ -1898,8 +1577,7 @@ def run_sectional_report(
 
     Returns dict with report_dir, tsv_path, html_path, client_unique_html,
     client_unique_csv, inconsistency_html, inconsistency_csv,
-    client_summary_html, client_summary_csv, unique_findings_html,
-    unique_findings_csv, unique_findings_txt, rows, n_files.
+    client_summary_html, client_summary_csv, rows, n_files.
     """
     root = Path(project_root)
     out_dir = Path(report_dir) if report_dir else make_report_dir()
@@ -1955,16 +1633,12 @@ def run_sectional_report(
     cu_html, cu_csv = write_client_unique(rows, out_dir, basename=f"client_unique_{ts}_v{REPORT_VERSION}")
     inc_html, inc_csv = write_inconsistency_report(rows, out_dir, basename=f"inconsistency_{ts}_v{REPORT_VERSION}")
     cs_html, cs_csv = write_client_summary(rows, out_dir, basename=f"client_summary_{ts}_v{REPORT_VERSION}")
-    uf_html, uf_csv, uf_txt = write_unique_findings(
-        rows, out_dir, basename=f"unique_findings_{ts}_v{REPORT_VERSION}"
-    )
 
     log(f"Wrote TSV: {tsv_path}")
     log(f"Wrote HTML: {html_path}")
     log(f"Wrote client unique: {cu_html}")
     log(f"Wrote inconsistency report: {inc_html}")
     log(f"Wrote client summary: {cs_html}")
-    log(f"Wrote unique findings digest: {uf_html}")
 
     return {
         "report_dir": str(out_dir),
@@ -1976,9 +1650,6 @@ def run_sectional_report(
         "inconsistency_csv": str(inc_csv),
         "client_summary_html": str(cs_html),
         "client_summary_csv": str(cs_csv),
-        "unique_findings_html": str(uf_html),
-        "unique_findings_csv": str(uf_csv),
-        "unique_findings_txt": str(uf_txt),
         "rows": rows,
         "n_files": len(rows),
         "report_version": REPORT_VERSION,
