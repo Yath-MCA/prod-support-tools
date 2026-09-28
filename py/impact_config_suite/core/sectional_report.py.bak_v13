@@ -19,7 +19,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 14
+REPORT_VERSION = 13
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -522,26 +522,10 @@ def _doi_tokens_from_hit(hit: dict[str, Any]) -> set[str]:
     return values
 
 
-CLIENT_SUMMARY_AREA_KEYS = (
-    ("FRONT", "FRONT"),
-    ("BODY", "BODY"),
-    ("REF", "REF"),
-    ("FN_GROUP", "FOOTNOTES"),
-    ("APP_GROUP", "APPENDIX"),
-    ("OTHER", "OTHER"),
-)
-CLIENT_SUMMARY_AREA_LABELS = tuple(label for label, _ in CLIENT_SUMMARY_AREA_KEYS)
-
 CLIENT_SUMMARY_HEADERS = [
-    "RowType",
     "Client",
-    "Scan docs",
-    "FRONT",
-    "BODY",
-    "REF",
-    "FN_GROUP",
-    "APP_GROUP",
-    "OTHER",
+    "File_id",
+    "Docid",
     "Pattern#",
     "Kind",
     "DOI",
@@ -549,8 +533,6 @@ CLIENT_SUMMARY_HEADERS = [
     "Attr_L",
     "Tag_R",
     "Attr_R",
-    "File_id",
-    "Docid",
     "Sections",
 ]
 
@@ -664,38 +646,14 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return patterns
 
 
-def _format_area_cell(issue_count: int, scanned: int) -> str:
-    """Render ``10% (25 documents)`` = issue docs in area / scan docs."""
-    if scanned <= 0:
-        pct = 0
-    else:
-        pct = int(round(issue_count * 100.0 / scanned))
-    return f"{pct}% ({issue_count} documents)"
-
-
-def _empty_areas() -> dict[str, dict[str, Any]]:
-    return {
-        label: {
-            "issue_document_count": 0,
-            "pct": 0.0,
-            "display": _format_area_cell(0, 0),
-        }
-        for label, _ in CLIENT_SUMMARY_AREA_KEYS
-    }
-
-
 def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per-client scanned docs + per-area Kind-v1 issue-doc rates.
+    """Per-client scanned docs vs docs with cross-query DOI inconsistencies.
 
     Returns list of dicts with keys:
-      client, scanned_document_count, issue_document_count, areas
-    where areas[LABEL] = {issue_document_count, pct, display}.
-    Area display: ``10% (25 documents)`` = Kind-v1 issue docs touching that
-    section / scan docs for the client. FN_GROUP=FOOTNOTES, APP_GROUP=APPENDIX.
-    Sorted by issue_document_count desc, then client name.
+      client, scanned_document_count, issue_document_count
+    sorted by issue_document_count desc, then client name.
     """
     issues = find_cross_query_inconsistencies(rows)
-    patterns = find_kind_v1_patterns(rows)
     scanned: dict[str, int] = defaultdict(int)
     for row in rows:
         scanned[str(row.get("client") or "unknown")] += 1
@@ -703,43 +661,15 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for issue in issues:
         client = str(issue.get("client") or "unknown")
         issue_docs[client].add(_doc_identity(issue))
-
-    section_to_label = {sec: label for label, sec in CLIENT_SUMMARY_AREA_KEYS}
-    area_docs: dict[str, dict[str, set[tuple[str, str, str]]]] = defaultdict(
-        lambda: {label: set() for label, _ in CLIENT_SUMMARY_AREA_KEYS}
-    )
-    for pat in patterns:
-        client = str(pat.get("client") or "unknown")
-        ident = _doc_identity(pat)
-        for sec in pat.get("sections") or []:
-            label = section_to_label.get(str(sec))
-            if label:
-                area_docs[client][label].add(ident)
-
-    clients = sorted(
-        set(scanned) | set(issue_docs) | set(area_docs),
-        key=lambda c: c.lower(),
-    )
-    summary: list[dict[str, Any]] = []
-    for client in clients:
-        n_scan = int(scanned.get(client, 0))
-        areas = _empty_areas()
-        for label, _ in CLIENT_SUMMARY_AREA_KEYS:
-            n_issue = len(area_docs.get(client, {}).get(label, set()))
-            pct = (n_issue * 100.0 / n_scan) if n_scan else 0.0
-            areas[label] = {
-                "issue_document_count": n_issue,
-                "pct": pct,
-                "display": _format_area_cell(n_issue, n_scan),
-            }
-        summary.append(
-            {
-                "client": client,
-                "scanned_document_count": n_scan,
-                "issue_document_count": len(issue_docs.get(client, set())),
-                "areas": areas,
-            }
-        )
+    clients = sorted(set(scanned) | set(issue_docs), key=lambda c: c.lower())
+    summary = [
+        {
+            "client": client,
+            "scanned_document_count": scanned.get(client, 0),
+            "issue_document_count": len(issue_docs.get(client, set())),
+        }
+        for client in clients
+    ]
     summary.sort(key=lambda item: (-item["issue_document_count"], item["client"].lower()))
     return summary
 
@@ -824,154 +754,17 @@ def _client_details_html(patterns: list[dict[str, Any]]) -> str:
     )
 
 
-_AREA_COLORS = {
-    "FRONT": "#38bdf8",
-    "BODY": "#a78bfa",
-    "REF": "#34d399",
-    "FN_GROUP": "#fbbf24",
-    "APP_GROUP": "#fb7185",
-    "OTHER": "#94a3b8",
-}
-
-
-def _area_mark(sections: list[str] | None, label: str) -> str:
-    """● when pattern touches the area; else empty."""
-    section_to_label = {sec: lab for lab, sec in CLIENT_SUMMARY_AREA_KEYS}
-    touched = {section_to_label.get(str(s), str(s)) for s in (sections or [])}
-    return "●" if label in touched else ""
-
-
-def _client_summary_blurb_html() -> str:
-    return (
-        '<p class="client-summary-blurb inconsistency-note">'
-        "Per client: <b>Scan docs</b> = files scanned. Area cells show the share of "
-        "scanned docs that have a Kind-v1 (<code>extlink_doi↔uri</code>) issue in that "
-        "area, formatted as <code>10% (25 documents)</code> = issue docs in area ÷ scan "
-        "docs. <b>FN_GROUP</b> = footnotes (<code>fn-group</code>); <b>APP_GROUP</b> = "
-        "appendix. A document may count in multiple areas (rates can sum over 100%). "
-        "Under each client, <b>pattern-1..N</b> rows mark the areas that pattern touches "
-        "(●). Chart: grouped bars of area % per client."
-        "</p>"
-    )
-
-
-def _client_summary_chart_html(summary: list[dict[str, Any]], *, title: str) -> str:
-    """Grouped bars: one cluster per client, one bar per area (% of scan docs)."""
-    if not summary:
-        return (
-            f'<div class="area-chart"><h3>{_esc(title)} chart</h3>'
-            "<p><em>No documents scanned.</em></p></div>"
-        )
-    legend = "".join(
-        f'<span class="area-legend-item">'
-        f'<span class="swatch" style="background:{_AREA_COLORS[label]}"></span>'
-        f"{_esc(label)}</span>"
-        for label, _ in CLIENT_SUMMARY_AREA_KEYS
-    )
-    rows_html: list[str] = []
-    for item in summary:
-        bars = "".join(
-            (
-                f'<div class="gbar" title="{_esc(label)}: '
-                f'{_esc(item["areas"][label]["display"])}">'
-                f'<div class="gbar-fill" style="height:'
-                f'{min(100.0, float(item["areas"][label]["pct"])):.1f}%;'
-                f'background:{_AREA_COLORS[label]}"></div>'
-                f'<div class="gbar-lab">{_esc(label)}</div>'
-                f'<div class="gbar-pct">'
-                f'{int(round(float(item["areas"][label]["pct"])))}%</div>'
-                f"</div>"
-            )
-            for label, _ in CLIENT_SUMMARY_AREA_KEYS
-        )
-        rows_html.append(
-            f'<div class="area-chart-row">'
-            f'<span class="area-chart-label">{_esc(item["client"])}</span>'
-            f'<div class="grouped-bars">{bars}</div>'
-            f"</div>"
-        )
-    return (
-        f'<div class="area-chart"><h3>{_esc(title)} chart</h3>'
-        '<p class="cause-chart-note">Grouped bars: each area = % of that client\'s '
-        "scanned docs with a Kind-v1 issue in the area. Areas can overlap.</p>"
-        f'<div class="area-legend">{legend}</div>'
-        f'{"".join(rows_html)}</div>'
-    )
-
-
-def _client_summary_table_html(
-    summary: list[dict[str, Any]],
-    patterns: list[dict[str, Any]],
-) -> str:
-    """Client rows with area % cells; nested pattern-1..N rows under each client."""
-    by_client: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for pat in patterns:
-        by_client[str(pat.get("client") or "unknown")].append(pat)
-
-    body_rows: list[str] = []
-    for item in summary:
-        client = str(item["client"])
-        area_tds = "".join(
-            f'<td class="area-cell">{_esc(item["areas"][label]["display"])}</td>'
-            for label, _ in CLIENT_SUMMARY_AREA_KEYS
-        )
-        body_rows.append(
-            f'<tr class="client-row" data-client="{_esc(client)}">'
-            f"<td><b>{_esc(client)}</b></td>"
-            f'<td>{int(item["scanned_document_count"])}</td>'
-            f"{area_tds}</tr>"
-        )
-        pats = sorted(
-            by_client.get(client, []),
-            key=lambda p: (
-                str(p.get("file_id") or p.get("docid") or "").lower(),
-                str(p.get("docid") or "").lower(),
-                int(p.get("pattern_num") or 0),
-            ),
-        )
-        for pat in pats:
-            id_label = _combined_id_text(
-                str(pat.get("file_id") or ""), str(pat.get("docid") or "")
-            ).replace("\n", " / ")
-            marks = "".join(
-                f'<td class="area-mark">{_esc(_area_mark(pat.get("sections"), label))}</td>'
-                for label, _ in CLIENT_SUMMARY_AREA_KEYS
-            )
-            body_rows.append(
-                f'<tr class="pattern-row" data-client="{_esc(client)}">'
-                f'<td class="pattern-label">pattern-{int(pat["pattern_num"])}'
-                f' <span class="pattern-meta">{_esc(id_label)} · '
-                f'{_esc(pat.get("doi") or "")}</span></td>'
-                f"<td></td>{marks}</tr>"
-            )
-
-    if not body_rows:
-        body_rows.append(
-            f"<tr><td colspan='{2 + len(CLIENT_SUMMARY_AREA_KEYS)}'>"
-            "<em>No clients.</em></td></tr>"
-        )
-
-    head = (
-        "<th>Client</th><th>Scan docs</th>"
-        + "".join(f"<th>{_esc(label)}</th>" for label, _ in CLIENT_SUMMARY_AREA_KEYS)
-    )
-    return (
-        '<table class="client-summary-table"><thead><tr>'
-        f"{head}</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"
-    )
-
-
 def _client_summary_panel_html(
     summary: list[dict[str, Any]],
     *,
     title: str = "Client-wise summary",
     patterns: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Shareable blurb + area-% table (with pattern rows) + grouped chart + details."""
-    pats = patterns or []
+    """Shareable table + bar chart + Kind-v1 pattern details per client/file."""
     total_scanned = sum(int(item["scanned_document_count"]) for item in summary)
     total_issues = sum(int(item["issue_document_count"]) for item in summary)
     n_clients = len(summary)
+    max_scanned = max((int(item["scanned_document_count"]) for item in summary), default=1) or 1
 
     kpi = (
         '<div class="client-summary-kpis">'
@@ -982,22 +775,56 @@ def _client_summary_panel_html(
         "</div>"
     )
 
-    chart = _client_summary_chart_html(summary, title=title)
-    table = _client_summary_table_html(summary, pats)
-    details = _client_details_html(pats)
+    if summary:
+        bars = "".join(
+            (
+                f'<div class="cause-bar" style="--pct-scanned:'
+                f'{round(int(item["scanned_document_count"]) / max_scanned * 100, 1)}%;'
+                f'--pct-issue:'
+                f'{round(int(item["issue_document_count"]) / max_scanned * 100, 1)}%">'
+                f'<span class="cause-bar-label">{_esc(item["client"])}</span>'
+                f'<span class="cause-bar-track">'
+                f'<span class="cause-bar-fill scanned"></span>'
+                f'<span class="cause-bar-fill issue"></span>'
+                f"</span>"
+                f'<span class="cause-bar-value">'
+                f'{int(item["issue_document_count"])} issue / '
+                f'{int(item["scanned_document_count"])} scanned'
+                f"</span></div>"
+            )
+            for item in summary
+        )
+    else:
+        bars = "<p><em>No documents scanned.</em></p>"
+
+    chart = (
+        f'<div class="cause-chart"><h3>{_esc(title)} chart</h3>'
+        '<p class="cause-chart-note">Amber = issue documents; teal track fill = scanned scale. '
+        "Issue document = any file with a cross-query DOI inconsistency.</p>"
+        f"{bars}</div>"
+    )
+
+    table_rows = "".join(
+        f'<tr><td>{_esc(item["client"])}</td>'
+        f'<td>{int(item["scanned_document_count"])}</td>'
+        f'<td>{int(item["issue_document_count"])}</td></tr>'
+        for item in summary
+    ) or "<tr><td colspan='3'><em>No clients.</em></td></tr>"
+
+    table = (
+        '<table class="client-summary-table"><thead><tr>'
+        "<th>Client</th><th>Scanned document count</th><th>Issue document count</th>"
+        f"</tr></thead><tbody>{table_rows}</tbody></table>"
+    )
+
+    details = _client_details_html(patterns or [])
 
     return (
         f'<section class="client-summary-panel" aria-label="{_esc(title)}">'
         f"<h2>{_esc(title)}</h2>"
-        f"{_client_summary_blurb_html()}"
-        f"{kpi}{table}{chart}{details}</section>"
-    )
-
-
-def _client_summary_css() -> str:
-    """CSS shared by standalone client_summary HTML and embedded panels."""
-    return (
-        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
+        '<p class="inconsistency-note">Shareable overview for production / XML teams: '
+        "scanned documents vs documents with DOI cross-query inconsistencies.</p>"
+        f"{kpi}{chart}{table}{details}</section>"
     )
 
 
@@ -1007,72 +834,64 @@ def write_client_summary(
     *,
     basename: str = "client_summary",
 ) -> tuple[Path, Path]:
-    """Write shareable client-wise area-% summary HTML + hybrid client/pattern CSV."""
+    """Write shareable client-wise summary HTML (KPI + Kind-v1 details) + detail CSV."""
     ensure_dir(report_dir)
     summary = compute_client_summary(rows)
     patterns = find_kind_v1_patterns(rows)
     html_path = report_dir / f"{basename}.html"
     csv_path = report_dir / f"{basename}.csv"
-
-    by_client: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for pat in patterns:
-        by_client[str(pat.get("client") or "unknown")].append(pat)
-
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(CLIENT_SUMMARY_HEADERS)
-        for item in summary:
-            client = str(item["client"])
+        for pat in patterns:
             writer.writerow(
                 [
-                    "client",
-                    client,
-                    int(item["scanned_document_count"]),
-                    *[item["areas"][label]["display"] for label, _ in CLIENT_SUMMARY_AREA_KEYS],
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
+                    pat["client"],
+                    pat["file_id"],
+                    pat["docid"],
+                    pat["pattern_num"],
+                    pat["kind"],
+                    pat["doi"],
+                    pat["tag_l"],
+                    pat["attr_l"],
+                    pat["tag_r"],
+                    pat["attr_r"],
+                    ";".join(pat.get("sections") or []),
                 ]
             )
-            pats = sorted(
-                by_client.get(client, []),
-                key=lambda p: (
-                    str(p.get("file_id") or p.get("docid") or "").lower(),
-                    str(p.get("docid") or "").lower(),
-                    int(p.get("pattern_num") or 0),
-                ),
-            )
-            for pat in pats:
-                writer.writerow(
-                    [
-                        "pattern",
-                        client,
-                        "",
-                        *[_area_mark(pat.get("sections"), label) for label, _ in CLIENT_SUMMARY_AREA_KEYS],
-                        pat["pattern_num"],
-                        pat["kind"],
-                        pat["doi"],
-                        pat["tag_l"],
-                        pat["attr_l"],
-                        pat["tag_r"],
-                        pat["attr_r"],
-                        pat["file_id"],
-                        pat["docid"],
-                        ";".join(pat.get("sections") or []),
-                    ]
-                )
-
     css = (
         "body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
-        "h1,h2,h3{color:#a5b4fc}.meta,.inconsistency-note{color:#94a3b8}"
-        + _client_summary_css()
+        "h1,h2,h3{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}"
+        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;max-width:1100px}"
+        ".client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}"
+        ".kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;"
+        "border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}"
+        ".kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}"
+        ".kpi-l{font-size:12px;color:#94a3b8}"
+        ".cause-chart{margin:0 0 20px}.cause-bar{display:grid;"
+        "grid-template-columns:minmax(120px,180px) 1fr auto;align-items:center;gap:10px;margin:8px 0}"
+        ".cause-bar-label{font-size:13px;font-weight:600}"
+        ".cause-bar-track{height:18px;background:#334155;position:relative;overflow:hidden;border-radius:6px}"
+        ".cause-bar-fill{display:block;height:100%;position:absolute;left:0;top:0;border-radius:6px}"
+        ".cause-bar-fill.scanned{width:var(--pct-scanned);background:#0ea5e9;opacity:.35}"
+        ".cause-bar-fill.issue{width:var(--pct-issue);background:#f59e0b}"
+        ".cause-bar-value{font-size:12px;color:#94a3b8;white-space:nowrap}"
+        "table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a}"
+        "th,td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left}"
+        "th{color:#94a3b8;font-weight:600}"
+        ".client-summary-details{margin-top:22px}"
+        "details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;"
+        "border-radius:8px;margin:10px 0;padding:8px 12px}"
+        "details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}"
+        "details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}"
+        ".pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}"
+        ".pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}"
+        ".pattern-doi{margin:6px 0;font-size:13px}"
+        ".pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}"
+        ".side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}"
+        ".side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}"
+        ".pattern-sections{font-size:12px;color:#94a3b8}"
+        "code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
     )
     page = "\n".join(
         [
@@ -1088,6 +907,7 @@ def write_client_summary(
     )
     html_path.write_text(page, encoding="utf-8")
     return html_path, csv_path
+
 
 
 UNIQUE_FINDINGS_HEADERS = [
@@ -1486,7 +1306,6 @@ def _inconsistency_section_html(
                     "client": client,
                     "scanned_document_count": len(docs),
                     "issue_document_count": len(docs),
-                    "areas": _empty_areas(),
                 }
                 for client, docs in sorted(
                     issue_docs.items(), key=lambda kv: (-len(kv[1]), kv[0].lower())
@@ -1557,7 +1376,7 @@ def write_inconsistency_report(
         "<!DOCTYPE html>", '<html lang="en"><head><meta charset="utf-8"/>',
         f"<title>Sectional Report Inconsistency Report v{REPORT_VERSION}</title>",
         "<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
-        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}</style></head><body>",
+        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.cause-chart{margin:0 0 20px}.cause-bar{display:grid;grid-template-columns:minmax(120px,180px) 1fr auto;align-items:center;gap:10px;margin:8px 0}.cause-bar-label{font-size:13px;font-weight:600}.cause-bar-track{height:18px;background:#334155;position:relative;overflow:hidden;border-radius:6px}.cause-bar-fill{display:block;height:100%;position:absolute;left:0;top:0;border-radius:6px}.cause-bar-fill.scanned{width:var(--pct-scanned);background:#0ea5e9;opacity:.35}.cause-bar-fill.issue{width:var(--pct-issue);background:#f59e0b}.cause-bar-value{font-size:12px;color:#94a3b8;white-space:nowrap}.client-bar{display:flex;gap:10px;align-items:center;margin:6px 0}.client-bar-label{width:160px}.client-bar-track{background:#334155;display:inline-block;flex:1;height:12px;border-radius:8px}.client-bar-fill{background:#f59e0b;display:block;height:100%;border-radius:8px}table{width:100%;border-collapse:collapse;font-size:13px;background:#1e293b}th,td{border-bottom:1px solid #334155;padding:6px 8px;text-align:left;vertical-align:top}small{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}</style></head><body>",
         f"<h1>Sectional Report Inconsistency Report</h1><div class=\"meta\">REPORT_VERSION={REPORT_VERSION}</div>",
         _inconsistency_section_html(issues, rows=rows),
         "</body></html>",
