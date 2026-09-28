@@ -19,7 +19,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 15
+REPORT_VERSION = 14
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -544,24 +544,19 @@ CLIENT_SUMMARY_HEADERS = [
     "OTHER",
     "Pattern#",
     "Kind",
-    "Skeleton",
-    "SampleDOI",
-    "Count",
+    "DOI",
     "Tag_L",
     "Attr_L",
     "Tag_R",
     "Attr_R",
-    "Example file-id",
+    "File_id",
+    "Docid",
     "Sections",
 ]
 
-KIND_V1 = "extlink_doi\u2194uri"
+KIND_V1 = "extlink_doi↔uri"
 KIND_V1_LEFT = "extlink_doi"
 KIND_V1_RIGHT = "uri"
-
-_ATTR_TOKEN_RE = re.compile(
-    r"""([^\s=]+)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s]+)"""
-)
 
 
 def _doc_identity(row_or_issue: dict[str, Any]) -> tuple[str, str, str]:
@@ -587,208 +582,86 @@ def _pick_side_hit(hits: list[dict[str, Any]]) -> dict[str, Any]:
     return hits[0]
 
 
-def _attr_names_only(attrs: str) -> str:
-    """Keep attribute *names* only (strip DOI/href/text values). Sorted unique."""
-    names: list[str] = []
-    seen: set[str] = set()
-    for match in _ATTR_TOKEN_RE.finditer(str(attrs or "")):
-        name = match.group(1).strip()
-        if "}" in name:
-            name = name.split("}", 1)[-1]
-        if ":" in name:
-            local = name.split(":", 1)[-1]
-            name = local if local else name
-        low = name.lower()
-        if not name or low in seen:
-            continue
-        seen.add(low)
-        names.append(name)
-    names.sort(key=lambda n: n.lower())
-    return ",".join(names)
-
-
-def _hit_tag(hit: dict[str, Any], query_key: str) -> str:
-    tag = str(hit.get("tag") or "").strip()
-    if tag:
-        return tag
-    if query_key == KIND_V1_LEFT:
-        return "ext-link"
-    if query_key == KIND_V1_RIGHT:
-        return "uri"
-    return ""
-
-
-def _hit_skeleton(hit: dict[str, Any], query_key: str) -> str:
-    """XML skeleton for one hit: tag + attr names (values stripped)."""
-    tag = _hit_tag(hit, query_key)
-    names = _attr_names_only(str(hit.get("attrs") or ""))
-    name_map: dict[str, str] = {}
-    if names:
-        for part in names.split(","):
-            part = part.strip()
-            if part:
-                name_map[part.lower()] = part
-    if not name_map:
-        type_attr, _type_value = QUERY_TYPE_META.get(query_key, ("", ""))
-        if type_attr:
-            name_map[type_attr.lower()] = type_attr
-    if str(hit.get("href") or "").strip():
-        name_map.setdefault("href", "href")
-    if name_map:
-        ordered = ",".join(name_map[k] for k in sorted(name_map))
-        return f"{tag}[{ordered}]"
-    return tag or "-"
-
-
-def _side_skeleton(hits: list[dict[str, Any]], query_key: str) -> tuple[str, str, str]:
-    """Unique skeletons on one side -> display tag, attr-names, skeleton string."""
-    skels: list[str] = []
-    seen: set[str] = set()
-    for hit in hits:
-        sk = _hit_skeleton(hit, query_key)
-        if sk not in seen:
-            seen.add(sk)
-            skels.append(sk)
-    skels.sort(key=lambda s: s.lower())
-    skeleton = " | ".join(skels) if skels else (
-        "ext-link" if query_key == KIND_V1_LEFT else "uri"
-    )
-    first = skels[0] if skels else skeleton
-    if "[" in first and first.endswith("]"):
-        tag, rest = first.split("[", 1)
-        attr_names = rest[:-1]
-    else:
-        tag, attr_names = first, ""
-    return tag, attr_names, skeleton
-
-
-def _area_pattern_skeleton(
-    left_hits: list[dict[str, Any]], right_hits: list[dict[str, Any]]
-) -> dict[str, str]:
-    """Combined L/R skeleton for one area (structure presence)."""
-    tag_l, attr_l, skel_l = _side_skeleton(left_hits, KIND_V1_LEFT)
-    tag_r, attr_r, skel_r = _side_skeleton(right_hits, KIND_V1_RIGHT)
-    arrow = "\u2194"
-    return {
-        "tag_l": tag_l,
-        "attr_l": attr_l,
-        "tag_r": tag_r,
-        "attr_r": attr_r,
-        "skeleton": f"{skel_l} {arrow} {skel_r}",
-        "skel_l": skel_l,
-        "skel_r": skel_r,
-    }
-
-
-def _sample_doi_from_hits(*hit_groups: list[dict[str, Any]]) -> str:
-    """Optional single sample DOI from any hits (first stable token)."""
-    found: list[str] = []
-    for hits in hit_groups:
-        for hit in hits:
-            for doi in sorted(_doi_tokens_from_hit(hit)):
-                if doi not in found:
-                    found.append(doi)
-    return found[0] if found else ""
-
-
 def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Kind v1 (v15): same-area structure presence of extlink_doi AND uri.
+    """Kind v1: same normalized DOI in both extlink_doi and uri buckets per file.
 
-    Never cross-area. Unique by XML skeleton (tag + attr names; values stripped).
-    Returns aggregated patterns per (client, area, skeleton) with counts and
-    optional sample DOI. Pattern# is assigned per client (skeleton-per-area).
+    Returns pattern dicts sorted by client, file_id/docid, DOI. Pattern# is
+    assigned per (client, file_id, docid) starting at 1.
     """
-    occ_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    raw: list[dict[str, Any]] = []
     for row in rows:
+        by_doi: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
         per = row.get("per_section") or {}
-        client = str(row.get("client") or "unknown")
         for section in SECTIONS:
-            bucket = per.get(section) or {}
-            left_hits = list((bucket.get(KIND_V1_LEFT) or {}).get("hits") or [])
-            right_hits = list((bucket.get(KIND_V1_RIGHT) or {}).get("hits") or [])
-            if not left_hits or not right_hits:
+            for query_key in (KIND_V1_LEFT, KIND_V1_RIGHT):
+                bucket = (per.get(section) or {}).get(query_key) or {}
+                for hit in bucket.get("hits") or []:
+                    for doi in _doi_tokens_from_hit(hit):
+                        sample = {
+                            "section": section,
+                            "query": query_key,
+                            "tag": str(hit.get("tag") or ""),
+                            "text": str(hit.get("text") or ""),
+                            "href": str(hit.get("href") or ""),
+                            "attrs": _hit_attrs_display(hit, query_key),
+                            "doi_org_in_href": bool(hit.get("doi_org_in_href")),
+                            "doi_org_in_text": bool(hit.get("doi_org_in_text")),
+                        }
+                        by_doi[doi][query_key].append(sample)
+        for doi, sides in by_doi.items():
+            if KIND_V1_LEFT not in sides or KIND_V1_RIGHT not in sides:
                 continue
-            meta = _area_pattern_skeleton(left_hits, right_hits)
-            sample_doi = _sample_doi_from_hits(left_hits, right_hits)
-            left = _pick_side_hit(left_hits)
-            right = _pick_side_hit(right_hits)
-            key = (client, section, meta["skeleton"])
-            entry = occ_by_key.get(key)
-            ident = _doc_identity(row)
-            file_label = (
-                str(row.get("file_id") or "").strip()
-                or str(row.get("docid") or "").strip()
-                or "-"
+            left = _pick_side_hit(sides[KIND_V1_LEFT])
+            right = _pick_side_hit(sides[KIND_V1_RIGHT])
+            sections = sorted(
+                {
+                    str(h.get("section") or "")
+                    for h in (sides[KIND_V1_LEFT] + sides[KIND_V1_RIGHT])
+                    if h.get("section")
+                }
             )
-            if entry is None:
-                occ_by_key[key] = {
-                    "client": client,
+            raw.append(
+                {
+                    "client": row.get("client") or "unknown",
                     "file_id": row.get("file_id") or "",
                     "docid": row.get("docid") or "",
                     "xml_path": row.get("xml_path") or "",
                     "kind": KIND_V1,
-                    "doi": sample_doi,
-                    "skeleton": meta["skeleton"],
-                    "tag_l": meta["tag_l"],
-                    "attr_l": meta["attr_l"],
+                    "doi": doi,
+                    "tag_l": left.get("tag") or "ext-link",
+                    "attr_l": left.get("attrs") or "",
                     "sample_l": left.get("text") or left.get("href") or "",
-                    "tag_r": meta["tag_r"],
-                    "attr_r": meta["attr_r"],
+                    "tag_r": right.get("tag") or "uri",
+                    "attr_r": right.get("attrs") or "",
                     "sample_r": right.get("text") or right.get("href") or "",
-                    "sections": [section],
-                    "area": section,
-                    "count": 1,
-                    "docs": {ident},
-                    "example_file_ids": [file_label],
-                    "_file_seen": {file_label},
+                    "sections": sections,
                 }
-            else:
-                entry["docs"].add(ident)
-                entry["count"] = len(entry["docs"])
-                if not entry["doi"] and sample_doi:
-                    entry["doi"] = sample_doi
-                if file_label not in entry["_file_seen"]:
-                    entry["_file_seen"].add(file_label)
-                    entry["example_file_ids"].append(file_label)
+            )
 
-    raw = list(occ_by_key.values())
     raw.sort(
         key=lambda p: (
             str(p["client"]).lower(),
-            str((p.get("sections") or ["Z"])[0]),
-            str(p.get("skeleton") or "").lower(),
+            str(p["file_id"] or p["docid"]).lower(),
+            str(p["docid"]).lower(),
+            p["doi"],
         )
     )
-    counters: dict[str, int] = defaultdict(int)
+    # Number patterns per file identity
+    counters: dict[tuple[str, str, str], int] = defaultdict(int)
     patterns: list[dict[str, Any]] = []
     for item in raw:
-        client = str(item["client"])
-        counters[client] += 1
-        patterns.append(
-            {
-                "client": item["client"],
-                "file_id": item["file_id"],
-                "docid": item["docid"],
-                "xml_path": item["xml_path"],
-                "kind": item["kind"],
-                "doi": item.get("doi") or "",
-                "skeleton": item["skeleton"],
-                "tag_l": item["tag_l"],
-                "attr_l": item["attr_l"],
-                "sample_l": item.get("sample_l") or "",
-                "tag_r": item["tag_r"],
-                "attr_r": item["attr_r"],
-                "sample_r": item.get("sample_r") or "",
-                "sections": list(item.get("sections") or []),
-                "area": item.get("area") or ((item.get("sections") or [""])[0]),
-                "count": int(item.get("count") or len(item.get("docs") or [])),
-                "example_file_id": (item.get("example_file_ids") or ["-"])[0],
-                "example_file_ids": list(item.get("example_file_ids") or []),
-                "pattern_num": counters[client],
-            }
+        key = (
+            str(item["client"]),
+            str(item["file_id"]),
+            str(item["docid"]),
         )
+        counters[key] += 1
+        numbered = dict(item)
+        numbered["pattern_num"] = counters[key]
+        patterns.append(numbered)
     return patterns
-
 
 
 def _format_area_cell(issue_count: int, scanned: int) -> str:
@@ -872,22 +745,13 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _pattern_block_html(pat: dict[str, Any]) -> str:
-    """One numbered Kind-v1 pattern card (skeleton + optional sample DOI)."""
+    """One numbered Kind-v1 pattern card (no View HTML/XML columns)."""
     sections = ", ".join(pat.get("sections") or [])
-    sample_doi = str(pat.get("doi") or "").strip()
-    doi_html = (
-        f'<div class="pattern-doi">Sample DOI: <code>{_esc(sample_doi)}</code></div>'
-        if sample_doi
-        else '<div class="pattern-doi">Sample DOI: <em>none</em></div>'
-    )
-    count = int(pat.get("count") or 1)
     return (
         f'<div class="pattern-block">'
         f'<div class="pattern-h"><b>pattern-{int(pat["pattern_num"])}</b>'
-        f' <span class="kind">{_esc(pat.get("kind") or KIND_V1)}</span>'
-        f' <span class="pattern-meta">count={count}</span></div>'
-        f'<div class="pattern-doi">Skeleton: <code>{_esc(pat.get("skeleton") or _pattern_signature(pat))}</code></div>'
-        f"{doi_html}"
+        f' <span class="kind">{_esc(pat.get("kind") or KIND_V1)}</span></div>'
+        f'<div class="pattern-doi">DOI: <code>{_esc(pat.get("doi") or "")}</code></div>'
         f'<div class="pattern-sides">'
         f'<div class="side left"><div class="side-label">Left ({_esc(KIND_V1_LEFT)})</div>'
         f'<div><code>{_esc(pat.get("tag_l") or "")}</code>'
@@ -898,7 +762,7 @@ def _pattern_block_html(pat: dict[str, Any]) -> str:
         f' <span class="attrs">{_esc(pat.get("attr_r") or "")}</span></div>'
         f'<div class="sample">{_esc(pat.get("sample_r") or "")}</div></div>'
         f"</div>"
-        f'<div class="pattern-sections">Area: {_esc(sections or "—")}</div>'
+        f'<div class="pattern-sections">Sections: {_esc(sections or "—")}</div>'
         f"</div>"
     )
 
@@ -910,7 +774,7 @@ def _client_details_html(patterns: list[dict[str, Any]]) -> str:
             '<section class="client-summary-details" aria-label="Pattern details">'
             "<h2>Details</h2>"
             f"<p class=\"inconsistency-note\">No {KIND_V1} patterns "
-            "(same-area structure presence of both buckets).</p></section>"
+            "(same normalized DOI in both buckets).</p></section>"
         )
 
     by_client: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -953,10 +817,9 @@ def _client_details_html(patterns: list[dict[str, Any]]) -> str:
     return (
         '<section class="client-summary-details" aria-label="Pattern details">'
         "<h2>Details</h2>"
-        f'<p class="inconsistency-note">Kind v1 ({_esc(KIND_V1)}): same-area structure '
-        "presence of both <code>extlink_doi</code> and <code>uri</code> "
-        "(never cross-area). Unique by XML skeleton (tag+attr names). "
-        "pattern-N = skeleton per area; counts + optional sample DOI.</p>"
+        f'<p class="inconsistency-note">Kind v1 ({_esc(KIND_V1)}): same normalized '
+        "DOI present in both <code>extlink_doi</code> and <code>uri</code> buckets. "
+        "Patterns numbered per file-id / docid.</p>"
         f'{"".join(client_blocks)}</section>'
     )
 
@@ -981,14 +844,13 @@ def _area_mark(sections: list[str] | None, label: str) -> str:
 def _client_summary_blurb_html() -> str:
     return (
         '<p class="client-summary-blurb inconsistency-note">'
-        "Per client (all clients listed): <b>Scan docs</b> = files scanned. Area cells "
-        "show the share of scanned docs that have a Kind-v1 (<code>extlink_doi\u2194uri</code>) "
-        "<b>same-area</b> structure-presence issue, formatted as "
-        "<code>10% (25 documents)</code> = issue docs in area \u00f7 scan docs. "
-        "<b>FN_GROUP</b> = footnotes; <b>APP_GROUP</b> = appendix. Never cross-area. "
-        "Under each client, <b>pattern-1..N</b> = unique XML skeleton per area "
-        "(tag+attr names; values stripped) with counts + optional sample DOI; \u25cf marks "
-        "the area. Chart: grouped bars of area % per client."
+        "Per client: <b>Scan docs</b> = files scanned. Area cells show the share of "
+        "scanned docs that have a Kind-v1 (<code>extlink_doi↔uri</code>) issue in that "
+        "area, formatted as <code>10% (25 documents)</code> = issue docs in area ÷ scan "
+        "docs. <b>FN_GROUP</b> = footnotes (<code>fn-group</code>); <b>APP_GROUP</b> = "
+        "appendix. A document may count in multiple areas (rates can sum over 100%). "
+        "Under each client, <b>pattern-1..N</b> rows mark the areas that pattern touches "
+        "(●). Chart: grouped bars of area % per client."
         "</p>"
     )
 
@@ -1062,29 +924,26 @@ def _client_summary_table_html(
         pats = sorted(
             by_client.get(client, []),
             key=lambda p: (
+                str(p.get("file_id") or p.get("docid") or "").lower(),
+                str(p.get("docid") or "").lower(),
                 int(p.get("pattern_num") or 0),
-                str((p.get("sections") or [""])[0]),
-                str(p.get("skeleton") or "").lower(),
             ),
         )
         for pat in pats:
+            id_label = _combined_id_text(
+                str(pat.get("file_id") or ""), str(pat.get("docid") or "")
+            ).replace("\n", " / ")
             marks = "".join(
                 f'<td class="area-mark">{_esc(_area_mark(pat.get("sections"), label))}</td>'
                 for label, _ in CLIENT_SUMMARY_AREA_KEYS
             )
-            count = int(pat.get("count") or 1)
-            skel = str(pat.get("skeleton") or _pattern_signature(pat))
-            sample = str(pat.get("doi") or "").strip()
-            meta_bits = [f"n={count}", skel]
-            if sample:
-                meta_bits.append(sample)
             body_rows.append(
                 f'<tr class="pattern-row" data-client="{_esc(client)}">'
                 f'<td class="pattern-label">pattern-{int(pat["pattern_num"])}'
-                f' <span class="pattern-meta">{_esc(" · ".join(meta_bits))}</span></td>'
+                f' <span class="pattern-meta">{_esc(id_label)} · '
+                f'{_esc(pat.get("doi") or "")}</span></td>'
                 f"<td></td>{marks}</tr>"
             )
-
 
     if not body_rows:
         body_rows.append(
@@ -1180,15 +1039,14 @@ def write_client_summary(
                     "",
                     "",
                     "",
-                    "",
                 ]
             )
             pats = sorted(
                 by_client.get(client, []),
                 key=lambda p: (
+                    str(p.get("file_id") or p.get("docid") or "").lower(),
+                    str(p.get("docid") or "").lower(),
                     int(p.get("pattern_num") or 0),
-                    str((p.get("sections") or [""])[0]),
-                    str(p.get("skeleton") or "").lower(),
                 ),
             )
             for pat in pats:
@@ -1200,18 +1058,16 @@ def write_client_summary(
                         *[_area_mark(pat.get("sections"), label) for label, _ in CLIENT_SUMMARY_AREA_KEYS],
                         pat["pattern_num"],
                         pat["kind"],
-                        pat.get("skeleton") or _pattern_signature(pat),
-                        pat.get("doi") or "",
-                        int(pat.get("count") or 1),
+                        pat["doi"],
                         pat["tag_l"],
                         pat["attr_l"],
                         pat["tag_r"],
                         pat["attr_r"],
-                        pat.get("example_file_id") or pat.get("file_id") or "",
+                        pat["file_id"],
+                        pat["docid"],
                         ";".join(pat.get("sections") or []),
                     ]
                 )
-
 
     css = (
         "body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
@@ -1237,9 +1093,8 @@ def write_client_summary(
 UNIQUE_FINDINGS_HEADERS = [
     "#",
     "Kind",
-    "Area",
-    "Skeleton",
-    "Sample DOI",
+    "Pattern (tag/attrs)",
+    "DOI/sample",
     "Clients",
     "Issue docs",
     "Example file-id(s)",
@@ -1258,20 +1113,15 @@ def _strip_href_from_attrs(attrs: str) -> str:
 
 
 def _pattern_signature(pat: dict[str, Any]) -> str:
-    """XML skeleton signature: tag + attr names only (values already stripped)."""
-    stored = str(pat.get("skeleton") or "").strip()
-    if stored:
-        return stored
-    raw_l = str(pat.get("attr_l") or "")
-    raw_r = str(pat.get("attr_r") or "")
-    left_attrs = raw_l if raw_l and "=" not in raw_l else _attr_names_only(raw_l)
-    right_attrs = raw_r if raw_r and "=" not in raw_r else _attr_names_only(raw_r)
+    """Left/right tag+attr signature (href stripped) for display and fallback key."""
+    left_attrs = _strip_href_from_attrs(str(pat.get("attr_l") or ""))
+    right_attrs = _strip_href_from_attrs(str(pat.get("attr_r") or ""))
     left = str(pat.get("tag_l") or "").strip()
     right = str(pat.get("tag_r") or "").strip()
     if left_attrs:
-        left = f"{left}[{left_attrs}]" if left else f"[{left_attrs}]"
+        left = f"{left} [{left_attrs}]" if left else f"[{left_attrs}]"
     if right_attrs:
-        right = f"{right}[{right_attrs}]" if right else f"[{right_attrs}]"
+        right = f"{right} [{right_attrs}]" if right else f"[{right_attrs}]"
     arrow = "\u2194"
     if left and right:
         return f"{left} {arrow} {right}"
@@ -1279,13 +1129,12 @@ def _pattern_signature(pat: dict[str, Any]) -> str:
 
 
 def _unique_finding_key(pat: dict[str, Any]) -> tuple[str, ...]:
-    """Unique key = kind + area + XML skeleton (sample DOI optional, not keyed)."""
+    """Unique key = kind + normalized DOI; fallback kind + L/R tag+attr signature."""
     kind = str(pat.get("kind") or KIND_V1)
-    area = str(pat.get("area") or "")
-    if not area:
-        secs = pat.get("sections") or []
-        area = str(secs[0]) if secs else ""
-    return ("skel", kind, area, _pattern_signature(pat))
+    doi = str(pat.get("doi") or "").strip().lower().rstrip("/")
+    if doi:
+        return ("doi", kind, doi)
+    return ("sig", kind, _pattern_signature(pat))
 
 
 def _file_id_label(pat: dict[str, Any]) -> str:
@@ -1293,31 +1142,24 @@ def _file_id_label(pat: dict[str, Any]) -> str:
     fid = str(pat.get("file_id") or "").strip()
     if fid:
         return fid
-    ex = str(pat.get("example_file_id") or "").strip()
-    if ex:
-        return ex
     return str(pat.get("docid") or "").strip() or "-"
 
 
 def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Collapse Kind-v1 patterns into mail-sized unique findings.
 
-    Unique key = kind + area + XML skeleton (tag+attr names; values stripped).
-    Counts + optional 1 sample DOI; file-ids collapsed to count + 1-2 examples.
+    Unique key = kind + normalized DOI (fallback kind + L/R tag+attr signature).
+    File-ids collapsed to count + 1-2 examples; full per-file detail stays in
+    client_summary / inconsistency reports on disk.
     """
     patterns = find_kind_v1_patterns(rows)
     buckets: dict[tuple[str, ...], dict[str, Any]] = {}
     for pat in patterns:
         key = _unique_finding_key(pat)
         entry = buckets.get(key)
-        area = str(pat.get("area") or "")
-        if not area:
-            secs = pat.get("sections") or []
-            area = str(secs[0]) if secs else ""
         if entry is None:
             entry = {
                 "kind": str(pat.get("kind") or KIND_V1),
-                "area": area,
                 "doi": str(pat.get("doi") or "").strip(),
                 "pattern": _pattern_signature(pat),
                 "sample": (
@@ -1325,23 +1167,20 @@ def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     or str(pat.get("sample_r") or "").strip()
                 ),
                 "clients": set(),
+                "docs": set(),
                 "file_ids": [],
                 "_file_id_seen": set(),
-                "count_sum": 0,
             }
             buckets[key] = entry
         client = str(pat.get("client") or "unknown")
         entry["clients"].add(client)
-        entry["count_sum"] += int(pat.get("count") or 1)
-        for fid in pat.get("example_file_ids") or []:
-            label = str(fid or "").strip()
-            if label and label not in entry["_file_id_seen"]:
-                entry["_file_id_seen"].add(label)
-                entry["file_ids"].append(label)
-        label = str(pat.get("example_file_id") or _file_id_label(pat) or "").strip()
+        doc_key = _doc_identity(pat)
+        entry["docs"].add(doc_key)
+        label = _file_id_label(pat)
         if label and label not in entry["_file_id_seen"]:
             entry["_file_id_seen"].add(label)
             entry["file_ids"].append(label)
+        # Prefer a richer pattern/sample if current is sparse
         if not entry["pattern"] or entry["pattern"] == "-":
             entry["pattern"] = _pattern_signature(pat)
         if not entry["sample"]:
@@ -1363,16 +1202,15 @@ def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             example_display = ", ".join(examples)
         else:
             example_display = "-"
-        issue_docs = int(entry.get("count_sum") or len(file_ids) or 0)
+        doi_or_sample = entry["doi"] or entry["sample"] or "-"
         findings.append(
             {
                 "kind": entry["kind"],
-                "area": entry.get("area") or "-",
                 "pattern": entry["pattern"],
-                "doi_or_sample": entry["doi"] or "",
+                "doi_or_sample": doi_or_sample,
                 "doi": entry["doi"],
                 "clients": sorted(entry["clients"], key=lambda c: c.lower()),
-                "issue_docs": issue_docs,
+                "issue_docs": len(entry["docs"]),
                 "example_file_ids": example_display,
                 "example_file_id_list": examples,
                 "file_id_count": len(file_ids),
@@ -1383,8 +1221,7 @@ def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         key=lambda f: (
             -int(f["issue_docs"]),
             str(f["kind"]).lower(),
-            str(f.get("area") or "").lower(),
-            str(f["pattern"]).lower(),
+            str(f["doi_or_sample"]).lower(),
         )
     )
     for i, item in enumerate(findings, start=1):
@@ -1425,9 +1262,9 @@ def format_unique_findings_mail_body(
             f"Clients: {len(clients)}"
         ),
         (
-            "Unique key = kind + area + XML skeleton "
-            "(tag+attr names; values stripped). "
-            "Counts + optional sample DOI; file-ids collapsed to 1–2 examples."
+            "Unique key = kind + normalized DOI "
+            "(fallback kind + left/right tag+attr signature). "
+            "File-ids collapsed to count + 1–2 examples; full reports on disk."
         ),
         "",
         "\t".join(UNIQUE_FINDINGS_HEADERS),
@@ -1440,9 +1277,8 @@ def format_unique_findings_mail_body(
                 [
                     str(f["num"]),
                     str(f["kind"]),
-                    str(f.get("area") or "-"),
                     str(f["pattern"]),
-                    str(f.get("doi_or_sample") or ""),
+                    str(f["doi_or_sample"]),
                     ", ".join(f.get("clients") or []),
                     str(f["issue_docs"]),
                     _format_example_file_ids_cell(f),
@@ -1462,9 +1298,8 @@ def _unique_findings_table_html(findings: list[dict[str, Any]]) -> str:
             f"<tr>"
             f"<td>{int(f['num'])}</td>"
             f"<td>{_esc(f['kind'])}</td>"
-            f"<td>{_esc(f.get('area') or '-')}</td>"
             f"<td><code>{_esc(f['pattern'])}</code></td>"
-            f"<td><code>{_esc(f.get('doi_or_sample') or '')}</code></td>"
+            f"<td><code>{_esc(f['doi_or_sample'])}</code></td>"
             f"<td>{_esc(', '.join(f.get('clients') or []))}</td>"
             f"<td>{int(f['issue_docs'])}</td>"
             f"<td>{_esc(_format_example_file_ids_cell(f))}</td>"
@@ -1507,9 +1342,8 @@ def write_unique_findings(
                 [
                     item["num"],
                     item["kind"],
-                    item.get("area") or "-",
                     item["pattern"],
-                    item.get("doi_or_sample") or "",
+                    item["doi_or_sample"],
                     ";".join(item.get("clients") or []),
                     item["issue_docs"],
                     _format_example_file_ids_cell(item),
@@ -1562,9 +1396,9 @@ def write_unique_findings(
             "<h1>Unique Findings Digest</h1>",
             f'<div class="meta">REPORT_VERSION={REPORT_VERSION} · mail-sized · '
             "full client_summary / inconsistency reports stay on disk</div>",
-            '<p class="note">Unique key = kind + area + XML skeleton '
-            "(tag+attr names; values stripped). Same-area only. "
-            "Counts + optional sample DOI; file-ids collapsed to 1–2 examples.</p>",
+            '<p class="note">Unique key = kind + normalized DOI '
+            "(fallback kind + left/right tag+attr signature). "
+            "File-ids collapsed to count + 1–2 examples.</p>",
             kpi,
             _unique_findings_table_html(findings),
             "<h2>Plain-text body (paste into mail)</h2>",
@@ -1577,51 +1411,47 @@ def write_unique_findings(
 
 
 def find_cross_query_inconsistencies(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Same-area Kind-v1 structure presence: extlink_doi AND uri in one area.
-
-    Never cross-area. Optional sample DOI is informational only; uniqueness for
-    summaries uses XML skeleton (see find_kind_v1_patterns).
-    """
+    """Find DOI values that occur in more than one query bucket per file."""
     issues: list[dict[str, Any]] = []
     for row in rows:
+        by_doi: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
         per = row.get("per_section") or {}
         for section in SECTIONS:
-            bucket = per.get(section) or {}
-            left_hits = list((bucket.get(KIND_V1_LEFT) or {}).get("hits") or [])
-            right_hits = list((bucket.get(KIND_V1_RIGHT) or {}).get("hits") or [])
-            if not left_hits or not right_hits:
+            for query_key in QUERY_KEYS:
+                bucket = (per.get(section) or {}).get(query_key) or {}
+                for hit in bucket.get("hits") or []:
+                    for doi in _doi_tokens_from_hit(hit):
+                        entry = by_doi[doi].setdefault(
+                            query_key,
+                            {"sections": set(), "samples": []},
+                        )
+                        entry["sections"].add(section)
+                        sample = {
+                            "section": section,
+                            "query": query_key,
+                            "text": str(hit.get("text") or ""),
+                            "href": str(hit.get("href") or ""),
+                        }
+                        if sample not in entry["samples"] and len(entry["samples"]) < SAMPLE_LIMIT:
+                            entry["samples"].append(sample)
+        for doi, buckets in by_doi.items():
+            if len(buckets) < 2:
                 continue
-            meta = _area_pattern_skeleton(left_hits, right_hits)
-            sample_doi = _sample_doi_from_hits(left_hits, right_hits)
-            samples: list[dict[str, Any]] = []
-            for hit in left_hits[:SAMPLE_LIMIT]:
-                samples.append(
-                    {
-                        "section": section,
-                        "query": KIND_V1_LEFT,
-                        "text": str(hit.get("text") or ""),
-                        "href": str(hit.get("href") or ""),
-                    }
-                )
-            for hit in right_hits[:SAMPLE_LIMIT]:
-                samples.append(
-                    {
-                        "section": section,
-                        "query": KIND_V1_RIGHT,
-                        "text": str(hit.get("text") or ""),
-                        "href": str(hit.get("href") or ""),
-                    }
-                )
+            queries = sorted(buckets)
+            samples = []
+            sections = set()
+            for query_key in queries:
+                sections.update(buckets[query_key]["sections"])
+                samples.extend(buckets[query_key]["samples"])
             issues.append(
                 {
                     "client": row.get("client") or "unknown",
                     "file_id": row.get("file_id") or "",
                     "docid": row.get("docid") or "",
                     "xml_path": row.get("xml_path") or "",
-                    "doi": sample_doi,
-                    "queries": [KIND_V1_LEFT, KIND_V1_RIGHT],
-                    "sections": [section],
-                    "skeleton": meta["skeleton"],
+                    "doi": doi,
+                    "queries": queries,
+                    "sections": sorted(sections),
                     "samples": samples[: SAMPLE_LIMIT * 2],
                 }
             )
@@ -1630,8 +1460,7 @@ def find_cross_query_inconsistencies(rows: list[dict[str, Any]]) -> list[dict[st
         key=lambda i: (
             str(i["client"]).lower(),
             str(i["file_id"] or i["docid"]).lower(),
-            str((i.get("sections") or [""])[0]),
-            str(i.get("skeleton") or i.get("doi") or ""),
+            i["doi"],
         ),
     )
 
@@ -1639,7 +1468,7 @@ def find_cross_query_inconsistencies(rows: list[dict[str, Any]]) -> list[dict[st
 def _inconsistency_section_html(
     issues: list[dict[str, Any]],
     *,
-    title: str = "Same-area extlink_doi\u2194uri inconsistencies",
+    title: str = "Cross-query DOI inconsistencies",
     rows: list[dict[str, Any]] | None = None,
     summary: list[dict[str, Any]] | None = None,
 ) -> str:

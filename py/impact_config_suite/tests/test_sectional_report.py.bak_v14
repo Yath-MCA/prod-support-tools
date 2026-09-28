@@ -334,7 +334,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(result["per_section"]["OTHER"]["doi_id"]["count"], 0)
 
     def test_report_version_and_html_filters(self):
-        self.assertEqual(sr.REPORT_VERSION, 15)
+        self.assertEqual(sr.REPORT_VERSION, 14)
         xml = self._write("folder/b.xml", SAMPLE_XML)
         # synthetic meta-bearing row via project
         proj = self.tmp / "proj_filters"
@@ -521,7 +521,7 @@ class TestSectionalReport(unittest.TestCase):
 
         html_path = sr.write_html_report([row], self.tmp / "sectional.html")
         page = html_path.read_text(encoding="utf-8")
-        self.assertIn("Same-area extlink_doi", page)
+        self.assertIn("Cross-query DOI inconsistencies", page)
         self.assertIn("ClientA", page)
         self.assertIn("HTML Preview", page)
         self.assertIn("Raw XML", page)
@@ -582,14 +582,13 @@ class TestSectionalReport(unittest.TestCase):
                 "OTHER",
                 "Pattern#",
                 "Kind",
-                "Skeleton",
-                "SampleDOI",
-                "Count",
+                "DOI",
                 "Tag_L",
                 "Attr_L",
                 "Tag_R",
                 "Attr_R",
-                "Example file-id",
+                "File_id",
+                "Docid",
                 "Sections",
             ],
         )
@@ -606,10 +605,6 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(patterns[0]["tag_l"], "ext-link")
         self.assertEqual(patterns[0]["tag_r"], "uri")
         self.assertIn("BODY", patterns[0]["sections"])
-        self.assertEqual(patterns[0]["area"], "BODY")
-        self.assertEqual(patterns[0]["count"], 1)
-        self.assertIn("ext-link", patterns[0]["skeleton"])
-        self.assertIn("uri", patterns[0]["skeleton"])
 
         cs_html, cs_csv = sr.write_client_summary([row, clean], self.tmp / "reports")
         self.assertTrue(cs_html.is_file())
@@ -634,8 +629,7 @@ class TestSectionalReport(unittest.TestCase):
         csv_text = cs_csv.read_text(encoding="utf-8")
         self.assertIn(
             "RowType,Client,Scan docs,FRONT,BODY,REF,FN_GROUP,APP_GROUP,OTHER,"
-            "Pattern#,Kind,Skeleton,SampleDOI,Count,Tag_L,Attr_L,Tag_R,Attr_R,"
-            "Example file-id,Sections",
+            "Pattern#,Kind,DOI,Tag_L,Attr_L,Tag_R,Attr_R,File_id,Docid,Sections",
             csv_text,
         )
         self.assertIn("client,ClientA,1,", csv_text)
@@ -644,8 +638,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertIn(doi, csv_text)
         self.assertIn("ext-link", csv_text)
         self.assertIn(",uri,", csv_text)
-        self.assertIn(",F1,", csv_text)
-        self.assertIn("BODY", csv_text)
+        self.assertIn(",F1,D1,", csv_text)
 
         # Main sectional HTML also embeds the shareable summary panel
         self.assertIn("Client-wise summary", page)
@@ -697,16 +690,13 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0]["num"], 1)
         self.assertEqual(findings[0]["kind"], sr.KIND_V1)
-        self.assertEqual(findings[0]["area"], "BODY")
         self.assertEqual(findings[0]["doi"], doi)
         self.assertEqual(findings[0]["doi_or_sample"], doi)
         self.assertEqual(findings[0]["issue_docs"], 2)
         self.assertEqual(findings[0]["clients"], ["ClientA"])
-        self.assertGreaterEqual(findings[0]["file_id_count"], 1)
-        self.assertTrue(
-            "F1" in findings[0]["example_file_ids"]
-            or "F9" in findings[0]["example_file_ids"]
-        )
+        self.assertEqual(findings[0]["file_id_count"], 2)
+        self.assertIn("F1", findings[0]["example_file_ids"])
+        self.assertIn("F9", findings[0]["example_file_ids"])
         self.assertIn("ext-link", findings[0]["pattern"])
         self.assertIn("uri", findings[0]["pattern"])
 
@@ -723,7 +713,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertIn(sr.KIND_V1, uf_page)
         csv_uf = uf_csv.read_text(encoding="utf-8")
         self.assertIn(
-            "#,Kind,Area,Skeleton,Sample DOI,Clients,Issue docs,Example file-id(s)",
+            "#,Kind,Pattern (tag/attrs),DOI/sample,Clients,Issue docs,Example file-id(s)",
             csv_uf,
         )
         self.assertIn(doi, csv_uf)
@@ -746,8 +736,6 @@ class TestSectionalReport(unittest.TestCase):
         fake = {
             "kind": sr.KIND_V1,
             "doi": "",
-            "area": "BODY",
-            "sections": ["BODY"],
             "tag_l": "ext-link",
             "attr_l": 'ext-link-type="doi" href="https://example/x"',
             "tag_r": "uri",
@@ -760,104 +748,10 @@ class TestSectionalReport(unittest.TestCase):
             "xml_path": "z.xml",
         }
         key = sr._unique_finding_key(fake)
-        self.assertEqual(key[0], "skel")
+        self.assertEqual(key[0], "sig")
         self.assertIn(sr.KIND_V1, key)
-        self.assertIn("BODY", key)
         self.assertNotIn("href=", key[-1])
-        self.assertNotIn("https://example", key[-1])
         self.assertIn("ext-link", key[-1])
-        self.assertIn("href", key[-1])  # attr *name* kept
-
-
-    def test_same_area_only_never_cross_area(self):
-        """extlink_doi in BODY + uri in REF must NOT flag (cross-area)."""
-        per = {
-            section: {query: {"count": 0, "hits": []} for query in sr.QUERY_KEYS}
-            for section in sr.SECTIONS
-        }
-        doi = "10.5281/zenodo.crossarea"
-        per["BODY"]["extlink_doi"] = {
-            "count": 1,
-            "hits": [{
-                "tag": "ext-link",
-                "text": f"https://doi.org/{doi}",
-                "href": f"https://doi.org/{doi}",
-                "attrs": 'ext-link-type="doi" href="https://doi.org/%s"' % doi,
-            }],
-        }
-        per["REF"]["uri"] = {
-            "count": 1,
-            "hits": [{
-                "tag": "uri",
-                "text": f"https://doi.org/{doi}",
-                "href": "",
-                "attrs": "",
-            }],
-        }
-        row = {
-            "client": "ClientX",
-            "file_id": "FX",
-            "docid": "DX",
-            "xml_path": str(self.tmp / "DX.xml"),
-            "per_section": per,
-            "section_counts": {section: 0 for section in sr.SECTIONS},
-            "query_totals": {query: 0 for query in sr.QUERY_KEYS},
-            "error": None,
-        }
-        self.assertEqual(sr.find_cross_query_inconsistencies([row]), [])
-        self.assertEqual(sr.find_kind_v1_patterns([row]), [])
-        findings = sr.compute_unique_findings([row])
-        self.assertEqual(findings, [])
-
-    def test_structure_presence_same_area_different_dois(self):
-        """Same area with both structures flags even when DOI tokens differ."""
-        per = {
-            section: {query: {"count": 0, "hits": []} for query in sr.QUERY_KEYS}
-            for section in sr.SECTIONS
-        }
-        per["BODY"]["extlink_doi"] = {
-            "count": 1,
-            "hits": [{
-                "tag": "ext-link",
-                "text": "https://doi.org/10.1/aaa",
-                "href": "https://doi.org/10.1/aaa",
-                "attrs": 'ext-link-type="doi" href="https://doi.org/10.1/aaa"',
-            }],
-        }
-        per["BODY"]["uri"] = {
-            "count": 1,
-            "hits": [{
-                "tag": "uri",
-                "text": "https://doi.org/10.2/bbb",
-                "href": "",
-                "attrs": "",
-            }],
-        }
-        row = {
-            "client": "ClientY",
-            "file_id": "FY",
-            "docid": "DY",
-            "xml_path": str(self.tmp / "DY.xml"),
-            "per_section": per,
-            "section_counts": {section: 0 for section in sr.SECTIONS},
-            "query_totals": {query: 0 for query in sr.QUERY_KEYS},
-            "error": None,
-        }
-        issues = sr.find_cross_query_inconsistencies([row])
-        self.assertEqual(len(issues), 1)
-        self.assertEqual(issues[0]["sections"], ["BODY"])
-        self.assertEqual(set(issues[0]["queries"]), {"extlink_doi", "uri"})
-        self.assertIn("skeleton", issues[0])
-        pats = sr.find_kind_v1_patterns([row])
-        self.assertEqual(len(pats), 1)
-        self.assertEqual(pats[0]["area"], "BODY")
-        # skeleton must not embed DOI values
-        self.assertNotIn("10.1/aaa", pats[0]["skeleton"])
-        self.assertNotIn("10.2/bbb", pats[0]["skeleton"])
-        self.assertIn("ext-link-type", pats[0]["skeleton"])
-        self.assertIn("href", pats[0]["skeleton"])
-
-
 
 
 if __name__ == "__main__":
