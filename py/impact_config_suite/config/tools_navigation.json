@@ -101,6 +101,10 @@
         {
           "id": "sectional_report",
           "label": "Sectional Report"
+        },
+        {
+          "id": "dtd_report",
+          "label": "DTD Report"
         }
       ]
     },
