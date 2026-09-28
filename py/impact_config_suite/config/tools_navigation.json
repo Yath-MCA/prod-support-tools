@@ -5,60 +5,121 @@
     {
       "name": "Analysis",
       "tools": [
-        { "id": "analyses", "label": "Analyses" },        
-        { "id": "search", "label": "Last Modifyed Documents" }
+        {
+          "id": "analyses",
+          "label": "Analyses"
+        },
+        {
+          "id": "search",
+          "label": "Last Modifyed Documents"
+        }
       ]
     },
-	{
+    {
       "name": "Reports / Pattern",
       "tools": [
-        { "id": "patterns", "label": "Patterns" },
-        { "id": "cjk_integrity", "label": "CJK Integrity" }
+        {
+          "id": "patterns",
+          "label": "Patterns"
+        },
+        {
+          "id": "cjk_integrity",
+          "label": "CJK Integrity"
+        }
       ]
     },
     {
       "name": "Auto Download",
       "tools": [
-        { "id": "data_transfer", "label": "Data Transfer" },
-        { "id": "document_manager", "label": "Document Manager" }
+        {
+          "id": "data_transfer",
+          "label": "Data Transfer"
+        },
+        {
+          "id": "document_manager",
+          "label": "Document Manager"
+        }
       ]
     },
     {
       "name": "Convert HTML/XML",
       "tools": [
-        { "id": "pgm_html_clone_processor", "label": "PGM HTML Clone Processor" },
-        { "id": "impact_to_ceg_pgm", "label": "IMPACT to CEG/PGM" }
+        {
+          "id": "pgm_html_clone_processor",
+          "label": "PGM HTML Clone Processor"
+        },
+        {
+          "id": "impact_to_ceg_pgm",
+          "label": "IMPACT to CEG/PGM"
+        }
       ]
     },
     {
       "name": "HTML/XML Comparison",
       "tools": [
-        { "id": "compare_html", "label": "Compare HTML" },
-        { "id": "compare_replace", "label": "Compare & Replace" },
-        { "id": "compare_xml", "label": "Compare XML" }
+        {
+          "id": "compare_html",
+          "label": "Compare HTML"
+        },
+        {
+          "id": "compare_replace",
+          "label": "Compare & Replace"
+        },
+        {
+          "id": "compare_xml",
+          "label": "Compare XML"
+        }
       ]
     },
     {
       "name": "Extractor Tools",
       "tools": [
-        { "id": "element_extractor", "label": "Element Extractor" },
-        { "id": "contrib_extractor", "label": "Contrib Extract" },
-        { "id": "word_extractor", "label": "Word Extractor" },
-        { "id": "id_pattern_extractor", "label": "ID Pattern Extractor" },
-        { "id": "citation_pattern_extractor", "label": "Citation Pattern Extractor" },
-        { "id": "doi_extractor", "label": "DOI Extractor" }
+        {
+          "id": "element_extractor",
+          "label": "Element Extractor"
+        },
+        {
+          "id": "contrib_extractor",
+          "label": "Contrib Extract"
+        },
+        {
+          "id": "word_extractor",
+          "label": "Word Extractor"
+        },
+        {
+          "id": "id_pattern_extractor",
+          "label": "ID Pattern Extractor"
+        },
+        {
+          "id": "citation_pattern_extractor",
+          "label": "Citation Pattern Extractor"
+        },
+        {
+          "id": "doi_extractor",
+          "label": "DOI Extractor"
+        },
+        {
+          "id": "sectional_report",
+          "label": "Sectional Report"
+        }
       ]
     },
     {
       "name": "Configuration",
       "tools": [
-        { "id": "new_journal_config", "label": "New Journal Config" }
+        {
+          "id": "new_journal_config",
+          "label": "New Journal Config"
+        }
       ]
     },
     {
       "name": "Metadata",
       "tools": [
-        { "id": "metadata_harvester", "label": "Metadata Harvester" }
+        {
+          "id": "metadata_harvester",
+          "label": "Metadata Harvester"
+        }
       ]
     }
   ]

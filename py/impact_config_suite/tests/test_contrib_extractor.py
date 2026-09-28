@@ -122,8 +122,8 @@ class TestStatusOf(unittest.TestCase):
         self.assertIn("older script version", ce.status_note(done, "LWW", "INF", ["a", "b"]))
 
     def test_update_when_version_2_under_v9(self):
-        """SCRIPT_VERSION=9 treats prior version=2/8 (and legacy logic-only) reports as updates."""
-        self.assertEqual(ce.SCRIPT_VERSION, 9)
+        """SCRIPT_VERSION=13 treats prior version=2/8/9/10 (and legacy logic-only) reports as updates."""
+        self.assertEqual(ce.SCRIPT_VERSION, 13)
         done = {
             "JATS": {
                 "LWW": {
@@ -394,6 +394,8 @@ class TestProcessGroupAndMeta(unittest.TestCase):
         self._old_report_root = ce.REPORT_ROOT
         ce.REPORT_ROOT = Path(self._report_td.name) / "Documents" / "impact-support-log"
         Path(ce.REPORT_ROOT).mkdir(parents=True, exist_ok=True)
+        # Avoid reusing a prior test's _SESSION_REPORT_DIR under a deleted temp root
+        ce.reset_session_report_dir()
 
     def tearDown(self):
         ce.REPORT_ROOT = self._old_report_root
@@ -437,8 +439,8 @@ class TestProcessGroupAndMeta(unittest.TestCase):
             )
             self.assertEqual(entry["documents"], 2)
             self.assertEqual(entry["failed"], 0)
-            self.assertEqual(ce.SCRIPT_VERSION, 9)
-            self.assertEqual(entry.get("version"), 9)
+            self.assertEqual(ce.SCRIPT_VERSION, 13)
+            self.assertEqual(entry.get("version"), 13)
             report = Path(entry["report"])
             self.assertTrue(report.is_absolute(), entry["report"])
             self.assertTrue(report.exists(), entry["report"])
@@ -449,15 +451,15 @@ class TestProcessGroupAndMeta(unittest.TestCase):
                 str(report.resolve()).startswith(str(Path(ce.REPORT_ROOT).resolve()))
             )
             self.assertFalse((tmp / "contrib_reports").exists())
-            self.assertIn("_contrib_v9.html", report_norm)
+            self.assertIn("_contrib_v13.html", report_norm)
             html = report.read_text(encoding="utf-8")
             self.assertIn("Script version", html)
-            self.assertIn("v9", html)
+            self.assertIn("v13", html)
             self.assertTrue(entry.get("elements_report"))
             elements = Path(entry["elements_report"])
             self.assertTrue(elements.is_absolute())
             self.assertTrue(elements.exists())
-            self.assertIn("_elements_v9.html", str(elements).replace("\\", "/"))
+            self.assertIn("_elements_v13.html", str(elements).replace("\\", "/"))
             el_html = elements.read_text(encoding="utf-8")
             self.assertNotIn("Default elements not listed", el_html)
             self.assertIn("Elements", el_html)
@@ -466,7 +468,18 @@ class TestProcessGroupAndMeta(unittest.TestCase):
             issues = Path(entry["issues_csv"])
             self.assertTrue(issues.is_absolute())
             self.assertTrue(issues.exists())
-            self.assertIn("_issues_v9.csv", str(issues).replace("\\", "/"))
+            self.assertIn("_issues_v13.csv", str(issues).replace("\\", "/"))
+
+            # v12 aff / author-notes in article-meta
+            self.assertTrue(entry.get("aff_report"))
+            aff = Path(entry["aff_report"])
+            self.assertTrue(aff.is_absolute())
+            self.assertTrue(aff.exists())
+            self.assertIn("_aff_v13.html", str(aff).replace("\\", "/"))
+            self.assertTrue(entry.get("aff_csv"))
+            self.assertTrue(Path(entry["aff_csv"]).exists())
+            self.assertTrue(entry.get("aff_unique_report"))
+            self.assertTrue(Path(entry["aff_unique_report"]).exists())
             # Per-doc outputs stay on project
             self.assertTrue((tmp / "JATS" / "N001" / ce.OUT_XML).exists())
             self.assertTrue((tmp / "JATS" / "N001" / ce.OUT_HTML).exists())
@@ -506,7 +519,7 @@ class TestProcessGroupAndMeta(unittest.TestCase):
             ce.save_done(tmp, done)
             loaded = ce.load_done(tmp)
             self.assertIn("INF", loaded["JATS"]["LWW"])
-            self.assertEqual(loaded["JATS"]["LWW"]["INF"].get("version"), 9)
+            self.assertEqual(loaded["JATS"]["LWW"]["INF"].get("version"), 13)
             st, n = ce.status_of(loaded, "LWW", "INF", ["N001", "N002"])
             self.assertEqual(st, "done")
             self.assertEqual(n, 0)
@@ -726,8 +739,8 @@ class TestGroupsAndCrossGroupV9(unittest.TestCase):
 
 class TestOlderVersionUpdateV9(unittest.TestCase):
     def test_update_when_version_8_under_v9(self):
-        """SCRIPT_VERSION=9 treats prior version=8 reports as updates."""
-        self.assertEqual(ce.SCRIPT_VERSION, 9)
+        """SCRIPT_VERSION=13 treats prior version=8/9/10 reports as updates."""
+        self.assertEqual(ce.SCRIPT_VERSION, 13)
         done = {
             "JATS": {
                 "LWW": {
@@ -796,7 +809,7 @@ class TestReportPathDefaults(unittest.TestCase):
             out = ce.build_elements_report("LWW", "ANE", inv, missing_parent)
             self.assertTrue(out.exists())
             self.assertTrue(missing_parent.is_dir())
-            self.assertIn("_elements_v9.html", out.name)
+            self.assertIn("_elements_v13.html", out.name)
 
 
 
@@ -843,6 +856,98 @@ class TestTabImport(unittest.TestCase):
             self.skipTest("tkinter not installed")
         from tabs.contrib_extractor_tab import ContribExtractorTab
         self.assertTrue(callable(ContribExtractorTab))
+
+
+
+
+class TestPhase0Chain(unittest.TestCase):
+    """Phase 0: comment/PI strip helpers and write_phase0_chain artifacts."""
+
+    SAMPLE = (
+        "<!-- header comment -->\n"
+        "<contrib-group>\n"
+        "  <?pistart xml:space=\",\"?>\n"
+        "  <contrib><!-- inline -->\n"
+        "    <name><surname>Doe</surname></name>\n"
+        "  </contrib>\n"
+        "  <?piend?>\n"
+        "</contrib-group>\n"
+    )
+
+    def test_clean_removes_comments_keeps_pi(self):
+        from core.contrib_phase0 import strip_xml_comments
+
+        clean = strip_xml_comments(self.SAMPLE)
+        self.assertNotIn("<!--", clean)
+        self.assertNotIn("header comment", clean)
+        self.assertNotIn("inline", clean)
+        self.assertIn("<?pistart", clean)
+        self.assertIn("<?piend?>", clean)
+        self.assertIn("<contrib-group>", clean)
+
+    def test_strip_removes_processing_instructions(self):
+        from core.contrib_phase0 import (
+            strip_processing_instructions,
+            strip_xml_comments,
+        )
+
+        clean = strip_xml_comments(self.SAMPLE)
+        stripped = strip_processing_instructions(clean)
+        self.assertNotIn("<?pistart", stripped)
+        self.assertNotIn("<?piend", stripped)
+        self.assertNotIn("<?", stripped)
+        self.assertIn("<contrib-group>", stripped)
+        self.assertIn("<contrib>", stripped)
+
+    def test_strip_preserves_leading_xml_declaration(self):
+        from core.contrib_phase0 import strip_processing_instructions
+
+        frag = '<?xml version="1.0"?><g><?pistart xml:space=","?>x</g>'
+        out = strip_processing_instructions(frag)
+        self.assertTrue(out.startswith("<?xml"), out)
+        self.assertNotIn("pistart", out)
+        self.assertIn("<g>", out)
+        self.assertIn("x</g>", out)
+
+    def test_write_phase0_chain_creates_expected_files(self):
+        from core.contrib_phase0 import (
+            OUT_COMPARE_HTML,
+            OUT_XML_ORIGINAL,
+            OUT_XML_ORIGINAL_CLEAN,
+            OUT_XML_REGEN,
+            OUT_XML_STRIP_PI,
+            write_phase0_chain,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            folder = Path(td)
+            paths = write_phase0_chain(folder, self.SAMPLE)
+            expected = {
+                OUT_XML_ORIGINAL,
+                ce.OUT_XML,
+                OUT_XML_ORIGINAL_CLEAN,
+                OUT_XML_STRIP_PI,
+                OUT_XML_REGEN,
+                OUT_COMPARE_HTML,
+            }
+            names = {p.name for p in folder.iterdir()}
+            self.assertTrue(expected.issubset(names), names)
+            # master + consumer are unchanged raw
+            self.assertEqual((folder / OUT_XML_ORIGINAL).read_text(encoding="utf-8"), self.SAMPLE)
+            self.assertEqual((folder / ce.OUT_XML).read_text(encoding="utf-8"), self.SAMPLE)
+            clean = (folder / OUT_XML_ORIGINAL_CLEAN).read_text(encoding="utf-8")
+            self.assertNotIn("<!--", clean)
+            self.assertIn("<?pistart", clean)
+            strip = (folder / OUT_XML_STRIP_PI).read_text(encoding="utf-8")
+            self.assertNotIn("<?", strip)
+            regen = (folder / OUT_XML_REGEN).read_text(encoding="utf-8")
+            self.assertEqual(regen, strip)  # Phase 0 regen stub copies strip_pi
+            compare = (folder / OUT_COMPARE_HTML).read_text(encoding="utf-8")
+            self.assertIn("Phase 0 stub", compare)
+            self.assertIn(OUT_XML_ORIGINAL_CLEAN, compare)
+            self.assertIn(OUT_XML_REGEN, compare)
+            self.assertEqual(paths["original"].name, OUT_XML_ORIGINAL)
+            self.assertEqual(paths["regen"].name, OUT_XML_REGEN)
 
 
 if __name__ == "__main__":

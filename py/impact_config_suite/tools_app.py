@@ -24,6 +24,7 @@ from tabs.new_config_tab import NewConfigTab
 from tabs.compare_tab import HTMLCompareTab, HTMLCompareReplaceTab
 from tabs.element_extractor_tab import ElementExtractorTab
 from tabs.contrib_extractor_tab import ContribExtractorTab
+from tabs.sectional_report_tab import SectionalReportTab
 from tabs.xml_compare_tab import XMLCompareTab
 from tabs.document_manager_tab import DocumentManagerTab
 from metadata_harvester.gui import MetadataHarvesterTab
@@ -51,6 +52,7 @@ class CommonToolsApp:
         "new_journal_config": NewConfigTab,
         "element_extractor": ElementExtractorTab,
         "contrib_extractor": ContribExtractorTab,
+        "sectional_report": SectionalReportTab,
         "document_manager": DocumentManagerTab,
         "metadata_harvester": MetadataHarvesterTab,
     }
@@ -89,6 +91,7 @@ class CommonToolsApp:
                     {"id": "new_journal_config", "label": "New Journal Config"},
                     {"id": "element_extractor", "label": "Element Extractor"},
                     {"id": "contrib_extractor", "label": "Contrib Extract"},
+                    {"id": "sectional_report", "label": "Sectional Report"},
                 ],
             },
             {

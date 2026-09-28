@@ -437,7 +437,7 @@ class ContribExtractorTab(ttk.Frame):
             self.last_report_path = result["last_report"]
         n = len(result.get("finished") or [])
         total = result.get("total") or 0
-        # Surface output paths (contrib HTML, elements HTML, issues CSV) in the log
+        # Surface output paths (contrib/elements/aff HTML, issues/aff CSV) in the log
         for item in result.get("finished") or []:
             if not isinstance(item, (tuple, list)) or len(item) < 3:
                 continue
@@ -449,6 +449,9 @@ class ContribExtractorTab(ttk.Frame):
                 ("report", "contrib"),
                 ("elements_report", "elements"),
                 ("issues_csv", "issues"),
+                ("aff_report", "aff"),
+                ("aff_csv", "aff_csv"),
+                ("aff_unique_report", "aff_unique"),
             ):
                 if entry.get(key):
                     bits.append(f"{label}={entry[key]}")
