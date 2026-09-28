@@ -334,7 +334,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(result["per_section"]["OTHER"]["doi_id"]["count"], 0)
 
     def test_report_version_and_html_filters(self):
-        self.assertEqual(sr.REPORT_VERSION, 17)
+        self.assertEqual(sr.REPORT_VERSION, 16)
         xml = self._write("folder/b.xml", SAMPLE_XML)
         # synthetic meta-bearing row via project
         proj = self.tmp / "proj_filters"
@@ -534,7 +534,7 @@ class TestSectionalReport(unittest.TestCase):
         inc_text = inc_html.read_text(encoding="utf-8")
         self.assertIn("ClientA", inc_text)
         self.assertIn("Client-wise summary", inc_text)
-        self.assertIn("URI-as-DOI", inc_text)
+        self.assertIn("doi_text_uri", inc_text)
         self.assertIn("FN_GROUP", inc_text)
         self.assertIn("APP_GROUP", inc_text)
         self.assertIn("client-summary-blurb", inc_text)
@@ -565,9 +565,6 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(body_a["regular_text_uri"], 0)
         self.assertEqual(body_a["overall_count"], 2)
         self.assertIn("%", body_a["doi_text_doi_display"])
-        self.assertIn("%", body_a["doi_text_uri_display"])
-        self.assertIn("%", body_a["overall_count_display"])
-        self.assertTrue(body_a["samples"]["doi_text_doi"] or body_a["samples"]["doi_text_uri"])
         self.assertEqual(by_client["ClientA"]["areas"]["FRONT"]["overall_count"], 0)
         self.assertEqual(
             sr.CLIENT_SUMMARY_HEADERS,
@@ -575,13 +572,11 @@ class TestSectionalReport(unittest.TestCase):
                 "RowType",
                 "Client",
                 "Area",
-                "URI-as-DOI",
-                "ext-link DOI",
-                "URI (non-DOI)",
-                "Total",
-                "Sample URI-as-DOI",
-                "Sample ext-link DOI",
-                "Sample URI (non-DOI)",
+                "doi_text_uri",
+                "doi_text_doi",
+                "doi_text_doi_pct",
+                "regular_text_uri",
+                "Overall_Count",
                 "Pattern#",
                 "Kind",
                 "Skeleton",
@@ -619,10 +614,10 @@ class TestSectionalReport(unittest.TestCase):
         cs_text = cs_html.read_text(encoding="utf-8")
         self.assertIn("Client-wise summary", cs_text)
         self.assertIn("client-summary-blurb", cs_text)
-        self.assertIn("URI-as-DOI", cs_text)
-        self.assertIn("ext-link DOI", cs_text)
-        self.assertIn("URI (non-DOI)", cs_text)
-        self.assertIn(">Total<", cs_text)
+        self.assertIn("doi_text_uri", cs_text)
+        self.assertIn("doi_text_doi", cs_text)
+        self.assertIn("regular_text_uri", cs_text)
+        self.assertIn("Overall_Count", cs_text)
         self.assertIn("Overall Totals", cs_text)
         self.assertIn("FN_GROUP", cs_text)
         self.assertIn("APP_GROUP", cs_text)
@@ -636,9 +631,8 @@ class TestSectionalReport(unittest.TestCase):
         self.assertNotIn("View XML", cs_text)
         csv_text = cs_csv.read_text(encoding="utf-8")
         self.assertIn(
-            "RowType,Client,Area,URI-as-DOI,ext-link DOI,URI (non-DOI),Total,"
-            "Sample URI-as-DOI,Sample ext-link DOI,Sample URI (non-DOI),"
-            "Pattern#,Kind,Skeleton,SampleDOI,Count,"
+            "RowType,Client,Area,doi_text_uri,doi_text_doi,doi_text_doi_pct,"
+            "regular_text_uri,Overall_Count,Pattern#,Kind,Skeleton,SampleDOI,Count,"
             "Tag_L,Attr_L,Tag_R,Attr_R,Example file-id,Sections",
             csv_text,
         )
@@ -653,7 +647,7 @@ class TestSectionalReport(unittest.TestCase):
 
         # Main sectional HTML also embeds the shareable summary panel
         self.assertIn("Client-wise summary", page)
-        self.assertIn("URI-as-DOI", page)
+        self.assertIn("doi_text_uri", page)
         self.assertIn("FN_GROUP", page)
         self.assertIn("pattern-1", page)
         self.assertIn(sr.KIND_V1, page)
@@ -920,7 +914,7 @@ class TestSectionalReport(unittest.TestCase):
         self.assertIn("BODY", findings[0]["area"])
 
     def test_client_summary_area_buckets_and_grand_pct(self):
-        """URI-as-DOI / ext-link DOI / URI (non-DOI) / Total all as N (P%) of grand + samples."""
+        """doi_text_* buckets + doi_text_doi % of grand Overall_Count."""
         per = {
             section: {query: {"count": 0, "hits": []} for query in sr.QUERY_KEYS}
             for section in sr.SECTIONS
@@ -983,47 +977,25 @@ class TestSectionalReport(unittest.TestCase):
         self.assertEqual(front["overall_count"], 3)
         self.assertAlmostEqual(front["doi_text_doi_pct"], 2 * 100.0 / 14, places=1)
         self.assertIn("14.3%", front["doi_text_doi_display"])
-        self.assertIn("7.1%", front["doi_text_uri_display"])
-        self.assertIn("21.4%", front["overall_count_display"])
-        self.assertEqual(front["regular_text_uri_display"], "0")
-        self.assertTrue(front["samples"]["doi_text_uri"])
-        self.assertTrue(front["samples"]["doi_text_doi"])
-        self.assertIn("https://doi.org/10.1/a", front["samples"]["doi_text_uri"][0])
         body = item["areas"]["BODY"]
         self.assertEqual(body["doi_text_doi"], 3)
         self.assertEqual(body["overall_count"], 3)
         self.assertIn("21.4%", body["doi_text_doi_display"])
-        self.assertIn("21.4%", body["overall_count_display"])
-        self.assertTrue(body["samples"]["doi_text_doi"])
         ref = item["areas"]["REF"]
         self.assertEqual(ref["regular_text_uri"], 8)
         self.assertEqual(ref["doi_text_doi"], 0)
         self.assertEqual(ref["overall_count"], 8)
-        self.assertIn("57.1%", ref["regular_text_uri_display"])
-        self.assertIn("57.1%", ref["overall_count_display"])
-        self.assertTrue(ref["samples"]["regular_text_uri"])
         self.assertEqual(item["totals"]["overall_count"], 14)
-        self.assertIn("100.0%", item["totals"]["overall_count_display"])
-        self.assertTrue(item["totals"]["samples"]["doi_text_doi"])
         html, csv_path = sr.write_client_summary([row], self.tmp / "lww_reports")
         page = html.read_text(encoding="utf-8")
         self.assertIn("Client: LWW", page)
         self.assertIn("Area: FRONT", page)
-        self.assertIn("URI-as-DOI", page)
-        self.assertIn("ext-link DOI", page)
-        self.assertIn("URI (non-DOI)", page)
-        self.assertIn(">Total<", page)
         self.assertIn("14.3%", page)
         self.assertIn("21.4%", page)
-        self.assertIn("7.1%", page)
-        self.assertIn("57.1%", page)
-        self.assertIn("bucket-samples", page)
         self.assertIn("Overall Totals", page)
         csv_text = csv_path.read_text(encoding="utf-8")
-        self.assertIn("area,LWW,FRONT,1 (7.1%),2 (14.3%),", csv_text)
-        self.assertIn("overall_totals,,,1 (7.1%),5 (35.7%),", csv_text)
-        self.assertIn("https://doi.org/10.1/a", csv_text)
-        self.assertIn("https://example.com/0", csv_text)
+        self.assertIn("area,LWW,FRONT,1,2,", csv_text)
+        self.assertIn("overall_totals,,,1,5,", csv_text)
 
 
 

@@ -19,7 +19,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 17
+REPORT_VERSION = 16
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -536,13 +536,11 @@ CLIENT_SUMMARY_HEADERS = [
     "RowType",
     "Client",
     "Area",
-    "URI-as-DOI",
-    "ext-link DOI",
-    "URI (non-DOI)",
-    "Total",
-    "Sample URI-as-DOI",
-    "Sample ext-link DOI",
-    "Sample URI (non-DOI)",
+    "doi_text_uri",
+    "doi_text_doi",
+    "doi_text_doi_pct",
+    "regular_text_uri",
+    "Overall_Count",
     "Pattern#",
     "Kind",
     "Skeleton",
@@ -835,73 +833,25 @@ def _hit_is_doi_like(hit: dict[str, Any]) -> bool:
     return bool(_doi_tokens_from_hit(hit))
 
 
-def _hit_sample_text(hit: dict[str, Any]) -> str:
-    """Prefer hit text, else href; clip to MAX_SAMPLE_TEXT."""
-    text = str(hit.get("text") or "").strip()
-    if not text:
-        text = str(hit.get("href") or "").strip()
-    text = " ".join(text.split())
-    if len(text) > MAX_SAMPLE_TEXT:
-        text = text[: MAX_SAMPLE_TEXT - 1] + "."
-    return text
-
-
-def _empty_bucket_samples() -> dict[str, list[str]]:
-    return {
-        "doi_text_uri": [],
-        "doi_text_doi": [],
-        "regular_text_uri": [],
-    }
-
-
-def _empty_area_buckets() -> dict[str, Any]:
+def _empty_area_buckets() -> dict[str, int]:
     return {
         "doi_text_uri": 0,
         "doi_text_doi": 0,
         "regular_text_uri": 0,
         "overall_count": 0,
-        "samples": _empty_bucket_samples(),
     }
 
 
-def _merge_samples(dest: list[str], src: Iterable[str]) -> None:
-    for text in src:
-        text = str(text or "").strip()
-        if not text:
-            continue
-        if text in dest:
-            continue
-        if len(dest) >= SAMPLE_LIMIT:
-            break
-        dest.append(text)
-
-
-def _add_sample(samples: dict[str, list[str]], bucket: str, hit: dict[str, Any]) -> None:
-    text = _hit_sample_text(hit)
-    if not text:
-        return
-    bucket_list = samples[bucket]
-    if text in bucket_list or len(bucket_list) >= SAMPLE_LIMIT:
-        return
-    bucket_list.append(text)
-
-
-def _classify_area_hits(bucket: dict[str, Any]) -> dict[str, Any]:
+def _classify_area_hits(bucket: dict[str, Any]) -> dict[str, int]:
     """Classify query hits in one area into the three client-summary buckets.
 
     Hit counts (not document counts):
       doi_text_uri     = uri or extlink_uri whose text/href looks like DOI
-                       (display label: URI-as-DOI)
       doi_text_doi     = extlink_doi or doi_id hits
-                       (display label: ext-link DOI)
       regular_text_uri = uri or extlink_uri that is NOT doi-like
-                       (display label: URI (non-DOI))
-      overall_count    = sum of the three (display label: Total)
-
-    Also collects up to SAMPLE_LIMIT sample texts per bucket.
+      overall_count    = sum of the three
     """
     counts = _empty_area_buckets()
-    samples = counts["samples"]
     for qk, hits_wrap in (bucket or {}).items():
         if qk not in QUERY_KEYS:
             continue
@@ -924,14 +874,11 @@ def _classify_area_hits(bucket: dict[str, Any]) -> dict[str, Any]:
         for hit in hits:
             if qk in ("extlink_doi", "doi_id"):
                 counts["doi_text_doi"] += 1
-                _add_sample(samples, "doi_text_doi", hit)
             elif qk in ("uri", "extlink_uri"):
                 if _hit_is_doi_like(hit):
                     counts["doi_text_uri"] += 1
-                    _add_sample(samples, "doi_text_uri", hit)
                 else:
                     counts["regular_text_uri"] += 1
-                    _add_sample(samples, "regular_text_uri", hit)
     counts["overall_count"] = (
         counts["doi_text_uri"]
         + counts["doi_text_doi"]
@@ -940,56 +887,14 @@ def _classify_area_hits(bucket: dict[str, Any]) -> dict[str, Any]:
     return counts
 
 
-def _format_count_pct(count: int, grand_overall: int) -> tuple[float, str]:
-    """Display = 'N (P%)' where P = N / grand Total; '0' when N is 0."""
-    if count <= 0:
-        return 0.0, "0"
-    if grand_overall <= 0:
-        return 0.0, f"{count} (0.0%)"
-    pct = count * 100.0 / grand_overall
-    return pct, f"{count} ({pct:.1f}%)"
-
-
-# Back-compat alias used by older call sites / tests
 def _format_doi_pct(doi_count: int, grand_overall: int) -> tuple[float, str]:
-    return _format_count_pct(doi_count, grand_overall)
-
-
-def _area_bucket_view(src: dict[str, Any], grand_overall: int) -> dict[str, Any]:
-    """Attach N (P%) display strings for all four count columns + samples."""
-    uri_n = int(src.get("doi_text_uri") or 0)
-    doi_n = int(src.get("doi_text_doi") or 0)
-    reg_n = int(src.get("regular_text_uri") or 0)
-    tot_n = int(src.get("overall_count") or 0)
-    uri_pct, uri_disp = _format_count_pct(uri_n, grand_overall)
-    doi_pct, doi_disp = _format_count_pct(doi_n, grand_overall)
-    reg_pct, reg_disp = _format_count_pct(reg_n, grand_overall)
-    tot_pct, tot_disp = _format_count_pct(tot_n, grand_overall)
-    samples_src = src.get("samples") or _empty_bucket_samples()
-    samples = {
-        "doi_text_uri": list(samples_src.get("doi_text_uri") or []),
-        "doi_text_doi": list(samples_src.get("doi_text_doi") or []),
-        "regular_text_uri": list(samples_src.get("regular_text_uri") or []),
-    }
-    return {
-        "doi_text_uri": uri_n,
-        "doi_text_doi": doi_n,
-        "doi_text_doi_pct": doi_pct,
-        "doi_text_uri_pct": uri_pct,
-        "regular_text_uri_pct": reg_pct,
-        "overall_count_pct": tot_pct,
-        "doi_text_uri_display": uri_disp,
-        "doi_text_doi_display": doi_disp,
-        "regular_text_uri_display": reg_disp,
-        "overall_count_display": tot_disp,
-        "regular_text_uri": reg_n,
-        "overall_count": tot_n,
-        "samples": samples,
-        # legacy keys used by older callers
-        "issue_document_count": 0,
-        "pct": 0.0,
-        "display": _format_area_cell(0, 0),
-    }
+    """doi_text_doi display = 'N (P%)' where P = N / grand Overall_Count."""
+    if grand_overall <= 0 or doi_count <= 0:
+        pct = 0.0
+        return pct, f"{doi_count} (0.0%)" if doi_count else "0"
+    pct = doi_count * 100.0 / grand_overall
+    # one decimal like the sample 14.3% / 21.4%
+    return pct, f"{doi_count} ({pct:.1f}%)"
 
 
 def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -998,14 +903,13 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     Returns list of client dicts:
       client, scanned_document_count, issue_document_count,
       areas[LABEL] = {
-        doi_text_uri, doi_text_doi, regular_text_uri, overall_count,
-        *_display ('N (P%)' of grand Total), *_pct, samples
+        doi_text_uri, doi_text_doi, doi_text_doi_pct, doi_text_doi_display,
+        regular_text_uri, overall_count
       },
       totals = same keys summed across areas (pct vs grand overall).
 
-    Display labels: URI-as-DOI / ext-link DOI / URI (non-DOI) / Total.
-    All count columns show N (P%) of grand Total across all clients.
     Also attaches ``_grand_overall`` on each item for renderers (same grand).
+    doi_text_doi % = doi_text_doi / grand Overall_Count across all clients.
     Sorted by client overall_count desc, then name.
     """
     issues = find_cross_query_inconsistencies(rows)
@@ -1014,8 +918,8 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         issue_docs[str(issue.get("client") or "unknown")].add(_doc_identity(issue))
 
     scanned: dict[str, int] = defaultdict(int)
-    # client -> label -> raw bucket counts + samples
-    raw: dict[str, dict[str, dict[str, Any]]] = defaultdict(
+    # client -> label -> raw bucket counts
+    raw: dict[str, dict[str, dict[str, int]]] = defaultdict(
         lambda: {label: _empty_area_buckets() for label, _ in CLIENT_SUMMARY_AREA_KEYS}
     )
     for row in rows:
@@ -1027,11 +931,9 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             dest = raw[client][label]
             for key in ("doi_text_uri", "doi_text_doi", "regular_text_uri", "overall_count"):
                 dest[key] += int(classified[key])
-            for bucket in ("doi_text_uri", "doi_text_doi", "regular_text_uri"):
-                _merge_samples(dest["samples"][bucket], classified["samples"][bucket])
 
     grand_overall = sum(
-        int(area_counts["overall_count"])
+        area_counts["overall_count"]
         for client_areas in raw.values()
         for area_counts in client_areas.values()
     )
@@ -1043,18 +945,36 @@ def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         totals = _empty_area_buckets()
         for label, _ in CLIENT_SUMMARY_AREA_KEYS:
             src = raw.get(client, {}).get(label) or _empty_area_buckets()
-            areas_out[label] = _area_bucket_view(src, grand_overall)
+            pct, display = _format_doi_pct(int(src["doi_text_doi"]), grand_overall)
+            areas_out[label] = {
+                "doi_text_uri": int(src["doi_text_uri"]),
+                "doi_text_doi": int(src["doi_text_doi"]),
+                "doi_text_doi_pct": pct,
+                "doi_text_doi_display": display if src["doi_text_doi"] or src["overall_count"] else "0",
+                "regular_text_uri": int(src["regular_text_uri"]),
+                "overall_count": int(src["overall_count"]),
+                # legacy keys used by older callers
+                "issue_document_count": 0,
+                "pct": 0.0,
+                "display": _format_area_cell(0, 0),
+            }
             for key in ("doi_text_uri", "doi_text_doi", "regular_text_uri", "overall_count"):
                 totals[key] += int(src[key])
-            for bucket in ("doi_text_uri", "doi_text_doi", "regular_text_uri"):
-                _merge_samples(totals["samples"][bucket], src["samples"][bucket])
+        t_pct, t_display = _format_doi_pct(int(totals["doi_text_doi"]), grand_overall)
         summary.append(
             {
                 "client": client,
                 "scanned_document_count": int(scanned.get(client, 0)),
                 "issue_document_count": len(issue_docs.get(client, set())),
                 "areas": areas_out,
-                "totals": _area_bucket_view(totals, grand_overall),
+                "totals": {
+                    "doi_text_uri": int(totals["doi_text_uri"]),
+                    "doi_text_doi": int(totals["doi_text_doi"]),
+                    "doi_text_doi_pct": t_pct,
+                    "doi_text_doi_display": t_display if totals["doi_text_doi"] or totals["overall_count"] else "0",
+                    "regular_text_uri": int(totals["regular_text_uri"]),
+                    "overall_count": int(totals["overall_count"]),
+                },
                 "_grand_overall": grand_overall,
             }
         )
@@ -1160,13 +1080,12 @@ def _client_summary_blurb_html() -> str:
         '<p class="client-summary-blurb inconsistency-note">'
         "Per <b>Client</b> &#8594; per <b>Area</b> (FRONT / BODY / REF / FN_GROUP / "
         "APP_GROUP / OTHER) hit counts: "
-        "<b>URI-as-DOI</b> = <code>uri</code> or <code>ext-link[ext-link-type=uri]</code> "
+        "<b>doi_text_uri</b> = <code>uri</code> or <code>ext-link[ext-link-type=uri]</code> "
         "whose text/href looks like a DOI; "
-        "<b>ext-link DOI</b> = <code>ext-link[ext-link-type=doi]</code> or <code>doi_id</code>; "
-        "<b>URI (non-DOI)</b> = uri/ext-link-uri that is <em>not</em> doi-like; "
-        "<b>Total</b> = sum of the three in that area. "
-        "Every count column is shown as <code>N (P%)</code> where P = N &#247; grand Total "
-        "across all clients/areas. Sample text is listed per bucket per area/client. "
+        "<b>doi_text_doi</b> = <code>ext-link[ext-link-type=doi]</code> or <code>doi_id</code> "
+        "(shown as <code>N (P%)</code> where P = N &#247; grand Overall_Count); "
+        "<b>regular_text_uri</b> = uri/ext-link-uri that is <em>not</em> doi-like; "
+        "<b>Overall_Count</b> = sum of the three in that area. "
         "Overall Totals row uses the same columns. "
         "Kind-v1 inconsistency stays same-area only; patterns unique by XML skeleton "
         "(tag+attr names; never DOI/text; areas collapsed); sample DOI display-only. "
@@ -1216,31 +1135,15 @@ def _client_summary_chart_html(summary: list[dict[str, Any]], *, title: str) -> 
         f'<div class="area-chart"><h3>{_esc(title)} chart</h3>'
         f'<div class="area-legend">{legend}</div>'
         f'{"".join(rows_html)}'
-        '<p class="cause-chart-note">Bars = area Total as % of that client\'s overall hits.</p></div>'
+        '<p class="cause-chart-note">Bars = area Overall_Count as % of that client\'s overall hits.</p></div>'
     )
-
-
-def _bucket_sample_html(samples: list[str] | None) -> str:
-    items = [str(s).strip() for s in (samples or []) if str(s).strip()]
-    if not items:
-        return ""
-    shown = items[:SAMPLE_LIMIT]
-    lis = "".join(f"<li><code>{_esc(s)}</code></li>" for s in shown)
-    return f'<ul class="bucket-samples">{lis}</ul>'
-
-
-def _count_cell_html(display: str, samples: list[str] | None = None) -> str:
-    sample_html = _bucket_sample_html(samples)
-    if sample_html:
-        return f"{_esc(display)}{sample_html}"
-    return _esc(display)
 
 
 def _client_summary_table_html(
     summary: list[dict[str, Any]],
     patterns: list[dict[str, Any]],
 ) -> str:
-    """Nested Client -> Area rows with URI-as-DOI / ext-link DOI / URI (non-DOI) / Total."""
+    """Nested Client -> Area rows with doi_text_uri / doi_text_doi(%) / regular / overall."""
     by_client: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for pat in patterns:
         by_client[str(pat.get("client") or "unknown")].append(pat)
@@ -1251,44 +1154,41 @@ def _client_summary_table_html(
             int((item.get("totals") or {}).get("overall_count") or 0) for item in summary
         )
 
-    col_heads = (
-        "<th></th><th>URI-as-DOI</th><th>ext-link DOI</th>"
-        "<th>URI (non-DOI)</th><th>Total</th>"
-    )
     body_rows: list[str] = []
     for item in summary:
         client = str(item["client"])
-        tot = item.get("totals") or {}
         body_rows.append(
             f'<tr class="client-row" data-client="{_esc(client)}">'
             f'<td colspan="5"><b>Client: {_esc(client)}</b>'
             f' <span class="pattern-meta">scan={int(item.get("scanned_document_count") or 0)}; '
             f'issues={int(item.get("issue_document_count") or 0)}; '
-            f'total={_esc(tot.get("overall_count_display") or str(tot.get("overall_count") or 0))}'
-            f"</span></td>"
+            f'overall={int((item.get("totals") or {}).get("overall_count") or 0)}</span></td>'
             f"</tr>"
         )
-        body_rows.append(f'<tr class="area-header-row">{col_heads}</tr>')
+        body_rows.append(
+            '<tr class="area-header-row">'
+            "<th></th><th>doi_text_uri</th><th>doi_text_doi (with %)</th>"
+            "<th>regular_text_uri</th><th>Overall_Count</th></tr>"
+        )
         for label, _ in CLIENT_SUMMARY_AREA_KEYS:
             area = item["areas"][label]
-            samples = area.get("samples") or {}
             body_rows.append(
                 f'<tr class="area-row" data-client="{_esc(client)}" data-area="{_esc(label)}">'
                 f'<td class="area-label">Area: {_esc(label)}</td>'
-                f'<td>{_count_cell_html(area.get("doi_text_uri_display") or str(area["doi_text_uri"]), samples.get("doi_text_uri"))}</td>'
-                f'<td>{_count_cell_html(area.get("doi_text_doi_display") or str(area["doi_text_doi"]), samples.get("doi_text_doi"))}</td>'
-                f'<td>{_count_cell_html(area.get("regular_text_uri_display") or str(area["regular_text_uri"]), samples.get("regular_text_uri"))}</td>'
-                f'<td>{_count_cell_html(area.get("overall_count_display") or str(area["overall_count"]))}</td>'
+                f'<td>{int(area["doi_text_uri"])}</td>'
+                f'<td>{_esc(area.get("doi_text_doi_display") or str(area["doi_text_doi"]))}</td>'
+                f'<td>{int(area["regular_text_uri"])}</td>'
+                f'<td>{int(area["overall_count"])}</td>'
                 f"</tr>"
             )
-        tot_samples = tot.get("samples") or {}
+        tot = item.get("totals") or {}
         body_rows.append(
             f'<tr class="client-total-row" data-client="{_esc(client)}">'
             f"<td><b>Client total</b></td>"
-            f'<td><b>{_count_cell_html(tot.get("doi_text_uri_display") or str(tot.get("doi_text_uri") or 0), tot_samples.get("doi_text_uri"))}</b></td>'
-            f'<td><b>{_count_cell_html(tot.get("doi_text_doi_display") or str(tot.get("doi_text_doi") or 0), tot_samples.get("doi_text_doi"))}</b></td>'
-            f'<td><b>{_count_cell_html(tot.get("regular_text_uri_display") or str(tot.get("regular_text_uri") or 0), tot_samples.get("regular_text_uri"))}</b></td>'
-            f'<td><b>{_count_cell_html(tot.get("overall_count_display") or str(tot.get("overall_count") or 0))}</b></td>'
+            f'<td><b>{int(tot.get("doi_text_uri") or 0)}</b></td>'
+            f'<td><b>{_esc(tot.get("doi_text_doi_display") or str(tot.get("doi_text_doi") or 0))}</b></td>'
+            f'<td><b>{int(tot.get("regular_text_uri") or 0)}</b></td>'
+            f'<td><b>{int(tot.get("overall_count") or 0)}</b></td>'
             f"</tr>"
         )
         # optional pattern rows under client
@@ -1320,23 +1220,14 @@ def _client_summary_table_html(
     g_doi = sum(int((i.get("totals") or {}).get("doi_text_doi") or 0) for i in summary)
     g_reg = sum(int((i.get("totals") or {}).get("regular_text_uri") or 0) for i in summary)
     g_all = sum(int((i.get("totals") or {}).get("overall_count") or 0) for i in summary)
-    g_uri_disp = _format_count_pct(g_uri, g_all or grand)[1]
-    g_doi_disp = _format_count_pct(g_doi, g_all or grand)[1]
-    g_reg_disp = _format_count_pct(g_reg, g_all or grand)[1]
-    g_all_disp = _format_count_pct(g_all, g_all or grand)[1]
-    # merge grand samples from client totals
-    g_samples = _empty_bucket_samples()
-    for i in summary:
-        tot_s = (i.get("totals") or {}).get("samples") or {}
-        for bucket in ("doi_text_uri", "doi_text_doi", "regular_text_uri"):
-            _merge_samples(g_samples[bucket], tot_s.get(bucket) or [])
+    _pct, g_doi_disp = _format_doi_pct(g_doi, g_all or grand)
     body_rows.append(
         '<tr class="grand-total-row">'
         "<td><b>Overall Totals</b></td>"
-        f"<td><b>{_count_cell_html(g_uri_disp if g_uri or g_all else '0', g_samples['doi_text_uri'])}</b></td>"
-        f"<td><b>{_count_cell_html(g_doi_disp if g_doi or g_all else '0', g_samples['doi_text_doi'])}</b></td>"
-        f"<td><b>{_count_cell_html(g_reg_disp if g_reg or g_all else '0', g_samples['regular_text_uri'])}</b></td>"
-        f"<td><b>{_count_cell_html(g_all_disp if g_all else '0')}</b></td>"
+        f"<td><b>{g_uri}</b></td>"
+        f"<td><b>{_esc(g_doi_disp if g_doi or g_all else '0')}</b></td>"
+        f"<td><b>{g_reg}</b></td>"
+        f"<td><b>{g_all}</b></td>"
         "</tr>"
     )
 
@@ -1345,8 +1236,8 @@ def _client_summary_table_html(
 
     return (
         '<table class="client-summary-table"><thead><tr>'
-        "<th>Client / Area</th><th>URI-as-DOI</th><th>ext-link DOI</th>"
-        "<th>URI (non-DOI)</th><th>Total</th>"
+        "<th>Client / Area</th><th>doi_text_uri</th><th>doi_text_doi (with %)</th>"
+        "<th>regular_text_uri</th><th>Overall_Count</th>"
         f"</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"
     )
 
@@ -1387,7 +1278,7 @@ def _client_summary_panel_html(
 def _client_summary_css() -> str:
     """CSS shared by standalone client_summary HTML and embedded panels."""
     return (
-        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table tr.area-header-row th{color:#94a3b8;font-weight:600;font-size:12px;background:#111827}.client-summary-table tr.area-row td{background:#0f172a}.client-summary-table td.area-label{padding-left:18px;color:#cbd5e1}.client-summary-table tr.client-total-row td{background:#1e293b;border-top:1px solid #475569}.client-summary-table tr.grand-total-row td{background:#312e81;font-weight:700}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.bucket-samples{margin:4px 0 0;padding-left:16px;font-size:11px;color:#94a3b8;list-style:disc}.bucket-samples code{font-size:11px;word-break:break-word}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
+        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table tr.area-header-row th{color:#94a3b8;font-weight:600;font-size:12px;background:#111827}.client-summary-table tr.area-row td{background:#0f172a}.client-summary-table td.area-label{padding-left:18px;color:#cbd5e1}.client-summary-table tr.client-total-row td{background:#1e293b;border-top:1px solid #475569}.client-summary-table tr.grand-total-row td{background:#312e81;font-weight:700}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
     )
 
 
@@ -1408,10 +1299,6 @@ def write_client_summary(
     for pat in patterns:
         by_client[str(pat.get("client") or "unknown")].append(pat)
 
-    def _join_samples(samples: list[str] | None) -> str:
-        items = [str(s).strip() for s in (samples or []) if str(s).strip()]
-        return " | ".join(items[:SAMPLE_LIMIT])
-
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(CLIENT_SUMMARY_HEADERS)
@@ -1419,19 +1306,16 @@ def write_client_summary(
             client = str(item["client"])
             for label, _ in CLIENT_SUMMARY_AREA_KEYS:
                 area = item["areas"][label]
-                samples = area.get("samples") or {}
                 writer.writerow(
                     [
                         "area",
                         client,
                         label,
-                        area.get("doi_text_uri_display") or str(area["doi_text_uri"]),
+                        int(area["doi_text_uri"]),
+                        int(area["doi_text_doi"]),
                         area.get("doi_text_doi_display") or str(area["doi_text_doi"]),
-                        area.get("regular_text_uri_display") or str(area["regular_text_uri"]),
-                        area.get("overall_count_display") or str(area["overall_count"]),
-                        _join_samples(samples.get("doi_text_uri")),
-                        _join_samples(samples.get("doi_text_doi")),
-                        _join_samples(samples.get("regular_text_uri")),
+                        int(area["regular_text_uri"]),
+                        int(area["overall_count"]),
                         "",
                         "",
                         "",
@@ -1446,19 +1330,16 @@ def write_client_summary(
                     ]
                 )
             tot = item.get("totals") or {}
-            tot_samples = tot.get("samples") or {}
             writer.writerow(
                 [
                     "client_total",
                     client,
                     "",
-                    tot.get("doi_text_uri_display") or str(tot.get("doi_text_uri") or 0),
+                    int(tot.get("doi_text_uri") or 0),
+                    int(tot.get("doi_text_doi") or 0),
                     tot.get("doi_text_doi_display") or str(tot.get("doi_text_doi") or 0),
-                    tot.get("regular_text_uri_display") or str(tot.get("regular_text_uri") or 0),
-                    tot.get("overall_count_display") or str(tot.get("overall_count") or 0),
-                    _join_samples(tot_samples.get("doi_text_uri")),
-                    _join_samples(tot_samples.get("doi_text_doi")),
-                    _join_samples(tot_samples.get("regular_text_uri")),
+                    int(tot.get("regular_text_uri") or 0),
+                    int(tot.get("overall_count") or 0),
                     "",
                     "",
                     "",
@@ -1487,10 +1368,8 @@ def write_client_summary(
                         "",
                         "",
                         "",
+                        "",
                         int(pat.get("count") or 1),
-                        "",
-                        "",
-                        "",
                         pat["pattern_num"],
                         pat["kind"],
                         pat.get("skeleton") or _pattern_signature(pat),
@@ -1509,27 +1388,17 @@ def write_client_summary(
         g_doi = sum(int((i.get("totals") or {}).get("doi_text_doi") or 0) for i in summary)
         g_reg = sum(int((i.get("totals") or {}).get("regular_text_uri") or 0) for i in summary)
         g_all = sum(int((i.get("totals") or {}).get("overall_count") or 0) for i in summary)
-        g_uri_disp = _format_count_pct(g_uri, g_all)[1] if g_uri or g_all else "0"
-        g_doi_disp = _format_count_pct(g_doi, g_all)[1] if g_doi or g_all else "0"
-        g_reg_disp = _format_count_pct(g_reg, g_all)[1] if g_reg or g_all else "0"
-        g_all_disp = _format_count_pct(g_all, g_all)[1] if g_all else "0"
-        g_samples = _empty_bucket_samples()
-        for i in summary:
-            tot_s = (i.get("totals") or {}).get("samples") or {}
-            for bucket in ("doi_text_uri", "doi_text_doi", "regular_text_uri"):
-                _merge_samples(g_samples[bucket], tot_s.get(bucket) or [])
+        _pct, g_disp = _format_doi_pct(g_doi, g_all)
         writer.writerow(
             [
                 "overall_totals",
                 "",
                 "",
-                g_uri_disp,
-                g_doi_disp,
-                g_reg_disp,
-                g_all_disp,
-                _join_samples(g_samples["doi_text_uri"]),
-                _join_samples(g_samples["doi_text_doi"]),
-                _join_samples(g_samples["regular_text_uri"]),
+                g_uri,
+                g_doi,
+                g_disp if g_doi or g_all else "0",
+                g_reg,
+                g_all,
                 "",
                 "",
                 "",
@@ -2074,7 +1943,7 @@ def write_inconsistency_report(
         "<!DOCTYPE html>", '<html lang="en"><head><meta charset="utf-8"/>',
         f"<title>Sectional Report Inconsistency Report v{REPORT_VERSION}</title>",
         "<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
-        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.bucket-samples{margin:4px 0 0;padding-left:16px;font-size:11px;color:#94a3b8;list-style:disc}.bucket-samples code{font-size:11px;word-break:break-word}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}</style></head><body>",
+        "h1,h2{color:#a5b4fc}.meta,.inconsistency-note,.cause-chart-note{color:#94a3b8}.client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}</style></head><body>",
         f"<h1>Sectional Report Inconsistency Report</h1><div class=\"meta\">REPORT_VERSION={REPORT_VERSION}</div>",
         _inconsistency_section_html(issues, rows=rows),
         "</body></html>",
