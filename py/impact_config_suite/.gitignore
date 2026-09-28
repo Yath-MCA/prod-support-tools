@@ -45,3 +45,6 @@ ENV/
 
 # Archive (preserved but not tracked)
 _archive/
+
+# Local patch work
+_patch_work/
