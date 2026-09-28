@@ -19,7 +19,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from lxml import etree
 
-REPORT_VERSION = 16
+REPORT_VERSION = 15
 REPORT_DIR = "sectional_reports"
 SUPPORT_LOG_NAME = "impact-support-log"
 # Tests / callers may set REPORT_ROOT to redirect away from ~/Documents/...
@@ -535,12 +535,13 @@ CLIENT_SUMMARY_AREA_LABELS = tuple(label for label, _ in CLIENT_SUMMARY_AREA_KEY
 CLIENT_SUMMARY_HEADERS = [
     "RowType",
     "Client",
-    "Area",
-    "doi_text_uri",
-    "doi_text_doi",
-    "doi_text_doi_pct",
-    "regular_text_uri",
-    "Overall_Count",
+    "Scan docs",
+    "FRONT",
+    "BODY",
+    "REF",
+    "FN_GROUP",
+    "APP_GROUP",
+    "OTHER",
     "Pattern#",
     "Kind",
     "Skeleton",
@@ -691,14 +692,13 @@ def _sample_doi_from_hits(*hit_groups: list[dict[str, Any]]) -> str:
 
 
 def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Kind v1 (v16): same-area structure presence of extlink_doi AND uri.
+    """Kind v1 (v15): same-area structure presence of extlink_doi AND uri.
 
-    Inconsistency detection stays same-area only. Pattern uniqueness is by
-    XML skeleton only (tag + attr *names*; values stripped) - never by DOI/text
-    and never split by area. Same skeleton across FRONT/BODY/REF/... collapses
-    to ONE pattern per client; sample DOI is display-only.
+    Never cross-area. Unique by XML skeleton (tag + attr names; values stripped).
+    Returns aggregated patterns per (client, area, skeleton) with counts and
+    optional sample DOI. Pattern# is assigned per client (skeleton-per-area).
     """
-    occ_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    occ_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
     for row in rows:
         per = row.get("per_section") or {}
         client = str(row.get("client") or "unknown")
@@ -712,7 +712,7 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             sample_doi = _sample_doi_from_hits(left_hits, right_hits)
             left = _pick_side_hit(left_hits)
             right = _pick_side_hit(right_hits)
-            key = (client, meta["skeleton"])
+            key = (client, section, meta["skeleton"])
             entry = occ_by_key.get(key)
             ident = _doc_identity(row)
             file_label = (
@@ -736,6 +736,7 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "attr_r": meta["attr_r"],
                     "sample_r": right.get("text") or right.get("href") or "",
                     "sections": [section],
+                    "area": section,
                     "count": 1,
                     "docs": {ident},
                     "example_file_ids": [file_label],
@@ -744,23 +745,17 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             else:
                 entry["docs"].add(ident)
                 entry["count"] = len(entry["docs"])
-                if section not in entry["sections"]:
-                    entry["sections"].append(section)
                 if not entry["doi"] and sample_doi:
                     entry["doi"] = sample_doi
                 if file_label not in entry["_file_seen"]:
                     entry["_file_seen"].add(file_label)
                     entry["example_file_ids"].append(file_label)
 
-    section_order = {name: idx for idx, name in enumerate(SECTIONS)}
     raw = list(occ_by_key.values())
-    for item in raw:
-        item["sections"] = sorted(
-            item["sections"], key=lambda s: section_order.get(s, 99)
-        )
     raw.sort(
         key=lambda p: (
             str(p["client"]).lower(),
+            str((p.get("sections") or ["Z"])[0]),
             str(p.get("skeleton") or "").lower(),
         )
     )
@@ -769,7 +764,6 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for item in raw:
         client = str(item["client"])
         counters[client] += 1
-        sections = list(item.get("sections") or [])
         patterns.append(
             {
                 "client": item["client"],
@@ -785,8 +779,8 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "tag_r": item["tag_r"],
                 "attr_r": item["attr_r"],
                 "sample_r": item.get("sample_r") or "",
-                "sections": sections,
-                "area": ";".join(sections) if sections else "",
+                "sections": list(item.get("sections") or []),
+                "area": item.get("area") or ((item.get("sections") or [""])[0]),
                 "count": int(item.get("count") or len(item.get("docs") or [])),
                 "example_file_id": (item.get("example_file_ids") or ["-"])[0],
                 "example_file_ids": list(item.get("example_file_ids") or []),
@@ -794,6 +788,7 @@ def find_kind_v1_patterns(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return patterns
+
 
 
 def _format_area_cell(issue_count: int, scanned: int) -> str:
@@ -808,12 +803,6 @@ def _format_area_cell(issue_count: int, scanned: int) -> str:
 def _empty_areas() -> dict[str, dict[str, Any]]:
     return {
         label: {
-            "doi_text_uri": 0,
-            "doi_text_doi": 0,
-            "doi_text_doi_pct": 0.0,
-            "doi_text_doi_display": "0",
-            "regular_text_uri": 0,
-            "overall_count": 0,
             "issue_document_count": 0,
             "pct": 0.0,
             "display": _format_area_cell(0, 0),
@@ -822,168 +811,63 @@ def _empty_areas() -> dict[str, dict[str, Any]]:
     }
 
 
-def _hit_is_doi_like(hit: dict[str, Any]) -> bool:
-    """True when hit text/href looks like a DOI (token or doi.org flag)."""
-    if hit.get("doi_org_in_href") or hit.get("doi_org_in_text"):
-        return True
-    text = str(hit.get("text") or "")
-    href = str(hit.get("href") or "")
-    if "doi.org" in text.lower() or "doi.org" in href.lower():
-        return True
-    return bool(_doi_tokens_from_hit(hit))
-
-
-def _empty_area_buckets() -> dict[str, int]:
-    return {
-        "doi_text_uri": 0,
-        "doi_text_doi": 0,
-        "regular_text_uri": 0,
-        "overall_count": 0,
-    }
-
-
-def _classify_area_hits(bucket: dict[str, Any]) -> dict[str, int]:
-    """Classify query hits in one area into the three client-summary buckets.
-
-    Hit counts (not document counts):
-      doi_text_uri     = uri or extlink_uri whose text/href looks like DOI
-      doi_text_doi     = extlink_doi or doi_id hits
-      regular_text_uri = uri or extlink_uri that is NOT doi-like
-      overall_count    = sum of the three
-    """
-    counts = _empty_area_buckets()
-    for qk, hits_wrap in (bucket or {}).items():
-        if qk not in QUERY_KEYS:
-            continue
-        hits = list((hits_wrap or {}).get("hits") or [])
-        if not hits:
-            # fall back to count when hits absent
-            try:
-                n = int((hits_wrap or {}).get("count") or 0)
-            except (TypeError, ValueError):
-                n = 0
-            if n <= 0:
-                continue
-            if qk in ("extlink_doi", "doi_id"):
-                counts["doi_text_doi"] += n
-            elif qk in ("uri", "extlink_uri"):
-                # without hit payloads we cannot split doi-like vs regular;
-                # treat as regular_text_uri (conservative)
-                counts["regular_text_uri"] += n
-            continue
-        for hit in hits:
-            if qk in ("extlink_doi", "doi_id"):
-                counts["doi_text_doi"] += 1
-            elif qk in ("uri", "extlink_uri"):
-                if _hit_is_doi_like(hit):
-                    counts["doi_text_uri"] += 1
-                else:
-                    counts["regular_text_uri"] += 1
-    counts["overall_count"] = (
-        counts["doi_text_uri"]
-        + counts["doi_text_doi"]
-        + counts["regular_text_uri"]
-    )
-    return counts
-
-
-def _format_doi_pct(doi_count: int, grand_overall: int) -> tuple[float, str]:
-    """doi_text_doi display = 'N (P%)' where P = N / grand Overall_Count."""
-    if grand_overall <= 0 or doi_count <= 0:
-        pct = 0.0
-        return pct, f"{doi_count} (0.0%)" if doi_count else "0"
-    pct = doi_count * 100.0 / grand_overall
-    # one decimal like the sample 14.3% / 21.4%
-    return pct, f"{doi_count} ({pct:.1f}%)"
-
-
 def compute_client_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per-client nested area report with doi/uri text buckets (hit counts).
+    """Per-client scanned docs + per-area Kind-v1 issue-doc rates.
 
-    Returns list of client dicts:
-      client, scanned_document_count, issue_document_count,
-      areas[LABEL] = {
-        doi_text_uri, doi_text_doi, doi_text_doi_pct, doi_text_doi_display,
-        regular_text_uri, overall_count
-      },
-      totals = same keys summed across areas (pct vs grand overall).
-
-    Also attaches ``_grand_overall`` on each item for renderers (same grand).
-    doi_text_doi % = doi_text_doi / grand Overall_Count across all clients.
-    Sorted by client overall_count desc, then name.
+    Returns list of dicts with keys:
+      client, scanned_document_count, issue_document_count, areas
+    where areas[LABEL] = {issue_document_count, pct, display}.
+    Area display: ``10% (25 documents)`` = Kind-v1 issue docs touching that
+    section / scan docs for the client. FN_GROUP=FOOTNOTES, APP_GROUP=APPENDIX.
+    Sorted by issue_document_count desc, then client name.
     """
     issues = find_cross_query_inconsistencies(rows)
+    patterns = find_kind_v1_patterns(rows)
+    scanned: dict[str, int] = defaultdict(int)
+    for row in rows:
+        scanned[str(row.get("client") or "unknown")] += 1
     issue_docs: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
     for issue in issues:
-        issue_docs[str(issue.get("client") or "unknown")].add(_doc_identity(issue))
+        client = str(issue.get("client") or "unknown")
+        issue_docs[client].add(_doc_identity(issue))
 
-    scanned: dict[str, int] = defaultdict(int)
-    # client -> label -> raw bucket counts
-    raw: dict[str, dict[str, dict[str, int]]] = defaultdict(
-        lambda: {label: _empty_area_buckets() for label, _ in CLIENT_SUMMARY_AREA_KEYS}
+    section_to_label = {sec: label for label, sec in CLIENT_SUMMARY_AREA_KEYS}
+    area_docs: dict[str, dict[str, set[tuple[str, str, str]]]] = defaultdict(
+        lambda: {label: set() for label, _ in CLIENT_SUMMARY_AREA_KEYS}
     )
-    for row in rows:
-        client = str(row.get("client") or "unknown")
-        scanned[client] += 1
-        per = row.get("per_section") or {}
-        for label, section in CLIENT_SUMMARY_AREA_KEYS:
-            classified = _classify_area_hits(per.get(section) or {})
-            dest = raw[client][label]
-            for key in ("doi_text_uri", "doi_text_doi", "regular_text_uri", "overall_count"):
-                dest[key] += int(classified[key])
+    for pat in patterns:
+        client = str(pat.get("client") or "unknown")
+        ident = _doc_identity(pat)
+        for sec in pat.get("sections") or []:
+            label = section_to_label.get(str(sec))
+            if label:
+                area_docs[client][label].add(ident)
 
-    grand_overall = sum(
-        area_counts["overall_count"]
-        for client_areas in raw.values()
-        for area_counts in client_areas.values()
+    clients = sorted(
+        set(scanned) | set(issue_docs) | set(area_docs),
+        key=lambda c: c.lower(),
     )
-
-    clients = sorted(set(scanned) | set(raw) | set(issue_docs), key=lambda c: c.lower())
     summary: list[dict[str, Any]] = []
     for client in clients:
-        areas_out: dict[str, dict[str, Any]] = {}
-        totals = _empty_area_buckets()
+        n_scan = int(scanned.get(client, 0))
+        areas = _empty_areas()
         for label, _ in CLIENT_SUMMARY_AREA_KEYS:
-            src = raw.get(client, {}).get(label) or _empty_area_buckets()
-            pct, display = _format_doi_pct(int(src["doi_text_doi"]), grand_overall)
-            areas_out[label] = {
-                "doi_text_uri": int(src["doi_text_uri"]),
-                "doi_text_doi": int(src["doi_text_doi"]),
-                "doi_text_doi_pct": pct,
-                "doi_text_doi_display": display if src["doi_text_doi"] or src["overall_count"] else "0",
-                "regular_text_uri": int(src["regular_text_uri"]),
-                "overall_count": int(src["overall_count"]),
-                # legacy keys used by older callers
-                "issue_document_count": 0,
-                "pct": 0.0,
-                "display": _format_area_cell(0, 0),
+            n_issue = len(area_docs.get(client, {}).get(label, set()))
+            pct = (n_issue * 100.0 / n_scan) if n_scan else 0.0
+            areas[label] = {
+                "issue_document_count": n_issue,
+                "pct": pct,
+                "display": _format_area_cell(n_issue, n_scan),
             }
-            for key in ("doi_text_uri", "doi_text_doi", "regular_text_uri", "overall_count"):
-                totals[key] += int(src[key])
-        t_pct, t_display = _format_doi_pct(int(totals["doi_text_doi"]), grand_overall)
         summary.append(
             {
                 "client": client,
-                "scanned_document_count": int(scanned.get(client, 0)),
+                "scanned_document_count": n_scan,
                 "issue_document_count": len(issue_docs.get(client, set())),
-                "areas": areas_out,
-                "totals": {
-                    "doi_text_uri": int(totals["doi_text_uri"]),
-                    "doi_text_doi": int(totals["doi_text_doi"]),
-                    "doi_text_doi_pct": t_pct,
-                    "doi_text_doi_display": t_display if totals["doi_text_doi"] or totals["overall_count"] else "0",
-                    "regular_text_uri": int(totals["regular_text_uri"]),
-                    "overall_count": int(totals["overall_count"]),
-                },
-                "_grand_overall": grand_overall,
+                "areas": areas,
             }
         )
-    summary.sort(
-        key=lambda item: (
-            -int(item.get("totals", {}).get("overall_count") or 0),
-            item["client"].lower(),
-        )
-    )
+    summary.sort(key=lambda item: (-item["issue_document_count"], item["client"].lower()))
     return summary
 
 
@@ -1020,7 +904,7 @@ def _pattern_block_html(pat: dict[str, Any]) -> str:
 
 
 def _client_details_html(patterns: list[dict[str, Any]]) -> str:
-    """Per-client pattern-1..N details (skeleton-unique; sample DOI display-only)."""
+    """Per-client → per file-id/docid → pattern-1..N details blocks."""
     if not patterns:
         return (
             '<section class="client-summary-details" aria-label="Pattern details">'
@@ -1035,15 +919,35 @@ def _client_details_html(patterns: list[dict[str, Any]]) -> str:
 
     client_blocks: list[str] = []
     for client in sorted(by_client, key=lambda c: c.lower()):
-        pats = sorted(by_client[client], key=lambda p: int(p["pattern_num"]))
-        body = "".join(_pattern_block_html(p) for p in pats)
+        pats = by_client[client]
+        by_file: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+        for pat in pats:
+            by_file[(str(pat.get("file_id") or ""), str(pat.get("docid") or ""))].append(pat)
+
+        file_blocks: list[str] = []
+        for (file_id, docid), file_pats in sorted(
+            by_file.items(),
+            key=lambda kv: ((kv[0][0] or kv[0][1]).lower(), kv[0][1].lower()),
+        ):
+            file_pats = sorted(file_pats, key=lambda p: int(p["pattern_num"]))
+            id_label = _combined_id_text(file_id, docid).replace("\n", " / ")
+            body = "".join(_pattern_block_html(p) for p in file_pats)
+            file_blocks.append(
+                f'<details class="file-details" open>'
+                f"<summary>{_esc(id_label)} "
+                f'<span class="cnt">{len(file_pats)} pattern'
+                f'{"s" if len(file_pats) != 1 else ""}</span></summary>'
+                f"{body}</details>"
+            )
+
+        n_files = len(by_file)
         n_pats = len(pats)
         client_blocks.append(
             f'<details class="client-details" open data-client="{_esc(client)}">'
             f"<summary><b>{_esc(client)}</b> "
-            f'<span class="cnt">{n_pats} pattern{"s" if n_pats != 1 else ""}'
-            f"</span></summary>"
-            f"{body}</details>"
+            f'<span class="cnt">{n_pats} pattern{"s" if n_pats != 1 else ""} '
+            f'/ {n_files} file{"s" if n_files != 1 else ""}</span></summary>'
+            f'{"".join(file_blocks)}</details>'
         )
 
     return (
@@ -1051,9 +955,8 @@ def _client_details_html(patterns: list[dict[str, Any]]) -> str:
         "<h2>Details</h2>"
         f'<p class="inconsistency-note">Kind v1 ({_esc(KIND_V1)}): same-area structure '
         "presence of both <code>extlink_doi</code> and <code>uri</code> "
-        "(never cross-area). Unique by XML skeleton only (tag+attr names; "
-        "never DOI/text; areas collapsed). "
-        "pattern-N = one skeleton per client; counts + optional sample DOI.</p>"
+        "(never cross-area). Unique by XML skeleton (tag+attr names). "
+        "pattern-N = skeleton per area; counts + optional sample DOI.</p>"
         f'{"".join(client_blocks)}</section>'
     )
 
@@ -1078,24 +981,20 @@ def _area_mark(sections: list[str] | None, label: str) -> str:
 def _client_summary_blurb_html() -> str:
     return (
         '<p class="client-summary-blurb inconsistency-note">'
-        "Per <b>Client</b> &#8594; per <b>Area</b> (FRONT / BODY / REF / FN_GROUP / "
-        "APP_GROUP / OTHER) hit counts: "
-        "<b>doi_text_uri</b> = <code>uri</code> or <code>ext-link[ext-link-type=uri]</code> "
-        "whose text/href looks like a DOI; "
-        "<b>doi_text_doi</b> = <code>ext-link[ext-link-type=doi]</code> or <code>doi_id</code> "
-        "(shown as <code>N (P%)</code> where P = N &#247; grand Overall_Count); "
-        "<b>regular_text_uri</b> = uri/ext-link-uri that is <em>not</em> doi-like; "
-        "<b>Overall_Count</b> = sum of the three in that area. "
-        "Overall Totals row uses the same columns. "
-        "Kind-v1 inconsistency stays same-area only; patterns unique by XML skeleton "
-        "(tag+attr names; never DOI/text; areas collapsed); sample DOI display-only. "
-        "<em>Counts are hit counts (not document counts).</em>"
+        "Per client (all clients listed): <b>Scan docs</b> = files scanned. Area cells "
+        "show the share of scanned docs that have a Kind-v1 (<code>extlink_doi\u2194uri</code>) "
+        "<b>same-area</b> structure-presence issue, formatted as "
+        "<code>10% (25 documents)</code> = issue docs in area \u00f7 scan docs. "
+        "<b>FN_GROUP</b> = footnotes; <b>APP_GROUP</b> = appendix. Never cross-area. "
+        "Under each client, <b>pattern-1..N</b> = unique XML skeleton per area "
+        "(tag+attr names; values stripped) with counts + optional sample DOI; \u25cf marks "
+        "the area. Chart: grouped bars of area % per client."
         "</p>"
     )
 
 
 def _client_summary_chart_html(summary: list[dict[str, Any]], *, title: str) -> str:
-    """Per-client stacked sense: overall_count bars by area (% of client overall)."""
+    """Grouped bars: one cluster per client, one bar per area (% of scan docs)."""
     if not summary:
         return (
             f'<div class="area-chart"><h3>{_esc(title)} chart</h3>'
@@ -1109,33 +1008,32 @@ def _client_summary_chart_html(summary: list[dict[str, Any]], *, title: str) -> 
     )
     rows_html: list[str] = []
     for item in summary:
-        client_overall = int((item.get("totals") or {}).get("overall_count") or 0) or 1
         bars = "".join(
             (
                 f'<div class="gbar" title="{_esc(label)}: '
-                f'{int(item["areas"][label]["overall_count"])} hits">'
-                f'<div class="gbar-pct">'
-                f'{int(round(int(item["areas"][label]["overall_count"]) * 100.0 / client_overall))}%'
-                f"</div>"
+                f'{_esc(item["areas"][label]["display"])}">'
                 f'<div class="gbar-fill" style="height:'
-                f'{max(2, int(round(int(item["areas"][label]["overall_count"]) * 100.0 / client_overall)))}px;'
+                f'{min(100.0, float(item["areas"][label]["pct"])):.1f}%;'
                 f'background:{_AREA_COLORS[label]}"></div>'
-                f'<div class="gbar-lab">{_esc(label)}</div></div>'
+                f'<div class="gbar-lab">{_esc(label)}</div>'
+                f'<div class="gbar-pct">'
+                f'{int(round(float(item["areas"][label]["pct"])))}%</div>'
+                f"</div>"
             )
             for label, _ in CLIENT_SUMMARY_AREA_KEYS
         )
         rows_html.append(
             f'<div class="area-chart-row">'
-            f'<div class="area-chart-label">{_esc(item["client"])}'
-            f'<div class="cause-chart-note">overall='
-            f'{int((item.get("totals") or {}).get("overall_count") or 0)}</div></div>'
-            f'<div class="grouped-bars">{bars}</div></div>'
+            f'<span class="area-chart-label">{_esc(item["client"])}</span>'
+            f'<div class="grouped-bars">{bars}</div>'
+            f"</div>"
         )
     return (
         f'<div class="area-chart"><h3>{_esc(title)} chart</h3>'
+        '<p class="cause-chart-note">Grouped bars: each area = % of that client\'s '
+        "scanned docs with a Kind-v1 issue in the area. Areas can overlap.</p>"
         f'<div class="area-legend">{legend}</div>'
-        f'{"".join(rows_html)}'
-        '<p class="cause-chart-note">Bars = area Overall_Count as % of that client\'s overall hits.</p></div>'
+        f'{"".join(rows_html)}</div>'
     )
 
 
@@ -1143,102 +1041,64 @@ def _client_summary_table_html(
     summary: list[dict[str, Any]],
     patterns: list[dict[str, Any]],
 ) -> str:
-    """Nested Client -> Area rows with doi_text_uri / doi_text_doi(%) / regular / overall."""
+    """Client rows with area % cells; nested pattern-1..N rows under each client."""
     by_client: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for pat in patterns:
         by_client[str(pat.get("client") or "unknown")].append(pat)
 
-    grand = int(summary[0].get("_grand_overall") or 0) if summary else 0
-    if not grand:
-        grand = sum(
-            int((item.get("totals") or {}).get("overall_count") or 0) for item in summary
-        )
-
     body_rows: list[str] = []
     for item in summary:
         client = str(item["client"])
+        area_tds = "".join(
+            f'<td class="area-cell">{_esc(item["areas"][label]["display"])}</td>'
+            for label, _ in CLIENT_SUMMARY_AREA_KEYS
+        )
         body_rows.append(
             f'<tr class="client-row" data-client="{_esc(client)}">'
-            f'<td colspan="5"><b>Client: {_esc(client)}</b>'
-            f' <span class="pattern-meta">scan={int(item.get("scanned_document_count") or 0)}; '
-            f'issues={int(item.get("issue_document_count") or 0)}; '
-            f'overall={int((item.get("totals") or {}).get("overall_count") or 0)}</span></td>'
-            f"</tr>"
+            f"<td><b>{_esc(client)}</b></td>"
+            f'<td>{int(item["scanned_document_count"])}</td>'
+            f"{area_tds}</tr>"
         )
-        body_rows.append(
-            '<tr class="area-header-row">'
-            "<th></th><th>doi_text_uri</th><th>doi_text_doi (with %)</th>"
-            "<th>regular_text_uri</th><th>Overall_Count</th></tr>"
-        )
-        for label, _ in CLIENT_SUMMARY_AREA_KEYS:
-            area = item["areas"][label]
-            body_rows.append(
-                f'<tr class="area-row" data-client="{_esc(client)}" data-area="{_esc(label)}">'
-                f'<td class="area-label">Area: {_esc(label)}</td>'
-                f'<td>{int(area["doi_text_uri"])}</td>'
-                f'<td>{_esc(area.get("doi_text_doi_display") or str(area["doi_text_doi"]))}</td>'
-                f'<td>{int(area["regular_text_uri"])}</td>'
-                f'<td>{int(area["overall_count"])}</td>'
-                f"</tr>"
-            )
-        tot = item.get("totals") or {}
-        body_rows.append(
-            f'<tr class="client-total-row" data-client="{_esc(client)}">'
-            f"<td><b>Client total</b></td>"
-            f'<td><b>{int(tot.get("doi_text_uri") or 0)}</b></td>'
-            f'<td><b>{_esc(tot.get("doi_text_doi_display") or str(tot.get("doi_text_doi") or 0))}</b></td>'
-            f'<td><b>{int(tot.get("regular_text_uri") or 0)}</b></td>'
-            f'<td><b>{int(tot.get("overall_count") or 0)}</b></td>'
-            f"</tr>"
-        )
-        # optional pattern rows under client
         pats = sorted(
             by_client.get(client, []),
             key=lambda p: (
                 int(p.get("pattern_num") or 0),
+                str((p.get("sections") or [""])[0]),
                 str(p.get("skeleton") or "").lower(),
             ),
         )
         for pat in pats:
+            marks = "".join(
+                f'<td class="area-mark">{_esc(_area_mark(pat.get("sections"), label))}</td>'
+                for label, _ in CLIENT_SUMMARY_AREA_KEYS
+            )
+            count = int(pat.get("count") or 1)
             skel = str(pat.get("skeleton") or _pattern_signature(pat))
             sample = str(pat.get("doi") or "").strip()
-            meta_bits = [
-                f"count={int(pat.get('count') or 1)}",
-                f"areas={';'.join(pat.get('sections') or []) or '-'}",
-            ]
+            meta_bits = [f"n={count}", skel]
             if sample:
-                meta_bits.append(f"sampleDOI={sample}")
+                meta_bits.append(sample)
             body_rows.append(
                 f'<tr class="pattern-row" data-client="{_esc(client)}">'
-                f'<td class="pattern-label" colspan="5">pattern-{int(pat["pattern_num"])}'
-                f' <span class="pattern-meta">{_esc(" · ".join(meta_bits))}</span>'
-                f"<br/><code>{_esc(skel)}</code></td></tr>"
+                f'<td class="pattern-label">pattern-{int(pat["pattern_num"])}'
+                f' <span class="pattern-meta">{_esc(" · ".join(meta_bits))}</span></td>'
+                f"<td></td>{marks}</tr>"
             )
 
-    # Overall Totals across all clients
-    g_uri = sum(int((i.get("totals") or {}).get("doi_text_uri") or 0) for i in summary)
-    g_doi = sum(int((i.get("totals") or {}).get("doi_text_doi") or 0) for i in summary)
-    g_reg = sum(int((i.get("totals") or {}).get("regular_text_uri") or 0) for i in summary)
-    g_all = sum(int((i.get("totals") or {}).get("overall_count") or 0) for i in summary)
-    _pct, g_doi_disp = _format_doi_pct(g_doi, g_all or grand)
-    body_rows.append(
-        '<tr class="grand-total-row">'
-        "<td><b>Overall Totals</b></td>"
-        f"<td><b>{g_uri}</b></td>"
-        f"<td><b>{_esc(g_doi_disp if g_doi or g_all else '0')}</b></td>"
-        f"<td><b>{g_reg}</b></td>"
-        f"<td><b>{g_all}</b></td>"
-        "</tr>"
+
+    if not body_rows:
+        body_rows.append(
+            f"<tr><td colspan='{2 + len(CLIENT_SUMMARY_AREA_KEYS)}'>"
+            "<em>No clients.</em></td></tr>"
+        )
+
+    head = (
+        "<th>Client</th><th>Scan docs</th>"
+        + "".join(f"<th>{_esc(label)}</th>" for label, _ in CLIENT_SUMMARY_AREA_KEYS)
     )
-
-    if not summary:
-        body_rows = ["<tr><td colspan='5'><em>No clients.</em></td></tr>"]
-
     return (
         '<table class="client-summary-table"><thead><tr>'
-        "<th>Client / Area</th><th>doi_text_uri</th><th>doi_text_doi (with %)</th>"
-        "<th>regular_text_uri</th><th>Overall_Count</th>"
-        f"</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"
+        f"{head}</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"
     )
 
 
@@ -1248,7 +1108,7 @@ def _client_summary_panel_html(
     title: str = "Client-wise summary",
     patterns: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Shareable blurb + nested Client/Area bucket table + chart + pattern details."""
+    """Shareable blurb + area-% table (with pattern rows) + grouped chart + details."""
     pats = patterns or []
     total_scanned = sum(int(item["scanned_document_count"]) for item in summary)
     total_issues = sum(int(item["issue_document_count"]) for item in summary)
@@ -1278,7 +1138,7 @@ def _client_summary_panel_html(
 def _client_summary_css() -> str:
     """CSS shared by standalone client_summary HTML and embedded panels."""
     return (
-        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table tr.area-header-row th{color:#94a3b8;font-weight:600;font-size:12px;background:#111827}.client-summary-table tr.area-row td{background:#0f172a}.client-summary-table td.area-label{padding-left:18px;color:#cbd5e1}.client-summary-table tr.client-total-row td{background:#1e293b;border-top:1px solid #475569}.client-summary-table tr.grand-total-row td{background:#312e81;font-weight:700}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
+        ".client-summary-panel{background:#1e293b;border-radius:10px;padding:16px;margin-bottom:24px}.client-summary-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}.kpi{background:#0f172a;border-radius:10px;padding:14px 18px;min-width:110px;border-left:4px solid #6366f1}.kpi.warn{border-left-color:#f59e0b}.kpi-n{font-size:22px;font-weight:700;color:#34d399}.kpi.warn .kpi-n{color:#fbbf24}.kpi-l{font-size:12px;color:#94a3b8}.client-summary-blurb{margin:8px 0 16px;line-height:1.45}.client-summary-table{width:100%;border-collapse:collapse;font-size:13px;background:#0f172a;margin:12px 0 20px}.client-summary-table th,.client-summary-table td{border-bottom:1px solid #334155;padding:8px 10px;text-align:left;vertical-align:top}.client-summary-table th{color:#94a3b8;font-weight:600}.client-summary-table tr.client-row td{background:#111827}.client-summary-table tr.pattern-row td{background:#0f172a;color:#cbd5e1;font-size:12px}.client-summary-table td.pattern-label{padding-left:28px;font-family:ui-monospace,Consolas,monospace}.pattern-meta{color:#64748b;font-weight:400;margin-left:6px}.area-cell{white-space:nowrap}.area-mark{text-align:center;color:#a5b4fc;font-size:14px}.area-chart{margin:0 0 20px}.area-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.area-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}.area-legend-item .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.area-chart-row{display:grid;grid-template-columns:minmax(100px,160px) 1fr;gap:12px;align-items:end;margin:14px 0}.area-chart-label{font-size:13px;font-weight:600;padding-bottom:18px}.grouped-bars{display:flex;gap:8px;align-items:flex-end;min-height:110px}.gbar{width:44px;text-align:center}.gbar-fill{width:100%;min-height:2px;border-radius:6px 6px 0 0;background:#64748b}.gbar-lab{font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all}.gbar-pct{font-size:11px;color:#e2e8f0;font-weight:600}.cause-chart-note{color:#94a3b8}.client-summary-details{margin-top:22px}details.client-details,details.file-details{background:#0f172a;border:1px solid #334155;border-radius:8px;margin:10px 0;padding:8px 12px}details.client-details>summary,details.file-details>summary{cursor:pointer;font-weight:600}details .cnt{font-weight:400;color:#94a3b8;font-size:12px;margin-left:8px}.pattern-block{border-left:3px solid #6366f1;padding:8px 12px;margin:10px 0;background:#1e293b;border-radius:6px}.pattern-h .kind{color:#fbbf24;font-size:12px;margin-left:8px}.pattern-doi{margin:6px 0;font-size:13px}.pattern-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.side-label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.side .attrs{color:#94a3b8;font-size:12px}.side .sample{margin-top:4px;font-size:12px;color:#cbd5e1;word-break:break-word}.pattern-sections{font-size:12px;color:#94a3b8}code{background:#334155;padding:1px 5px;border-radius:4px;font-size:12px}"
     )
 
 
@@ -1288,7 +1148,7 @@ def write_client_summary(
     *,
     basename: str = "client_summary",
 ) -> tuple[Path, Path]:
-    """Write nested Client/Area bucket summary HTML + CSV."""
+    """Write shareable client-wise area-% summary HTML + hybrid client/pattern CSV."""
     ensure_dir(report_dir)
     summary = compute_client_summary(rows)
     patterns = find_kind_v1_patterns(rows)
@@ -1304,42 +1164,12 @@ def write_client_summary(
         writer.writerow(CLIENT_SUMMARY_HEADERS)
         for item in summary:
             client = str(item["client"])
-            for label, _ in CLIENT_SUMMARY_AREA_KEYS:
-                area = item["areas"][label]
-                writer.writerow(
-                    [
-                        "area",
-                        client,
-                        label,
-                        int(area["doi_text_uri"]),
-                        int(area["doi_text_doi"]),
-                        area.get("doi_text_doi_display") or str(area["doi_text_doi"]),
-                        int(area["regular_text_uri"]),
-                        int(area["overall_count"]),
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                    ]
-                )
-            tot = item.get("totals") or {}
             writer.writerow(
                 [
-                    "client_total",
+                    "client",
                     client,
-                    "",
-                    int(tot.get("doi_text_uri") or 0),
-                    int(tot.get("doi_text_doi") or 0),
-                    tot.get("doi_text_doi_display") or str(tot.get("doi_text_doi") or 0),
-                    int(tot.get("regular_text_uri") or 0),
-                    int(tot.get("overall_count") or 0),
+                    int(item["scanned_document_count"]),
+                    *[item["areas"][label]["display"] for label, _ in CLIENT_SUMMARY_AREA_KEYS],
                     "",
                     "",
                     "",
@@ -1353,23 +1183,21 @@ def write_client_summary(
                     "",
                 ]
             )
-            for pat in sorted(
+            pats = sorted(
                 by_client.get(client, []),
                 key=lambda p: (
                     int(p.get("pattern_num") or 0),
+                    str((p.get("sections") or [""])[0]),
                     str(p.get("skeleton") or "").lower(),
                 ),
-            ):
+            )
+            for pat in pats:
                 writer.writerow(
                     [
                         "pattern",
                         client,
-                        ";".join(pat.get("sections") or []),
                         "",
-                        "",
-                        "",
-                        "",
-                        int(pat.get("count") or 1),
+                        *[_area_mark(pat.get("sections"), label) for label, _ in CLIENT_SUMMARY_AREA_KEYS],
                         pat["pattern_num"],
                         pat["kind"],
                         pat.get("skeleton") or _pattern_signature(pat),
@@ -1383,35 +1211,7 @@ def write_client_summary(
                         ";".join(pat.get("sections") or []),
                     ]
                 )
-        # grand totals
-        g_uri = sum(int((i.get("totals") or {}).get("doi_text_uri") or 0) for i in summary)
-        g_doi = sum(int((i.get("totals") or {}).get("doi_text_doi") or 0) for i in summary)
-        g_reg = sum(int((i.get("totals") or {}).get("regular_text_uri") or 0) for i in summary)
-        g_all = sum(int((i.get("totals") or {}).get("overall_count") or 0) for i in summary)
-        _pct, g_disp = _format_doi_pct(g_doi, g_all)
-        writer.writerow(
-            [
-                "overall_totals",
-                "",
-                "",
-                g_uri,
-                g_doi,
-                g_disp if g_doi or g_all else "0",
-                g_reg,
-                g_all,
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-            ]
-        )
+
 
     css = (
         "body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}"
@@ -1479,9 +1279,13 @@ def _pattern_signature(pat: dict[str, Any]) -> str:
 
 
 def _unique_finding_key(pat: dict[str, Any]) -> tuple[str, ...]:
-    """Unique key = kind + XML skeleton only (never DOI/text; areas collapsed)."""
+    """Unique key = kind + area + XML skeleton (sample DOI optional, not keyed)."""
     kind = str(pat.get("kind") or KIND_V1)
-    return ("skel", kind, _pattern_signature(pat))
+    area = str(pat.get("area") or "")
+    if not area:
+        secs = pat.get("sections") or []
+        area = str(secs[0]) if secs else ""
+    return ("skel", kind, area, _pattern_signature(pat))
 
 
 def _file_id_label(pat: dict[str, Any]) -> str:
@@ -1498,9 +1302,8 @@ def _file_id_label(pat: dict[str, Any]) -> str:
 def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Collapse Kind-v1 patterns into mail-sized unique findings.
 
-    Unique key = kind + XML skeleton only (tag+attr names; values stripped;
-    never DOI/text; areas collapsed into one finding). Counts + optional 1
-    sample DOI; file-ids collapsed to count + 1-2 examples.
+    Unique key = kind + area + XML skeleton (tag+attr names; values stripped).
+    Counts + optional 1 sample DOI; file-ids collapsed to count + 1-2 examples.
     """
     patterns = find_kind_v1_patterns(rows)
     buckets: dict[tuple[str, ...], dict[str, Any]] = {}
@@ -1515,7 +1318,6 @@ def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             entry = {
                 "kind": str(pat.get("kind") or KIND_V1),
                 "area": area,
-                "areas": set(),
                 "doi": str(pat.get("doi") or "").strip(),
                 "pattern": _pattern_signature(pat),
                 "sample": (
@@ -1528,13 +1330,6 @@ def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "count_sum": 0,
             }
             buckets[key] = entry
-        if "areas" not in entry:
-            entry["areas"] = set()
-        for sec in pat.get("sections") or ([] if not area else [area]):
-            if sec:
-                entry["areas"].add(str(sec))
-        if area:
-            entry["areas"].add(area)
         client = str(pat.get("client") or "unknown")
         entry["clients"].add(client)
         entry["count_sum"] += int(pat.get("count") or 1)
@@ -1569,12 +1364,10 @@ def compute_unique_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             example_display = "-"
         issue_docs = int(entry.get("count_sum") or len(file_ids) or 0)
-        areas_sorted = sorted(entry.get("areas") or set())
-        area_display = ";".join(areas_sorted) if areas_sorted else (entry.get("area") or "-")
         findings.append(
             {
                 "kind": entry["kind"],
-                "area": area_display,
+                "area": entry.get("area") or "-",
                 "pattern": entry["pattern"],
                 "doi_or_sample": entry["doi"] or "",
                 "doi": entry["doi"],
@@ -1632,8 +1425,8 @@ def format_unique_findings_mail_body(
             f"Clients: {len(clients)}"
         ),
         (
-            "Unique key = kind + XML skeleton only "
-            "(tag+attr names; values stripped; never DOI/text; areas collapsed). "
+            "Unique key = kind + area + XML skeleton "
+            "(tag+attr names; values stripped). "
             "Counts + optional sample DOI; file-ids collapsed to 1–2 examples."
         ),
         "",
@@ -1769,8 +1562,8 @@ def write_unique_findings(
             "<h1>Unique Findings Digest</h1>",
             f'<div class="meta">REPORT_VERSION={REPORT_VERSION} · mail-sized · '
             "full client_summary / inconsistency reports stay on disk</div>",
-            '<p class="note">Unique key = kind + XML skeleton only '
-            "(tag+attr names; values stripped; never DOI/text; areas collapsed). Same-area only. "
+            '<p class="note">Unique key = kind + area + XML skeleton '
+            "(tag+attr names; values stripped). Same-area only. "
             "Counts + optional sample DOI; file-ids collapsed to 1–2 examples.</p>",
             kpi,
             _unique_findings_table_html(findings),
@@ -1864,14 +1657,6 @@ def _inconsistency_section_html(
                     "client": client,
                     "scanned_document_count": len(docs),
                     "issue_document_count": len(docs),
-                    "totals": {
-                        "doi_text_uri": 0,
-                        "doi_text_doi": 0,
-                        "doi_text_doi_pct": 0.0,
-                        "doi_text_doi_display": "0",
-                        "regular_text_uri": 0,
-                        "overall_count": 0,
-                    },
                     "areas": _empty_areas(),
                 }
                 for client, docs in sorted(
