@@ -105,6 +105,10 @@
         {
           "id": "dtd_report",
           "label": "DTD Report"
+        },
+        {
+          "id": "fn_group_report",
+          "label": "Footnotes Group Report"
         }
       ]
     },
