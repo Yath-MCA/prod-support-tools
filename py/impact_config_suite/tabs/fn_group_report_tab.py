@@ -24,6 +24,9 @@ class FnGroupReportTab(ttk.Frame):
         self.cancelled = False
         self.last_report_path: str | None = None
         self.last_report_dir: str | None = None
+        self.last_csv_path: str | None = None
+        self.last_tsv_path: str | None = None
+        self.last_id_csv_path: str | None = None
         self._build_ui()
 
     def _build_ui(self):
@@ -170,7 +173,25 @@ class FnGroupReportTab(ttk.Frame):
             bg="#7c3aed", fg="white", font=("Segoe UI", 10, "bold"),
             border=0, padx=16, pady=12, state="disabled", cursor="hand2",
         )
-        self.open_last_btn.pack(side="right")
+        self.open_last_btn.pack(side="right", padx=(10, 0))
+        self.open_csv_btn = tk.Button(
+            btn_fr, text="Open Unique CSV", command=self._open_unique_csv,
+            bg="#0ea5e9", fg="white", font=("Segoe UI", 10, "bold"),
+            border=0, padx=16, pady=12, state="disabled", cursor="hand2",
+        )
+        self.open_csv_btn.pack(side="right", padx=(10, 0))
+        self.open_tsv_btn = tk.Button(
+            btn_fr, text="Open Detail TSV", command=self._open_detail_tsv,
+            bg="#0284c7", fg="white", font=("Segoe UI", 10, "bold"),
+            border=0, padx=16, pady=12, state="disabled", cursor="hand2",
+        )
+        self.open_tsv_btn.pack(side="right", padx=(10, 0))
+        self.open_id_csv_btn = tk.Button(
+            btn_fr, text="Open ID Patterns CSV", command=self._open_id_patterns_csv,
+            bg="#0369a1", fg="white", font=("Segoe UI", 10, "bold"),
+            border=0, padx=16, pady=12, state="disabled", cursor="hand2",
+        )
+        self.open_id_csv_btn.pack(side="right")
 
         tk.Label(
             main, text="Activity log:", bg="#1e293b", fg="#94a3b8",
@@ -269,12 +290,22 @@ class FnGroupReportTab(ttk.Frame):
             return
         self.last_report_path = result.get("html_path")
         self.last_report_dir = result.get("report_dir")
+        self.last_csv_path = result.get("csv_path")
+        self.last_tsv_path = result.get("tsv_path")
+        self.last_id_csv_path = result.get("id_patterns_csv_path")
         self.open_folder_btn.config(state="normal")
         if self.last_report_path and Path(self.last_report_path).is_file():
             self.open_last_btn.config(state="normal")
+        if self.last_csv_path and Path(self.last_csv_path).is_file():
+            self.open_csv_btn.config(state="normal")
+        if self.last_tsv_path and Path(self.last_tsv_path).is_file():
+            self.open_tsv_btn.config(state="normal")
+        if self.last_id_csv_path and Path(self.last_id_csv_path).is_file():
+            self.open_id_csv_btn.config(state="normal")
         self.status_var.set(
             f"Done - {result.get('n_docs', 0)} BITS doc(s), "
-            f"{result.get('n_unique', 0)} unique pattern(s). "
+            f"{result.get('n_unique', 0)} unique pattern(s), "
+            f"{result.get('excluded_table_fn', 0)} table-fn skipped. "
             f"Report: {self.last_report_dir}"
         )
         self._log(f"Report folder: {self.last_report_dir}")
@@ -301,3 +332,18 @@ class FnGroupReportTab(ttk.Frame):
             messagebox.showinfo("Footnotes Group Report", "No report available yet.")
             return
         webbrowser.open(Path(self.last_report_path).as_uri())
+
+    def _open_path_file(self, path: str | None, label: str):
+        if not path or not Path(path).is_file():
+            messagebox.showinfo("Footnotes Group Report", f"No {label} available yet.")
+            return
+        os.startfile(str(path))  # noqa: S606 - Windows open file
+
+    def _open_unique_csv(self):
+        self._open_path_file(self.last_csv_path, "unique patterns CSV")
+
+    def _open_detail_tsv(self):
+        self._open_path_file(self.last_tsv_path, "detail TSV")
+
+    def _open_id_patterns_csv(self):
+        self._open_path_file(self.last_id_csv_path, "ID patterns CSV")

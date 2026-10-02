@@ -1,19 +1,22 @@
 # Footnotes Group Report (BITS) — Design
 
 Date: 2026-10-02  
-Status: approved  
+Status: approved (v2 extensions)  
 Suite: impact_config_suite  
-Approach: 1 (enrich meta + dedicated report)
+Approach: 1 (enrich meta + dedicated report)  
+Report version: 2
 
 ## Goal
 
 For **BITS books only**, discover unique `fn-group` and `ref-list` structural patterns (CSS-like selectors with volatile `id` dropped), keyed by **client × DTD basename × kind × placement**, and persist `dtd_basename` into both `meta.json` and `documents.json`.
 
+Also roll up **ID patterns by area category** (reuse ID Pattern Extractor normalizer) and expose Open File / Copy Path actions in the HTML report.
+
 ## Non-goals
 
 - Do not change Analyses / book_analyzer xref HTML.
-- Do not scan JATS articles in v1.
-- Do not hard-fail on client/DTD mismatch (soft warning only).
+- Do not scan JATS articles in v1/v2.
+- Do not hard-fail on client/DTD mismatch or multiple book-end fn-groups (soft warning only).
 - Do not hard-code OHO|OXMEDO|LSE until those clients appear in the corpus.
 
 ## Locked decisions
@@ -27,60 +30,75 @@ For **BITS books only**, discover unique `fn-group` and `ref-list` structural pa
 | Persist | `dtd_basename` on meta.json **and** documents.json embedded `meta` |
 | Placement | `chapter-end` \| `book-end` \| `front-matter` \| `other` for fn-group **and** ref-list |
 | Soft map | `BITS-book-oasis2-1.dtd` → OSO\|OHO\|OXMEDO; `BITS.dtd` → LSE\|TNF |
+| Exclude | `fn-group[content-type="table-fn"]` skipped entirely |
+| Book-end | Under `.book-back` only (never `.book-body`); expect **one** fn-group per book |
 
 ## Architecture
 
-1. Load project (`documents.json` + `meta.json`) via same collect pattern as Sectional/DTD Report.
-2. Filter to BITS books (`dtd == "BITS"` and/or `type == "Books"` / folder under `BITS/`).
-3. Parse DOCTYPE (reuse `core.dtd_report.parse_doctype_text` / `dtd_basename`); use `NO_DTD` when missing.
-4. Optionally write `dtd_basename` into meta.json and documents.json `meta` (default on).
-5. Parse XML → all `fn-group` and `ref-list` → normalize pattern + classify placement.
-6. Roll up unique rows → HTML + CSV + detail TSV under `impact-support-log/{ts}_fn_group_reports/`.
+1. Load project (`documents.json` + `meta.json`); filter BITS books first.
+2. Parse DOCTYPE → `dtd_basename` (`NO_DTD` if missing).
+3. Optionally write `dtd_basename` into meta.json and documents.json `meta`.
+4. Parse XML → `fn-group` / `ref-list` (skip `table-fn`) → pattern + placement + id_pattern + area.
+5. Soft-warn when a doc has **>1** book-end `fn-group`.
+6. Roll up structural unique rows + parallel ID-pattern unique rows → HTML / CSV / TSV.
 
 ## Pattern rules
 
-- CSS-like ancestor chain from document root to target element.
-- Keep discriminating attrs: `book-part-type`, `content-type`, `class` on ancestors and on the target.
-- Always omit `id` (and other volatile attrs).
-- Uniqueness key: `(client, dtd_basename, kind, placement, pattern_xpath)` where `kind ∈ {fn-group, ref-list}`.
+- CSS-like ancestor chain; keep `book-part-type`, `content-type`, `class`; omit `id`.
+- Structural uniqueness: `(client, dtd_basename, kind, placement, pattern_xpath)`.
+- ID uniqueness (parallel): `(client, dtd_basename, kind, area_category, id_pattern)`.
 
 Examples:
 
-- TNF / `BITS.dtd`: `.book-body .book-part[book-part-type="chapter"] .back .fn-group[content-type="endnotes"]`
-- OSO / oasis: same path with `[content-type="footnotes"]`; also front-matter nested groups
+- TNF chapter-end: `.book-body .book-part[book-part-type="chapter"] .back .fn-group[content-type="endnotes"]`
+- Book-end: `.book-back … .fn-group[content-type="endnotes"]` (must include `.book-back`, not `.book-body`)
 
-## Placement
+## Placement semantics
 
-| Placement | Signal |
-|-----------|--------|
-| `chapter-end` | Under `book-part` … `/back/{fn-group\|ref-list}` |
-| `book-end` | Under `book-back` |
-| `front-matter` | Under `front-matter` / `front-matter-part` |
-| `other` | Else |
+| Kind + placement | Path | Cardinality |
+|------------------|------|-------------|
+| `fn-group` + chapter-end | `.book-body` … `.back .fn-group` | Multiple OK |
+| `fn-group` + book-end | `.book-back` only | **One** expected; else `multiple_book_end_fn_group` |
+| `fn-group` + front-matter | `.front-matter` … | as found |
+| `ref-list` | same ancestor rules | as found |
+
+## Filters
+
+- Skip `fn-group` with `content-type="table-fn"` (count in KPI `table-fn skipped`).
+
+## ID pattern + area
+
+- `id_pattern` via `IDPatternExtractor.normalize_id_to_pattern`.
+- `area_category` via `_determine_area` with Books keys `front` / `body` / `back` (fallback `unknown`).
 
 ## Meta enrich
 
-- Field: `dtd_basename` (e.g. `BITS.dtd`, `BITS-book-oasis2-1.dtd`, `NO_DTD`).
+- Field: `dtd_basename` (`BITS.dtd`, `BITS-book-oasis2-1.dtd`, `NO_DTD`).
 - Leave folder-level `dtd: "BITS"` unchanged.
-- Soft warning column when client’s expected DTD family ≠ observed basename.
+- Soft DTD-family mismatch warning by client.
 
 ## Modules
 
 - `core/fn_group_report.py` — enrich + scan + writers
-- `tabs/fn_group_report_tab.py` — GUI
+- `tabs/fn_group_report_tab.py` — GUI (Open HTML / Folder / Unique CSV / Detail TSV / ID Patterns CSV)
 - `tests/test_fn_group_report.py`
-- Nav: Configuration → **Footnotes Group Report** (beside DTD Report)
+- Nav: Configuration → **Footnotes Group Report**
 
 ## Outputs
 
-- Summary HTML (filters: client / DTD / kind / placement)
-- Unique patterns CSV
-- Detail TSV (one row per occurrence)
-- Errors/skips for missing/unparseable XML
+Under `Documents/impact-support-log/{ts}_fn_group_reports/`:
+
+- `summary.html` — structural patterns + ID patterns + scanned docs (Open File / Copy Path)
+- `unique_patterns.csv`
+- `unique_id_patterns.csv`
+- `detail.tsv`
 
 ## Testing
 
-- Normalize drops `id`, keeps `content-type` / `book-part-type`.
-- Two chapter-end endnotes groups → one unique key.
-- `book-back/ref-list` → `book-end`.
-- Enrich writes both JSON files; oasis SYSTEM → `BITS-book-oasis2-1.dtd`.
+- Drop `id`; keep stable attrs.
+- Exclude `table-fn`.
+- Two chapter-end endnotes → one unique key; under `.book-body`.
+- Book-end under `.book-back` only; multi book-end → soft warning.
+- ID pattern + area (`fn-group-{nnn}`, `workid-{work}-…`, body/front).
+- Enrich writes both JSON files.
+- HTML contains Open File / Copy Path.

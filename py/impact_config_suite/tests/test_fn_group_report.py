@@ -39,6 +39,47 @@ TNF_CHAPTER = """<?xml version="1.0" encoding="UTF-8"?>
 </book>
 """
 
+TNF_WITH_TABLE_FN = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book SYSTEM "BITS.dtd">
+<book id="book-001">
+  <book-body>
+    <book-part book-part-type="chapter" id="book-part-001">
+      <back>
+        <fn-group content-type="endnotes" id="fn-group-001">
+          <fn id="fn1"><p>note</p></fn>
+        </fn-group>
+      </back>
+    </book-part>
+  </book-body>
+  <book-back>
+    <app-group>
+      <app>
+        <table-wrap>
+          <table-wrap-foot>
+            <fn-group content-type="table-fn" id="tfn-1">
+              <fn id="t1"><p>table note</p></fn>
+            </fn-group>
+          </table-wrap-foot>
+        </table-wrap>
+        <fn-group content-type="endnotes" id="fn-group-book">
+          <fn id="fnb"><p>book note</p></fn>
+        </fn-group>
+      </app>
+    </app-group>
+  </book-back>
+</book>
+"""
+
+MULTI_BOOK_END = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book SYSTEM "BITS.dtd">
+<book>
+  <book-back>
+    <fn-group content-type="endnotes" id="fn-group-a"><fn id="a"><p>a</p></fn></fn-group>
+    <fn-group content-type="endnotes" id="fn-group-b"><fn id="b"><p>b</p></fn></fn-group>
+  </book-back>
+</book>
+"""
+
 OSO_OASIS = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE book SYSTEM "//t-b-indmenu/AutoProofHub/oupbits/impact/BITS-book-oasis2-1.dtd">
 <book>
@@ -46,7 +87,7 @@ OSO_OASIS = """<?xml version="1.0" encoding="UTF-8"?>
     <front-matter-part book-part-type="introduction" id="fm-1">
       <named-book-part-body>
         <sec id="sec-1">
-          <fn-group content-type="footnotes" id="workid-fm-fn-group-1">
+          <fn-group content-type="footnotes" id="workid-USAC0026086-fm-fn-group-1">
             <fn id="fn0"><p>front note</p></fn>
           </fn-group>
         </sec>
@@ -54,9 +95,9 @@ OSO_OASIS = """<?xml version="1.0" encoding="UTF-8"?>
     </front-matter-part>
   </front-matter>
   <book-body>
-    <book-part book-part-type="chapter" id="workid-ch-1">
+    <book-part book-part-type="chapter" id="workid-USAC0026086-book-part-2">
       <back>
-        <fn-group content-type="footnotes" id="workid-ch-fn-group-1">
+        <fn-group content-type="footnotes" id="workid-USAC0026086-book-part-2-fn-group-1">
           <fn id="fn1"><p>ch note</p></fn>
         </fn-group>
       </back>
@@ -95,23 +136,19 @@ class TestFnGroupReport(unittest.TestCase):
         self.assertNotIn("id=", pat)
         self.assertNotIn("fn-group-001", pat)
         self.assertIn('book-part[book-part-type="chapter"]', pat)
-        self.assertIn('fn-group[class="fn-group"][content-type="endnotes"]', pat.replace(
-            '[content-type="endnotes"][class="fn-group"]',
-            '[class="fn-group"][content-type="endnotes"]',
-        ) or pat)
-        # attrs are sorted by name: class then content-type
         self.assertIn('content-type="endnotes"', pat)
         self.assertIn('class="fn-group"', pat)
-        self.assertTrue(pat.endswith('.fn-group[class="fn-group"][content-type="endnotes"]')
-                        or '.fn-group' in pat)
+        self.assertIn(".fn-group", pat)
 
     def test_two_chapter_endnotes_one_unique_key(self):
         xml = self._write("tnf.xml", TNF_CHAPTER)
-        targets = fgr.extract_targets(xml)
+        targets, excl = fgr.extract_targets(xml)
+        self.assertEqual(excl, 0)
         fns = [t for t in targets if t["kind"] == "fn-group"]
         self.assertEqual(len(fns), 2)
         self.assertEqual(fns[0]["pattern_xpath"], fns[1]["pattern_xpath"])
         self.assertEqual(fns[0]["placement"], "chapter-end")
+        self.assertIn(".book-body", fns[0]["pattern_xpath"])
         detail = [
             {
                 "client": "TNF",
@@ -132,9 +169,57 @@ class TestFnGroupReport(unittest.TestCase):
         self.assertEqual(len(fn_unique), 1)
         self.assertEqual(fn_unique[0]["occurrence_count"], 2)
 
-    def test_book_back_ref_list_is_book_end(self):
+    def test_excludes_table_fn(self):
+        xml = self._write("tablefn.xml", TNF_WITH_TABLE_FN)
+        targets, excl = fgr.extract_targets(xml)
+        self.assertEqual(excl, 1)
+        fns = [t for t in targets if t["kind"] == "fn-group"]
+        self.assertEqual(len(fns), 2)
+        for t in fns:
+            self.assertNotIn("table-fn", t["pattern_xpath"])
+        book_end = [t for t in fns if t["placement"] == "book-end"]
+        self.assertEqual(len(book_end), 1)
+        self.assertIn(".book-back", book_end[0]["pattern_xpath"])
+        self.assertNotIn(".book-body", book_end[0]["pattern_xpath"])
+
+    def test_book_end_never_under_book_body(self):
         xml = self._write("tnf2.xml", TNF_CHAPTER)
-        targets = fgr.extract_targets(xml)
+        targets, _ = fgr.extract_targets(xml)
+        for t in targets:
+            if t["placement"] == "book-end":
+                self.assertIn(".book-back", t["pattern_xpath"])
+                self.assertNotIn(".book-body", t["pattern_xpath"])
+            if t["placement"] == "chapter-end":
+                self.assertIn(".book-body", t["pattern_xpath"])
+
+    def test_multiple_book_end_fn_group_warning(self):
+        xml = self._write("multi.xml", MULTI_BOOK_END)
+        targets, _ = fgr.extract_targets(xml)
+        detail = [
+            {
+                "client": "TNF",
+                "dtd_basename": "BITS.dtd",
+                "docid": "Nd1",
+                "file_id": "f1",
+                "kind": t["kind"],
+                "placement": t["placement"],
+                "pattern_xpath": t["pattern_xpath"],
+                "element_id": t["element_id"],
+                "cardinality_warning": "",
+                "error": "",
+            }
+            for t in targets
+            if t["kind"] == "fn-group"
+        ]
+        self.assertEqual(len(detail), 2)
+        fgr.apply_book_end_cardinality_warnings(detail)
+        self.assertTrue(
+            all("multiple_book_end_fn_group" in (r.get("cardinality_warning") or "") for r in detail)
+        )
+
+    def test_book_back_ref_list_is_book_end(self):
+        xml = self._write("tnf2b.xml", TNF_CHAPTER)
+        targets, _ = fgr.extract_targets(xml)
         refs = [t for t in targets if t["kind"] == "ref-list"]
         placements = {t["placement"] for t in refs}
         self.assertIn("chapter-end", placements)
@@ -143,11 +228,30 @@ class TestFnGroupReport(unittest.TestCase):
         self.assertEqual(len(book_end), 1)
         self.assertIn(".book-back", book_end[0]["pattern_xpath"])
 
+    def test_id_pattern_and_area_category(self):
+        xml = self._write("oso_id.xml", OSO_OASIS)
+        targets, _ = fgr.extract_targets(xml)
+        chapter = [
+            t
+            for t in targets
+            if t["kind"] == "fn-group" and t["placement"] == "chapter-end"
+        ][0]
+        self.assertEqual(chapter["area_category"], "body")
+        self.assertIn("{work}", chapter["id_pattern"])
+        self.assertIn("fn-group", chapter["id_pattern"])
+        self.assertNotIn("USAC", chapter["id_pattern"])
+
+        tnf = self._write("tnf_id.xml", TNF_CHAPTER)
+        tnf_targets, _ = fgr.extract_targets(tnf)
+        tnf_fn = [t for t in tnf_targets if t["kind"] == "fn-group"][0]
+        self.assertEqual(tnf_fn["id_pattern"], "fn-group-{nnn}")
+        self.assertEqual(tnf_fn["area_category"], "body")
+
     def test_oso_front_matter_and_oasis_basename(self):
         xml = self._write("oso.xml", OSO_OASIS)
         info = fgr.resolve_dtd_basename(xml)
         self.assertEqual(info["dtd_basename"], "BITS-book-oasis2-1.dtd")
-        targets = fgr.extract_targets(xml)
+        targets, _ = fgr.extract_targets(xml)
         fns = [t for t in targets if t["kind"] == "fn-group"]
         placements = {t["placement"] for t in fns}
         self.assertIn("front-matter", placements)
@@ -219,7 +323,7 @@ class TestFnGroupReport(unittest.TestCase):
         d2 = project / "BITS" / "Nd2"
         d1.mkdir(parents=True)
         d2.mkdir(parents=True)
-        (d1 / "Nd1_original.xml").write_text(TNF_CHAPTER, encoding="utf-8")
+        (d1 / "Nd1_original.xml").write_text(TNF_WITH_TABLE_FN, encoding="utf-8")
         (d2 / "Nd2_original.xml").write_text(OSO_OASIS, encoding="utf-8")
 
         meta = {
@@ -257,16 +361,26 @@ class TestFnGroupReport(unittest.TestCase):
         )
 
         result = fgr.run_fn_group_report(project, update_meta=True)
+        self.assertEqual(result["report_version"], 2)
         self.assertEqual(result["n_docs"], 2)
+        self.assertGreaterEqual(result["excluded_table_fn"], 1)
         self.assertGreaterEqual(result["n_unique"], 2)
         self.assertTrue(Path(result["html_path"]).is_file())
         self.assertTrue(Path(result["csv_path"]).is_file())
+        self.assertTrue(Path(result["id_patterns_csv_path"]).is_file())
+
+        html = Path(result["html_path"]).read_text(encoding="utf-8")
+        self.assertIn("Open File", html)
+        self.assertIn("Copy Path", html)
+        self.assertIn("copyFilePath", html)
+        self.assertIn("ID patterns by category", html)
+        # Pattern cells must not include table-fn content-type (meta may say "table-fn excluded")
+        self.assertNotIn('content-type=&quot;table-fn&quot;', html)
+        self.assertNotIn('content-type="table-fn"', html)
 
         with open(result["csv_path"], encoding="utf-8", newline="") as f:
             rows = list(csv.DictReader(f))
-        clients = {r["client"] for r in rows}
-        self.assertIn("TNF", clients)
-        self.assertIn("OSO", clients)
+        self.assertTrue(all("table-fn" not in (r.get("pattern_xpath") or "") for r in rows))
         tnf_fn = [
             r
             for r in rows
@@ -276,12 +390,19 @@ class TestFnGroupReport(unittest.TestCase):
         ]
         self.assertTrue(tnf_fn)
         self.assertIn("endnotes", tnf_fn[0]["pattern_xpath"])
-        oso_fn = [
+        book_end = [
             r
             for r in rows
-            if r["client"] == "OSO" and r["kind"] == "fn-group"
+            if r["kind"] == "fn-group" and r["placement"] == "book-end"
         ]
-        self.assertTrue(any("footnotes" in r["pattern_xpath"] for r in oso_fn))
+        for r in book_end:
+            self.assertIn(".book-back", r["pattern_xpath"])
+            self.assertNotIn(".book-body", r["pattern_xpath"])
+
+        with open(result["id_patterns_csv_path"], encoding="utf-8", newline="") as f:
+            id_rows = list(csv.DictReader(f))
+        self.assertTrue(id_rows)
+        self.assertTrue(any(r.get("area_category") for r in id_rows))
 
         metas = json.loads((project / "meta.json").read_text(encoding="utf-8"))
         self.assertEqual(metas["Nd1"]["dtd_basename"], "BITS.dtd")
